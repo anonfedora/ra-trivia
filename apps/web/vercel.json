@@ -1,6 +1,3 @@
 {
-    "framework": "nextjs",
-    "buildCommand": "cd ../.. && pnpm install --frozen-lockfile && cd apps/web && pnpm run build",
-    "outputDirectory": ".next",
-    "installCommand": "npm install -g pnpm"
+    "framework": "nextjs"
 }
