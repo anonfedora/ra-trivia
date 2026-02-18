@@ -5,7 +5,7 @@
   "main": "index.js",
   "scripts": {
     "dev": "ts-node-dev --respawn --transpile-only src/index.ts",
-    "build": "npx prisma@6.19.2 generate --schema=../../packages/database/prisma/schema.prisma && tsc",
+    "build": "prisma generate --schema=../../packages/database/prisma/schema.prisma && tsc",
     "start": "node dist/index.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
