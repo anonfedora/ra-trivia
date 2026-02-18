@@ -1,0 +1,20 @@
+services:
+  - type: web
+    name: ra-trivia-server
+    runtime: node
+    region: oregon
+    plan: free
+    rootDir: apps/server
+    buildCommand: npm install -g pnpm && pnpm install --frozen-lockfile && pnpm run build
+    startCommand: pnpm run start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        sync: false   # Set this manually in Render dashboard
+      - key: JWT_SECRET
+        sync: false   # Set this manually in Render dashboard
+      - key: RESEND_API_KEY
+        sync: false   # Set this manually in Render dashboard
+      - key: PORT
+        value: 4000

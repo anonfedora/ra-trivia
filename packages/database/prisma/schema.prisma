@@ -1,0 +1,64 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String        @id @default(uuid())
+  email     String        @unique
+  name      String
+  password  String
+  role      Role          @default(CANDIDATE)
+  church    String?
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+  sessions  QuizSession[]
+}
+
+model Question {
+  id            String   @id @default(uuid())
+  text          String
+  optionA       String
+  optionB       String
+  optionC       String
+  optionD       String
+  correctOption String
+  quizId        String
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  quiz          Quiz     @relation(fields: [quizId], references: [id])
+}
+
+model Quiz {
+  id        String        @id @default(uuid())
+  title     String
+  duration  Int
+  isActive  Boolean       @default(false)
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+  questions Question[]
+  sessions  QuizSession[]
+}
+
+model QuizSession {
+  id        String    @id @default(uuid())
+  startTime DateTime  @default(now())
+  endTime   DateTime?
+  score     Float?
+  answers   Json?
+  userId    String
+  quizId    String
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  quiz      Quiz      @relation(fields: [quizId], references: [id])
+  user      User      @relation(fields: [userId], references: [id])
+}
+
+enum Role {
+  ADMIN
+  CANDIDATE
+}
