@@ -5,7 +5,7 @@
   "main": "index.js",
   "scripts": {
     "dev": "ts-node-dev --respawn --transpile-only src/index.ts",
-    "build": "tsc",
+    "build": "pnpm exec prisma generate --schema=../../packages/database/prisma/schema.prisma && tsc",
     "start": "node dist/index.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
@@ -26,6 +26,13 @@
     "xlsx": "^0.18.5"
   },
   "devDependencies": {
-    "@types/multer": "^2.0.0"
+    "@types/bcryptjs": "^2.4.6",
+    "@types/cors": "^2.8.17",
+    "@types/express": "^5.0.0",
+    "@types/jsonwebtoken": "^9.0.7",
+    "@types/multer": "^2.0.0",
+    "@types/node": "^20.0.0",
+    "prisma": "6.19.2",
+    "typescript": "^5.0.0"
   }
 }

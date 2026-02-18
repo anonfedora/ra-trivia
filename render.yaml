@@ -4,9 +4,8 @@ services:
     runtime: node
     region: oregon
     plan: free
-    rootDir: apps/server
-    buildCommand: npm install -g pnpm && pnpm install --frozen-lockfile && pnpm run build
-    startCommand: pnpm run start
+    buildCommand: npm install -g pnpm && pnpm install --frozen-lockfile && pnpm run build --filter server
+    startCommand: node apps/server/dist/index.js
     envVars:
       - key: NODE_ENV
         value: production
