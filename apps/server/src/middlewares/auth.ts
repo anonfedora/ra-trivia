@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
+const JWT_SECRET = process.env.JWT_SECRET!; // Will be validated on startup
 
 export interface AuthRequest extends Request {
     user?: {
@@ -22,14 +22,14 @@ export const authenticate = (req: AuthRequest, res: Response, next: NextFunction
         req.user = decoded;
         next();
     } catch (error) {
-        res.status(401).json({ message: 'Invalid token' });
+        res.status(401).json({ message: 'Invalid or expired token' });
     }
 };
 
 export const authorize = (roles: string[]) => {
     return (req: AuthRequest, res: Response, next: NextFunction) => {
         if (!req.user || !roles.includes(req.user.role)) {
-            return res.status(403).json({ message: 'Forbidden' });
+            return res.status(403).json({ message: 'Forbidden: Insufficient permissions' });
         }
         next();
     };
@@ -37,7 +37,7 @@ export const authorize = (roles: string[]) => {
 
 export const authorizeAdmin = (req: AuthRequest, res: Response, next: NextFunction) => {
     if (req.user?.role !== 'ADMIN') {
-        return res.status(403).json({ message: 'Require Admin role' });
+        return res.status(403).json({ message: 'Forbidden: Admin access required' });
     }
     next();
 };

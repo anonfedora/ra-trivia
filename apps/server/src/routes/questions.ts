@@ -2,12 +2,30 @@ import { Router } from 'express';
 import { prisma } from 'database';
 import multer from 'multer';
 import * as xlsx from 'xlsx';
+import { authenticate, authorizeAdmin } from '../middlewares/auth';
 
 const router = Router();
-const upload = multer({ dest: 'uploads/' });
+const upload = multer({ 
+    dest: 'uploads/',
+    limits: {
+        fileSize: 5 * 1024 * 1024, // 5MB limit
+    },
+    fileFilter: (req, file, cb) => {
+        // Only allow Excel files
+        const allowedMimes = [
+            'application/vnd.ms-excel',
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        ];
+        if (allowedMimes.includes(file.mimetype)) {
+            cb(null, true);
+        } else {
+            cb(new Error('Only Excel files are allowed'));
+        }
+    }
+});
 
 // Admin: Import questions from Excel
-router.post('/import', upload.single('file'), async (req, res) => {
+router.post('/import', authenticate, authorizeAdmin, upload.single('file'), async (req, res) => {
     try {
         if (!req.file) {
             return res.status(400).json({ message: 'No file uploaded' });
@@ -103,10 +121,15 @@ router.post('/import', upload.single('file'), async (req, res) => {
     }
 });
 
-// Admin: Get all questions (for a quiz)
-router.get('/', async (req, res) => {
+// Admin: Get all questions (for a quiz) - Protected endpoint
+router.get('/', authenticate, authorizeAdmin, async (req, res) => {
     try {
         const { quizId } = req.query;
+        
+        if (!quizId) {
+            return res.status(400).json({ message: 'Quiz ID is required' });
+        }
+        
         const questions = await prisma.question.findMany({
             where: { quizId: quizId as string }
         });

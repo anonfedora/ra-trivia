@@ -1,18 +1,49 @@
-import { Router } from 'express';
+import { Router, Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { prisma } from 'database';
+import { body } from 'express-validator';
+import { handleValidationErrors } from '../middlewares/errorHandler';
+import { 
+    passwordValidation, 
+    emailValidation, 
+    nameValidation 
+} from '../utils/validation';
 
 const router = Router();
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
+const JWT_SECRET = process.env.JWT_SECRET!; // Will be validated on startup
 
-router.post('/register', async (req, res) => {
+// Registration validation rules
+const registerValidation = [
+    emailValidation(),
+    nameValidation(),
+    passwordValidation(),
+    body('church')
+        .optional()
+        .trim()
+        .isLength({ max: 200 })
+        .withMessage('Church name must not exceed 200 characters')
+        .escape(),
+    body('role')
+        .optional()
+        .isIn(['ADMIN', 'CANDIDATE'])
+        .withMessage('Role must be either ADMIN or CANDIDATE')
+];
+
+// Login validation rules
+const loginValidation = [
+    body('email')
+        .isEmail()
+        .withMessage('Please provide a valid email address')
+        .normalizeEmail(),
+    body('password')
+        .notEmpty()
+        .withMessage('Password is required')
+];
+
+router.post('/register', registerValidation, handleValidationErrors, async (req: Request, res: Response) => {
     try {
         const { email, name, password, church, role } = req.body;
-
-        if (!email || !name || !password) {
-            return res.status(400).json({ message: 'Email, name and password are required' });
-        }
 
         const existingUser = await prisma.user.findUnique({
             where: { email }
@@ -22,44 +53,60 @@ router.post('/register', async (req, res) => {
             return res.status(400).json({ message: 'User with this email already exists' });
         }
 
-        const hashedPassword = await bcrypt.hash(password, 10);
+        // Hash password with higher cost factor for better security
+        const hashedPassword = await bcrypt.hash(password, 12);
+        
         const user = await prisma.user.create({
             data: {
                 email,
                 name,
                 password: hashedPassword,
-                church,
+                church: church || null,
                 role: role || 'CANDIDATE'
             }
         });
 
         const token = jwt.sign({ userId: user.id, role: user.role }, JWT_SECRET, { expiresIn: '24h' });
-        res.status(201).json({ token, user: { id: user.id, name: user.name, email: user.email, role: user.role } });
+        res.status(201).json({ 
+            token, 
+            user: { 
+                id: user.id, 
+                name: user.name, 
+                email: user.email, 
+                role: user.role 
+            } 
+        });
     } catch (error) {
-        console.error(error);
+        console.error('Registration error:', error);
         res.status(500).json({ message: 'Internal server error' });
     }
 });
 
-router.post('/login', async (req, res) => {
+router.post('/login', loginValidation, handleValidationErrors, async (req: Request, res: Response) => {
     try {
         const { email, password } = req.body;
-        if (!email || !password) {
-            return res.status(400).json({ message: 'Email and password are required' });
-        }
 
         const user = await prisma.user.findUnique({
             where: { email }
         });
 
         if (!user || !(await bcrypt.compare(password, user.password))) {
+            // Use generic message to prevent user enumeration
             return res.status(401).json({ message: 'Invalid credentials' });
         }
 
         const token = jwt.sign({ userId: user.id, role: user.role }, JWT_SECRET, { expiresIn: '24h' });
-        res.json({ token, user: { id: user.id, name: user.name, email: user.email, role: user.role } });
+        res.json({ 
+            token, 
+            user: { 
+                id: user.id, 
+                name: user.name, 
+                email: user.email, 
+                role: user.role 
+            } 
+        });
     } catch (error) {
-        console.error(error);
+        console.error('Login error:', error);
         res.status(500).json({ message: 'Internal server error' });
     }
 });
