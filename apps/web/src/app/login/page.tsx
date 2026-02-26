@@ -81,7 +81,7 @@ export default function LoginPage() {
                 </form>
 
                 <p className="mt-8 text-center text-slate-500 text-sm">
-                    Don't have an account? <Link href="/register" className="text-primary font-bold hover:underline">Register here</Link>
+                    Don&apos;t have an account? <Link href="/register" className="text-primary font-bold hover:underline">Register here</Link>
                 </p>
                 <p className="mt-2 text-center text-slate-500 text-sm">
                     Are you an admin? <span className="text-primary font-bold">Log in with your credentials</span>
