@@ -58,8 +58,26 @@ app.use(cors({
             callback(new Error('Not allowed by CORS'));
         }
     },
-    credentials: true
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+    preflightContinue: false,
+    optionsSuccessStatus: 204
 })); // Configure CORS properly
+
+// Handle preflight requests explicitly
+app.options('*', (req, res) => {
+    const origin = req.headers.origin;
+    if (allowedOrigins.includes(origin as string) || !origin) {
+        res.header('Access-Control-Allow-Origin', origin || '*');
+        res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+        res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+        res.header('Access-Control-Allow-Credentials', 'true');
+        res.status(204).send();
+    } else {
+        res.status(403).send('CORS policy violation');
+    }
+});
 app.use(express.json({ limit: '10mb' })); // Limit body size
 app.use(sanitizeInput); // Prevent XSS attacks with custom sanitization
 
