@@ -18,13 +18,46 @@ import passwordRequirementsRoutes from './routes/password-requirements';
 // Validate environment variables on startup
 validateEnv();
 
+// Test database connection
+import { prisma } from 'database';
+
+async function testDatabaseConnection() {
+    try {
+        await prisma.$connect();
+        console.log('✅ Database connected successfully');
+    } catch (error) {
+        console.error('❌ Database connection failed:', error);
+        process.exit(1);
+    }
+}
+
+testDatabaseConnection();
+
 const app = express();
 const PORT = process.env.PORT || 4000;
 
 // Security middleware
 app.use(helmet()); // Set security headers
+
+// Configure CORS to allow multiple origins
+const allowedOrigins = [
+    process.env.CORS_ORIGIN,
+    'http://localhost:3000',
+    'https://ra-trivia.vercel.app',
+    'https://ra-trivia.onrender.com'
+].filter(Boolean);
+
 app.use(cors({
-    origin: process.env.CORS_ORIGIN || 'http://localhost:3000',
+    origin: (origin, callback) => {
+        // Allow requests with no origin (like mobile apps or curl requests)
+        if (!origin) return callback(null, true);
+        
+        if (allowedOrigins.includes(origin)) {
+            callback(null, true);
+        } else {
+            callback(new Error('Not allowed by CORS'));
+        }
+    },
     credentials: true
 })); // Configure CORS properly
 app.use(express.json({ limit: '10mb' })); // Limit body size

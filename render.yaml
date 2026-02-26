@@ -15,5 +15,7 @@ services:
         sync: false   # Set this manually in Render dashboard
       - key: RESEND_API_KEY
         sync: false   # Set this manually in Render dashboard
+      - key: CORS_ORIGIN
+        value: https://ra-trivia.vercel.app
       - key: PORT
         value: 4000

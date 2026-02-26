@@ -78,7 +78,25 @@ router.post('/register', registerValidation, handleValidationErrors, async (req:
         });
     } catch (error) {
         console.error('Registration error:', error);
-        res.status(500).json({ message: 'Internal server error' });
+        
+        // Log more detailed error information
+        if (error instanceof Error) {
+            console.error('Error name:', error.name);
+            console.error('Error message:', error.message);
+            console.error('Error stack:', error.stack);
+        }
+        
+        // Check for specific database connection errors
+        if (error && typeof error === 'object' && 'code' in error) {
+            console.error('Database error code:', (error as any).code);
+        }
+        
+        res.status(500).json({ 
+            message: 'Internal server error',
+            ...(process.env.NODE_ENV === 'development' && { 
+                error: error instanceof Error ? error.message : 'Unknown error' 
+            })
+        });
     }
 });
 
