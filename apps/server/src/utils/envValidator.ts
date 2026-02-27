@@ -6,6 +6,11 @@ export const validateEnv = () => {
         'RESEND_API_KEY'
     ];
 
+    const optional = [
+        'RESEND_FROM_EMAIL',
+        'RESEND_FROM_NAME'
+    ];
+
     const missing = required.filter(key => !process.env[key]);
 
     if (missing.length > 0) {
@@ -29,4 +34,7 @@ export const validateEnv = () => {
     }
 
     console.log('✅ Environment variables validated successfully');
+    const fromEmail = process.env.RESEND_FROM_EMAIL || 'onboarding@resend.dev';
+    const fromName = process.env.RESEND_FROM_NAME || 'Quiz System';
+    console.log(`📧 Email config: ${fromName} <${fromEmail}>`);
 };

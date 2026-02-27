@@ -19,26 +19,54 @@ interface Result {
     };
 }
 
+interface PagedResponse<T> {
+    items: T[];
+    total: number;
+    page: number;
+    pageSize: number;
+}
+
 export default function AdminResults() {
     const [results, setResults] = useState<Result[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
+    const [status, setStatus] = useState<'all' | 'completed' | 'running'>('all');
+    const [page, setPage] = useState(1);
+    const [pageSize] = useState(25);
+    const [total, setTotal] = useState(0);
 
     const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
 
     useEffect(() => {
         fetchResults();
-    }, []);
+    }, [page, pageSize, status]);
 
-    const fetchResults = async () => {
+    useEffect(() => {
+        const t = setTimeout(() => {
+            setPage(1);
+            fetchResults(1);
+        }, 250);
+        return () => clearTimeout(t);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [searchTerm, status]);
+
+    const fetchResults = async (overridePage?: number) => {
         const token = localStorage.getItem('token');
+        const effectivePage = overridePage ?? page;
         try {
-            const res = await fetch(`${apiUrl}/admin/results`, {
+            const params = new URLSearchParams({
+                page: String(effectivePage),
+                pageSize: String(pageSize),
+                status,
+                ...(searchTerm.trim() ? { q: searchTerm.trim() } : {})
+            });
+            const res = await fetch(`${apiUrl}/admin/results?${params.toString()}`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
             if (res.ok) {
-                const data = await res.json();
-                setResults(data);
+                const data: PagedResponse<Result> = await res.json();
+                setResults(data.items);
+                setTotal(data.total);
             }
         } catch (err) {
             console.error('Failed to fetch results', err);
@@ -68,11 +96,7 @@ export default function AdminResults() {
         }
     };
 
-    const filteredResults = results.filter(r =>
-        r.user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        r.user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        r.quiz.title.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
     if (isLoading) {
         return (
@@ -121,7 +145,25 @@ export default function AdminResults() {
                 <section className="bg-white rounded-[2.5rem] shadow-xl border border-slate-100 overflow-hidden animate-slide-up" style={{ animationDelay: '200ms' }}>
                     <div className="p-8 border-b border-slate-50 flex justify-between items-center bg-slate-50/50">
                         <h3 className="text-xl font-bold text-slate-800">Candidate Attempts</h3>
-                        <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">{filteredResults.length} records found</span>
+                        <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">{total} records found</span>
+                    </div>
+
+                    <div className="px-8 pt-6 flex flex-col md:flex-row gap-4 md:items-center">
+                        <div className="flex gap-2">
+                            {(['all', 'completed', 'running'] as const).map(s => (
+                                <button
+                                    key={s}
+                                    onClick={() => setStatus(s)}
+                                    className={`px-4 py-2 rounded-xl text-sm font-bold border transition-all ${status === s ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'}`}
+                                >
+                                    {s === 'all' ? 'All' : s === 'completed' ? 'Completed' : 'Running'}
+                                </button>
+                            ))}
+                        </div>
+
+                        <div className="ml-auto text-sm font-bold text-slate-400">
+                            Page {page} of {totalPages}
+                        </div>
                     </div>
 
                     <div className="overflow-x-auto">
@@ -136,7 +178,7 @@ export default function AdminResults() {
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-50">
-                                {filteredResults.length > 0 ? filteredResults.map((result) => (
+                                {results.length > 0 ? results.map((result) => (
                                     <tr key={result.id} className="hover:bg-slate-50 transition-colors">
                                         <td className="px-8 py-6">
                                             <div className="flex items-center gap-3">
@@ -210,6 +252,28 @@ export default function AdminResults() {
                                 )}
                             </tbody>
                         </table>
+                    </div>
+
+                    <div className="p-8 border-t border-slate-50 flex flex-col md:flex-row gap-4 md:items-center justify-between bg-slate-50/30">
+                        <div className="text-sm text-slate-500 font-medium">
+                            Showing {(total === 0) ? 0 : (page - 1) * pageSize + 1} - {Math.min(page * pageSize, total)} of {total}
+                        </div>
+                        <div className="flex gap-3">
+                            <button
+                                onClick={() => setPage(p => Math.max(1, p - 1))}
+                                disabled={page <= 1}
+                                className="px-5 py-2 rounded-xl font-bold bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                            >
+                                Prev
+                            </button>
+                            <button
+                                onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                                disabled={page >= totalPages}
+                                className="px-5 py-2 rounded-xl font-bold bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                            >
+                                Next
+                            </button>
+                        </div>
                     </div>
                 </section>
             </div>

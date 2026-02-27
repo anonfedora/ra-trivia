@@ -41,7 +41,7 @@ app.use(helmet()); // Set security headers
 
 // Configure CORS to allow multiple origins
 const allowedOrigins = [
-    process.env.CORS_ORIGIN,
+    ...(process.env.CORS_ORIGIN ? process.env.CORS_ORIGIN.split(',') : []),
     'http://localhost:3000',
     'https://ra-trivia.vercel.app',
     'https://ra-trivia.onrender.com'
@@ -59,8 +59,8 @@ app.use(cors({
         }
     },
     credentials: true,
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'cache-control'],
     preflightContinue: false,
     optionsSuccessStatus: 204
 })); // Configure CORS properly
@@ -69,10 +69,17 @@ app.use(cors({
 app.use((req, res, next) => {
     if (req.method === 'OPTIONS') {
         const origin = req.headers.origin;
+        const requestedHeaders = req.headers['access-control-request-headers'];
         if (allowedOrigins.includes(origin as string) || !origin) {
             res.header('Access-Control-Allow-Origin', origin || '*');
-            res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-            res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+            res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
+            // Important: include any headers the browser requests (e.g. cache-control)
+            res.header(
+                'Access-Control-Allow-Headers',
+                (typeof requestedHeaders === 'string' && requestedHeaders.length > 0)
+                    ? requestedHeaders
+                    : 'Content-Type, Authorization, cache-control'
+            );
             res.header('Access-Control-Allow-Credentials', 'true');
             res.status(204).send();
         } else {

@@ -3,12 +3,15 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { BookOpen, Clock, PlayCircle, LogOut } from 'lucide-react';
+import { BookOpen, Clock, PlayCircle, LogOut, Calendar, Repeat } from 'lucide-react';
 
 interface Quiz {
     id: string;
     title: string;
     duration: number;
+    retakeLimit?: number | null;
+    startDate?: string | null;
+    endDate?: string | null;
     _count: {
         questions: number;
     };
@@ -31,6 +34,28 @@ export default function DashboardPage() {
     const [isLoading, setIsLoading] = useState(true);
     const [user, setUser] = useState<any>(null);
     const router = useRouter();
+
+    const formatDateTime = (value: string) => {
+        const d = new Date(value);
+        if (Number.isNaN(d.getTime())) return value;
+        return d.toLocaleString();
+    };
+
+    const getScheduleLabel = (quiz: Quiz) => {
+        const start = quiz.startDate ? formatDateTime(quiz.startDate) : null;
+        const end = quiz.endDate ? formatDateTime(quiz.endDate) : null;
+
+        if (start && end) return `${start} - ${end}`;
+        if (start) return `From ${start}`;
+        if (end) return `Until ${end}`;
+        return 'Anytime';
+    };
+
+    const getTriesLabel = (quiz: Quiz) => {
+        if (quiz.retakeLimit === null || quiz.retakeLimit === undefined) return 'Unlimited';
+        if (quiz.retakeLimit === 1) return '1 try';
+        return `${quiz.retakeLimit} tries`;
+    };
 
     useEffect(() => {
         const storedUser = localStorage.getItem('user');
@@ -145,6 +170,14 @@ export default function DashboardPage() {
                                                 <div className="flex items-center gap-3 text-slate-500">
                                                     <Clock size={18} />
                                                     <span className="font-medium">{quiz.duration} Minutes</span>
+                                                </div>
+                                                <div className="flex items-center gap-3 text-slate-500">
+                                                    <Calendar size={18} />
+                                                    <span className="font-medium">{getScheduleLabel(quiz)}</span>
+                                                </div>
+                                                <div className="flex items-center gap-3 text-slate-500">
+                                                    <Repeat size={18} />
+                                                    <span className="font-medium">{getTriesLabel(quiz)}</span>
                                                 </div>
                                                 <div className="flex items-center gap-3 text-slate-500">
                                                     <PlayCircle size={18} />

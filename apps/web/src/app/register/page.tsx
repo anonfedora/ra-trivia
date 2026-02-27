@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { apiJson } from '../../lib/api';
 
 export default function RegisterPage() {
     const [email, setEmail] = useState('');
@@ -10,35 +11,34 @@ export default function RegisterPage() {
     const [password, setPassword] = useState('');
     const [church, setChurch] = useState('');
     const [error, setError] = useState('');
+    const [success, setSuccess] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const router = useRouter();
 
     const handleRegister = async (e: React.FormEvent) => {
         e.preventDefault();
         setError('');
+        setSuccess('');
         setIsLoading(true);
 
         const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
-        try {
-            const res = await fetch(`${apiUrl}/auth/register`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email, name, password, church }),
-            });
+        const result = await apiJson<{ user: any; message?: string }>(`${apiUrl}/auth/register`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email, name, password, church })
+        });
 
-            const data = await res.json();
-            if (res.ok) {
-                localStorage.setItem('token', data.token);
-                localStorage.setItem('user', JSON.stringify(data.user));
-                router.push('/dashboard');
-            } else {
-                setError(data.message || 'Registration failed');
-            }
-        } catch (err) {
-            setError('Connection error. Is the server running?');
-        } finally {
-            setIsLoading(false);
+        if (result.ok && result.data?.user) {
+            // TODO: Revert to email verification flow when re-enabled
+            // Store token and redirect to dashboard
+            // Note: Registration doesn't return token, user needs to login
+            router.push('/login?message=Registration successful, please login');
+            return;
+        } else {
+            setError('error' in result ? result.error : 'Registration failed');
         }
+
+        setIsLoading(false);
     };
 
     return (
@@ -53,7 +53,13 @@ export default function RegisterPage() {
                     </div>
                 )}
 
-                <form onSubmit={handleRegister} className="space-y-4">
+                {success && !error && (
+                    <div className="bg-green-50 text-green-700 p-4 rounded-2xl mb-6 text-sm font-medium border border-green-100">
+                        {success}
+                    </div>
+                )}
+
+                <form onSubmit={handleRegister} className="space-y-6">
                     <div className="space-y-2">
                         <label className="text-sm font-semibold text-slate-700 ml-1">Email Address</label>
                         <input

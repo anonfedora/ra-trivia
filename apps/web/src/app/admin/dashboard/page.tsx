@@ -9,6 +9,9 @@ interface Quiz {
     title: string;
     duration: number;
     isActive: boolean;
+    retakeLimit?: number | null;
+    startDate?: string | null;
+    endDate?: string | null;
     _count: {
         questions: number;
     };
@@ -28,6 +31,13 @@ interface Attempt {
     };
 }
 
+interface PagedResponse<T> {
+    items: T[];
+    total: number;
+    page: number;
+    pageSize: number;
+}
+
 export default function AdminDashboard() {
     const [quizzes, setQuizzes] = useState<Quiz[]>([]);
     const [recentAttempts, setRecentAttempts] = useState<Attempt[]>([]);
@@ -35,6 +45,14 @@ export default function AdminDashboard() {
     const [isUploading, setIsUploading] = useState(false);
     const [file, setFile] = useState<File | null>(null);
     const [selectedQuizId, setSelectedQuizId] = useState<string>('');
+
+    // Edit Selected Quiz
+    const [editTitle, setEditTitle] = useState('');
+    const [editDuration, setEditDuration] = useState('');
+    const [editRetakeLimit, setEditRetakeLimit] = useState('2');
+    const [editStartDate, setEditStartDate] = useState('');
+    const [editEndDate, setEditEndDate] = useState('');
+    const [isSavingEdit, setIsSavingEdit] = useState(false);
 
     // Create Quiz Form
     const [newTitle, setNewTitle] = useState('');
@@ -46,6 +64,25 @@ export default function AdminDashboard() {
     useEffect(() => {
         fetchData();
     }, []);
+
+    useEffect(() => {
+        const selected = quizzes.find(q => q.id === selectedQuizId);
+        if (!selected) return;
+
+        setEditTitle(selected.title ?? '');
+        setEditDuration(String(selected.duration ?? ''));
+        setEditRetakeLimit(String(selected.retakeLimit ?? 2));
+
+        const toLocalInput = (iso?: string | null) => {
+            if (!iso) return '';
+            const d = new Date(iso);
+            if (Number.isNaN(d.getTime())) return '';
+            const pad = (n: number) => String(n).padStart(2, '0');
+            return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+        };
+        setEditStartDate(toLocalInput(selected.startDate));
+        setEditEndDate(toLocalInput(selected.endDate));
+    }, [selectedQuizId, quizzes]);
 
     const fetchData = async () => {
         const token = localStorage.getItem('token');
@@ -66,13 +103,47 @@ export default function AdminDashboard() {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
             if (resultRes.ok) {
-                const data = await resultRes.json();
-                setRecentAttempts(data.slice(0, 5));
+                const data: PagedResponse<Attempt> = await resultRes.json();
+                setRecentAttempts(data.items.slice(0, 5));
             }
         } catch (err) {
             console.error('Failed to fetch data', err);
         } finally {
             setIsLoading(false);
+        }
+    };
+
+    const handleSaveQuizMeta = async () => {
+        if (!selectedQuizId) return;
+        setIsSavingEdit(true);
+        const token = localStorage.getItem('token');
+        try {
+            const res = await fetch(`${apiUrl}/quizzes/${selectedQuizId}`, {
+                method: 'PATCH',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({
+                    title: editTitle,
+                    duration: editDuration,
+                    retakeLimit: editRetakeLimit,
+                    startDate: editStartDate ? new Date(editStartDate).toISOString() : null,
+                    endDate: editEndDate ? new Date(editEndDate).toISOString() : null
+                })
+            });
+
+            if (res.ok) {
+                fetchQuizzes();
+                alert('Exam updated successfully');
+            } else {
+                const errData = await res.json().catch(() => ({}));
+                alert(`Update failed: ${errData.message || 'Unknown error'}`);
+            }
+        } catch (err) {
+            alert('Update error: Could not connect to the server');
+        } finally {
+            setIsSavingEdit(false);
         }
     };
 
@@ -342,6 +413,91 @@ export default function AdminDashboard() {
 
                     {/* Right Column: Sidebar Actions */}
                     <div className="space-y-8">
+                        {/* Edit Selected Quiz */}
+                        <section className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-xl animate-fade-in">
+                            <h3 className="text-xl font-bold text-slate-900 mb-6 flex items-center gap-2">
+                                <CheckCircle className="text-primary" size={20} />
+                                Edit Selected Exam
+                            </h3>
+
+                            {!selectedQuizId ? (
+                                <p className="text-slate-400 font-medium">Select an exam from the table to edit.</p>
+                            ) : (
+                                <div className="space-y-4">
+                                    <div className="space-y-2">
+                                        <label className="text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">Title</label>
+                                        <input
+                                            type="text"
+                                            value={editTitle}
+                                            onChange={(e) => setEditTitle(e.target.value)}
+                                            className="w-full px-5 py-3 rounded-2xl bg-slate-50 border border-slate-200 focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all outline-none text-sm"
+                                        />
+                                    </div>
+
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <div className="space-y-2">
+                                            <label className="text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">Duration (min)</label>
+                                            <input
+                                                type="number"
+                                                min={1}
+                                                value={editDuration}
+                                                onChange={(e) => setEditDuration(e.target.value)}
+                                                className="w-full px-5 py-3 rounded-2xl bg-slate-50 border border-slate-200 focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all outline-none text-sm"
+                                            />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <label className="text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">Retake Limit</label>
+                                            <input
+                                                type="number"
+                                                min={1}
+                                                max={10}
+                                                value={editRetakeLimit}
+                                                onChange={(e) => setEditRetakeLimit(e.target.value)}
+                                                className="w-full px-5 py-3 rounded-2xl bg-slate-50 border border-slate-200 focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all outline-none text-sm"
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div className="space-y-2">
+                                        <label className="text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">Start Date (optional)</label>
+                                        <input
+                                            type="datetime-local"
+                                            value={editStartDate}
+                                            onChange={(e) => setEditStartDate(e.target.value)}
+                                            className="w-full px-5 py-3 rounded-2xl bg-slate-50 border border-slate-200 focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all outline-none text-sm"
+                                        />
+                                    </div>
+
+                                    <div className="space-y-2">
+                                        <label className="text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">End Date (optional)</label>
+                                        <input
+                                            type="datetime-local"
+                                            value={editEndDate}
+                                            onChange={(e) => setEditEndDate(e.target.value)}
+                                            className="w-full px-5 py-3 rounded-2xl bg-slate-50 border border-slate-200 focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all outline-none text-sm"
+                                        />
+                                    </div>
+
+                                    <div className="flex gap-3 pt-2">
+                                        <button
+                                            type="button"
+                                            onClick={handleSaveQuizMeta}
+                                            disabled={isSavingEdit}
+                                            className="flex-1 px-6 py-3 rounded-2xl font-bold text-white bg-primary hover:bg-primary/90 transition-all disabled:opacity-60"
+                                        >
+                                            {isSavingEdit ? 'Saving...' : 'Save Changes'}
+                                        </button>
+                                        <Link
+                                            href={`/admin/quizzes/${selectedQuizId}/preview`}
+                                            className="px-6 py-3 rounded-2xl font-bold bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 transition-all"
+                                        >
+                                            Preview
+                                        </Link>
+                                    </div>
+                                </div>
+                            )}
+                        </section>
+
                         {/* Create Quiz Form */}
                         <section className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-xl animate-fade-in" style={{ animationDelay: '150ms' }}>
                             <h3 className="text-xl font-bold text-slate-900 mb-6 flex items-center gap-2">

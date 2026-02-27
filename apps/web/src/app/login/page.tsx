@@ -1,37 +1,41 @@
 "use client";
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { apiJson } from '../../lib/api';
 
 export default function LoginPage() {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [error, setError] = useState('');
+    const [info, setInfo] = useState('');
     const router = useRouter();
+
+    useEffect(() => {
+        const params = new URLSearchParams(window.location.search);
+        const verified = params.get('verified');
+        if (verified === '1') setInfo('Email verified. You can now log in.');
+        if (verified === '0') setInfo('Verification link is invalid or expired.');
+    }, []);
 
     const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();
         setError('');
 
         const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
-        try {
-            const res = await fetch(`${apiUrl}/auth/login`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email, password }),
-            });
+        const result = await apiJson<{ token: string; user: any; message?: string }>(`${apiUrl}/auth/login`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email, password })
+        });
 
-            const data = await res.json();
-            if (res.ok) {
-                localStorage.setItem('token', data.token);
-                localStorage.setItem('user', JSON.stringify(data.user));
-                router.push(data.user.role === 'ADMIN' ? '/admin/dashboard' : '/dashboard');
-            } else {
-                setError(data.message || 'Login failed');
-            }
-        } catch (err) {
-            setError('Connection error. Is the server running?');
+        if (result.ok) {
+            localStorage.setItem('token', result.data.token);
+            localStorage.setItem('user', JSON.stringify(result.data.user));
+            router.push(result.data.user.role === 'ADMIN' ? '/admin/dashboard' : '/dashboard');
+        } else {
+            setError(('error' in result && result.error) ? result.error : 'Login failed');
         }
     };
 
@@ -44,6 +48,12 @@ export default function LoginPage() {
                 {error && (
                     <div className="bg-red-50 text-red-600 p-4 rounded-2xl mb-6 text-sm font-medium border border-red-100">
                         {error}
+                    </div>
+                )}
+
+                {info && !error && (
+                    <div className="bg-green-50 text-green-700 p-4 rounded-2xl mb-6 text-sm font-medium border border-green-100">
+                        {info}
                     </div>
                 )}
 

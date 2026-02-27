@@ -11,6 +11,43 @@ router.post('/start', authenticate, async (req: AuthRequest, res) => {
         const { quizId } = req.body;
         const userId = req.user!.userId;
 
+        // Check retake limit (max 2 attempts)
+        const completedSessions = await prisma.quizSession.count({
+            where: {
+                userId,
+                quizId,
+                endTime: { not: null }
+            }
+        });
+
+        if (completedSessions >= 2) {
+            return res.status(400).json({ 
+                message: 'You have reached the maximum number of attempts (2) for this quiz.' 
+            });
+        }
+
+        // Check quiz scheduling
+        const quiz = await prisma.quiz.findUnique({
+            where: { id: quizId }
+        });
+
+        if (!quiz) {
+            return res.status(404).json({ message: 'Quiz not found' });
+        }
+
+        const now = new Date();
+        if (quiz.startDate && now < quiz.startDate) {
+            return res.status(400).json({ 
+                message: 'This quiz has not started yet.' 
+            });
+        }
+
+        if (quiz.endDate && now > quiz.endDate) {
+            return res.status(400).json({ 
+                message: 'This quiz has ended.' 
+            });
+        }
+
         // Check if user already has an active session
         let session = await prisma.quizSession.findFirst({
             where: {
@@ -31,12 +68,41 @@ router.post('/start', authenticate, async (req: AuthRequest, res) => {
             });
         }
 
-        const quiz = await prisma.quiz.findUnique({
+        // Get quiz with questions and randomize them
+        const quizWithQuestions = await prisma.quiz.findUnique({
             where: { id: quizId },
             include: { questions: true }
         });
 
-        res.status(201).json({ session, quiz });
+        if (!quizWithQuestions) {
+            return res.status(404).json({ message: 'Quiz not found' });
+        }
+
+        // Randomize question order and shuffle answers
+        const randomizedQuestions = quizWithQuestions.questions
+            .sort(() => Math.random() - 0.5) // Shuffle questions
+            .map(question => {
+                // Create array of options and shuffle them
+                const options = [
+                    { key: 'A', text: question.optionA },
+                    { key: 'B', text: question.optionB },
+                    { key: 'C', text: question.optionC },
+                    { key: 'D', text: question.optionD }
+                ].filter(opt => opt.text) // Remove empty options
+                 .sort(() => Math.random() - 0.5); // Shuffle options
+
+                return {
+                    ...question,
+                    randomizedOptions: options
+                };
+            });
+
+        const randomizedQuiz = {
+            ...quizWithQuestions,
+            questions: randomizedQuestions
+        };
+
+        res.status(201).json({ session, quiz: randomizedQuiz });
     } catch (error) {
         console.error(error);
         res.status(500).json({ message: 'Internal server error' });
@@ -182,7 +248,12 @@ router.get('/session/:id', authenticate, async (req: AuthRequest, res) => {
             return {
                 questionId: q.id,
                 text: q.text,
-                options: [q.optionA, q.optionB, q.optionC, q.optionD].filter(Boolean),
+                options: [
+                    { key: 'A', text: q.optionA },
+                    { key: 'B', text: q.optionB },
+                    { key: 'C', text: q.optionC },
+                    { key: 'D', text: q.optionD }
+                ].filter((opt: any) => Boolean(opt.text)),
                 selectedOption: selected,
                 correctOption: q.correctOption,
                 isCorrect

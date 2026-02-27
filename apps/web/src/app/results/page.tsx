@@ -8,7 +8,7 @@ import { CheckCircle2, XCircle, Home, Award, BookOpen, TrendingUp } from 'lucide
 interface QuestionBreakdown {
     questionId: string;
     text: string;
-    options: string[];
+    options: { key: string; text: string }[];
     selectedOption: string | null;
     correctOption: string;
     isCorrect: boolean;
@@ -152,17 +152,20 @@ function ResultsContent() {
 
                                         <div className="space-y-2">
                                             {q.options.map((opt) => {
-                                                const isSelected = opt === q.selectedOption;
-                                                const isCorrect = opt === q.correctOption;
+                                                const isSelected = opt.key === q.selectedOption;
+                                                const isCorrect = opt.key === q.correctOption;
                                                 let style = 'bg-slate-50 border-slate-100 text-slate-600';
                                                 if (isCorrect) style = 'bg-emerald-50 border-emerald-200 text-emerald-700 font-bold';
                                                 if (isSelected && !isCorrect) style = 'bg-rose-50 border-rose-200 text-rose-600 font-bold line-through';
                                                 return (
-                                                    <div key={opt} className={`flex items-center gap-3 px-4 py-3 rounded-xl border text-sm ${style}`}>
+                                                    <div key={opt.key} className={`flex items-center gap-3 px-4 py-3 rounded-xl border text-sm ${style}`}>
                                                         {isCorrect && <CheckCircle2 size={14} className="text-emerald-500 flex-shrink-0" />}
                                                         {isSelected && !isCorrect && <XCircle size={14} className="text-rose-400 flex-shrink-0" />}
                                                         {!isCorrect && !isSelected && <div className="w-3.5 h-3.5 flex-shrink-0" />}
-                                                        <span>{opt}</span>
+                                                        <span>
+                                                            <span className="font-black mr-2">{opt.key}.</span>
+                                                            {opt.text}
+                                                        </span>
                                                     </div>
                                                 );
                                             })}

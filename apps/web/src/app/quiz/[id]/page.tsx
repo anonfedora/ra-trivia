@@ -12,6 +12,8 @@ export default function QuizPage() {
     const [timeLeft, setTimeLeft] = useState(0);
     const [answers, setAnswers] = useState<any>({});
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [showWarning, setShowWarning] = useState<string | null>(null);
+    const [showReview, setShowReview] = useState(false);
     const router = useRouter();
 
     useEffect(() => {
@@ -38,7 +40,31 @@ export default function QuizPage() {
                 if (res.ok) {
                     setQuiz(data.quiz);
                     setSession(data.session);
-                    setAnswers(data.session.answers || {});
+                    
+                    // Recover answers from localStorage backup
+                    const backupAnswers = localStorage.getItem(`quiz_backup_${data.session.id}`);
+                    if (backupAnswers) {
+                        const parsedAnswers = JSON.parse(backupAnswers);
+                        setAnswers(parsedAnswers);
+                        
+                        // Sync with server
+                        Object.entries(parsedAnswers).forEach(([questionId, selectedOption]) => {
+                            fetch(`${apiUrl}/quiz/update-answer`, {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                    'Authorization': `Bearer ${token}`
+                                },
+                                body: JSON.stringify({
+                                    sessionId: data.session.id,
+                                    questionId,
+                                    selectedOption
+                                }),
+                            }).catch(err => console.error('Failed to sync backup answer:', err));
+                        });
+                    } else {
+                        setAnswers(data.session.answers || {});
+                    }
 
                     // Initialize timer
                     const durationSeconds = data.quiz.duration * 60;
@@ -51,7 +77,7 @@ export default function QuizPage() {
         };
 
         fetchQuiz();
-    }, [router]);
+    }, [router, quizId]);
 
     useEffect(() => {
         if (timeLeft <= 0) return;
@@ -62,6 +88,19 @@ export default function QuizPage() {
                     handleSubmit();
                     return 0;
                 }
+                
+                // Show warnings
+                if (prev === 300) { // 5 minutes
+                    setShowWarning('5 minutes remaining!');
+                    setTimeout(() => setShowWarning(null), 3000);
+                } else if (prev === 60) { // 1 minute
+                    setShowWarning('1 minute remaining!');
+                    setTimeout(() => setShowWarning(null), 3000);
+                } else if (prev === 30) { // 30 seconds
+                    setShowWarning('30 seconds remaining!');
+                    setTimeout(() => setShowWarning(null), 3000);
+                }
+                
                 return prev - 1;
             });
         }, 1000);
@@ -69,7 +108,13 @@ export default function QuizPage() {
     }, [timeLeft]);
 
     const saveAnswer = async (questionId: string, option: string) => {
-        setAnswers((prev: any) => ({ ...prev, [questionId]: option }));
+        const newAnswers = { ...answers, [questionId]: option };
+        setAnswers(newAnswers);
+
+        // Backup to localStorage for recovery
+        if (session?.id) {
+            localStorage.setItem(`quiz_backup_${session.id}`, JSON.stringify(newAnswers));
+        }
 
         // Auto-save to server
         try {
@@ -109,6 +154,10 @@ export default function QuizPage() {
             });
 
             if (res.ok) {
+                // Clean up localStorage backup
+                if (session?.id) {
+                    localStorage.removeItem(`quiz_backup_${session.id}`);
+                }
                 router.push(`/results?quizId=${quizId}&sessionId=${session.id}`);
             } else {
                 const data = await res.json();
@@ -131,9 +180,98 @@ export default function QuizPage() {
     if (!quiz) return <div className="min-h-screen flex items-center justify-center font-bold text-slate-400">Loading quiz...</div>;
 
     const currentQuestion = quiz.questions[currentIndex];
+    const answeredCount = Object.keys(answers).length;
+    const unansweredCount = quiz.questions.length - answeredCount;
+
+    // Review Screen
+    if (showReview) {
+        return (
+            <main className="min-h-screen bg-slate-50 p-6 md:p-12 flex flex-col items-center">
+                <div className="max-w-4xl w-full">
+                    <div className="bg-white rounded-[2.5rem] shadow-xl p-10 border border-slate-100 mb-8">
+                        <h1 className="text-3xl font-bold text-slate-900 mb-6">Review Your Answers</h1>
+                        
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+                            <div className="bg-blue-50 p-4 rounded-2xl text-center">
+                                <div className="text-2xl font-bold text-blue-600">{answeredCount}</div>
+                                <div className="text-sm text-blue-500">Answered</div>
+                            </div>
+                            <div className="bg-orange-50 p-4 rounded-2xl text-center">
+                                <div className="text-2xl font-bold text-orange-600">{unansweredCount}</div>
+                                <div className="text-sm text-orange-500">Unanswered</div>
+                            </div>
+                            <div className="bg-slate-50 p-4 rounded-2xl text-center">
+                                <div className="text-2xl font-bold text-slate-600">{quiz.questions.length}</div>
+                                <div className="text-sm text-slate-500">Total Questions</div>
+                            </div>
+                        </div>
+
+                        <div className="space-y-3 max-h-96 overflow-y-auto">
+                            {quiz.questions.map((question: any, index: number) => {
+                                const hasAnswer = answers[question.id];
+                                return (
+                                    <div 
+                                        key={question.id}
+                                        className={`p-4 rounded-2xl border-2 cursor-pointer transition-all ${
+                                            hasAnswer 
+                                                ? 'bg-green-50 border-green-200 hover:bg-green-100' 
+                                                : 'bg-red-50 border-red-200 hover:bg-red-100'
+                                        }`}
+                                        onClick={() => {
+                                            setShowReview(false);
+                                            setCurrentIndex(index);
+                                        }}
+                                    >
+                                        <div className="flex justify-between items-center">
+                                            <div className="flex-1">
+                                                <span className="font-bold text-slate-700">Q{index + 1}:</span>
+                                                <span className="ml-2 text-slate-600">{question.text.substring(0, 80)}...</span>
+                                            </div>
+                                            <div className={`px-3 py-1 rounded-full text-sm font-bold ${
+                                                hasAnswer 
+                                                    ? 'bg-green-100 text-green-700' 
+                                                    : 'bg-red-100 text-red-700'
+                                            }`}>
+                                                {hasAnswer ? 'Answered' : 'Not Answered'}
+                                            </div>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </div>
+
+                    <div className="flex gap-4">
+                        <button
+                            onClick={() => setShowReview(false)}
+                            className="flex-1 px-8 py-4 rounded-2xl font-bold text-slate-600 bg-white border border-slate-200 hover:bg-slate-50 transition-all"
+                        >
+                            Continue Editing
+                        </button>
+                        <button
+                            onClick={handleSubmit}
+                            disabled={isSubmitting || unansweredCount > 0}
+                            className="flex-1 px-8 py-4 rounded-2xl font-bold text-white bg-green-600 hover:bg-green-700 shadow-xl shadow-green-100 transition-all transform hover:-translate-y-1 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                            {isSubmitting ? 'Submitting...' : unansweredCount > 0 ? `Submit (${unansweredCount} unanswered)` : 'Submit Quiz'}
+                        </button>
+                    </div>
+                </div>
+            </main>
+        );
+    }
 
     return (
         <main className="min-h-screen bg-slate-50 p-6 md:p-12 flex flex-col items-center">
+            {/* Timer Warning */}
+            {showWarning && (
+                <div className="fixed top-4 left-1/2 transform -translate-x-1/2 z-50 animate-bounce">
+                    <div className="bg-red-500 text-white px-6 py-3 rounded-2xl font-bold text-lg shadow-xl border-2 border-red-600">
+                        ⚠️ {showWarning}
+                    </div>
+                </div>
+            )}
+
             <div className="max-w-4xl w-full flex justify-between items-center mb-10">
                 <div>
                     <h1 className="text-2xl font-bold text-slate-900">{quiz.title}</h1>
@@ -150,7 +288,21 @@ export default function QuizPage() {
                 </h2>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-auto">
-                    {['A', 'B', 'C', 'D'].map((opt) => (
+                    {currentQuestion.randomizedOptions?.map((opt: any) => (
+                        <button
+                            key={opt.key}
+                            onClick={() => saveAnswer(currentQuestion.id, opt.key)}
+                            className={`p-6 rounded-2xl text-left font-semibold transition-all border-2 ${answers[currentQuestion.id] === opt.key
+                                ? 'bg-primary/5 border-primary text-primary shadow-md'
+                                : 'bg-slate-50 border-transparent text-slate-600 hover:bg-slate-100'
+                                }`}
+                        >
+                            <span className={`inline-flex items-center justify-center w-8 h-8 rounded-lg mr-3 shadow-sm ${answers[currentQuestion.id] === opt.key ? 'bg-primary text-white' : 'bg-white text-slate-400'}`}>
+                                {opt.key}
+                            </span>
+                            {opt.text}
+                        </button>
+                    )) || ['A', 'B', 'C', 'D'].map((opt) => (
                         <button
                             key={opt}
                             onClick={() => saveAnswer(currentQuestion.id, opt)}
@@ -186,11 +338,10 @@ export default function QuizPage() {
                     </button>
                 ) : (
                     <button
-                        onClick={handleSubmit}
-                        disabled={isSubmitting}
+                        onClick={() => setShowReview(true)}
                         className="px-10 py-4 rounded-2xl font-bold text-white bg-green-600 hover:bg-green-700 shadow-xl shadow-green-100 transition-all transform hover:-translate-y-1"
                     >
-                        {isSubmitting ? 'Submitting...' : 'Finish Quiz'}
+                        Review & Submit
                     </button>
                 )}
             </div>

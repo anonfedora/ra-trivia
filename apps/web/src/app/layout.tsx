@@ -7,6 +7,11 @@ const inter = Inter({ subsets: ["latin"] });
 export const metadata: Metadata = {
     title: "Quiz Portal",
     description: "Advanced Quiz Application",
+    icons: {
+        icon: "/favicon.png",
+        apple: "/apple-touch-icon.png",
+        shortcut: "/favicon.png",
+    },
 };
 
 export default function RootLayout({
