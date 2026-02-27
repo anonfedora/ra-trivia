@@ -36,8 +36,8 @@ testDatabaseConnection();
 const app = express();
 const PORT = process.env.PORT || 4000;
 
-// Trust proxy for Render deployment
-app.set('trust proxy', true);
+// Trust proxy for Render deployment (only trust Render's proxy)
+app.set('trust proxy', 1);
 
 // Security middleware
 app.use(helmet()); // Set security headers

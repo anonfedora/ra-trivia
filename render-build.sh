@@ -3,13 +3,7 @@
 # Install dependencies
 pnpm install
 
-# Generate Prisma client
-cd packages/database && npx prisma generate && cd ../..
-
-# Build the server
+# Build server (includes Prisma generation and migration)
 cd apps/server && pnpm run build
-
-# Run database migrations (this creates tables if they don't exist)
-pnpm run migrate
 
 echo "Build completed successfully!"
