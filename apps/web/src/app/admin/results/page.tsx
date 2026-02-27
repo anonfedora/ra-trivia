@@ -37,19 +37,6 @@ export default function AdminResults() {
 
     const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
 
-    useEffect(() => {
-        fetchResults();
-    }, [page, pageSize, status]);
-
-    useEffect(() => {
-        const t = setTimeout(() => {
-            setPage(1);
-            fetchResults(1);
-        }, 250);
-        return () => clearTimeout(t);
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [searchTerm, status]);
-
     const fetchResults = async (overridePage?: number) => {
         const token = localStorage.getItem('token');
         const effectivePage = overridePage ?? page;
@@ -74,6 +61,19 @@ export default function AdminResults() {
             setIsLoading(false);
         }
     };
+
+    useEffect(() => {
+        fetchResults();
+    }, [page, pageSize, status]);
+
+    useEffect(() => {
+        const t = setTimeout(() => {
+            setPage(1);
+            fetchResults(1);
+        }, 250);
+        return () => clearTimeout(t);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [searchTerm, status]);
 
     const handleExport = async () => {
         const token = localStorage.getItem('token');

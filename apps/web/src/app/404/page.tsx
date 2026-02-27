@@ -20,7 +20,7 @@ export default function NotFound() {
                     </svg>
                 </div>
                 <h1 className="text-4xl font-bold text-slate-900 mb-4">Page Not Found</h1>
-                <p className="text-slate-500 mb-8">The page you're looking for doesn't exist or is not accessible.</p>
+                <p className="text-slate-500 mb-8">The page you&apos;re looking for doesn&apos;t exist or is not accessible.</p>
                 <Link 
                     href="/"
                     className="inline-flex items-center px-6 py-3 bg-primary text-white rounded-2xl font-medium hover:bg-primary/90 transition-colors"

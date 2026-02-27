@@ -63,7 +63,7 @@ export default function AdminDashboard() {
 
     useEffect(() => {
         fetchData();
-    }, []);
+    }, []); // Empty dependency array - runs once on mount
 
     useEffect(() => {
         const selected = quizzes.find(q => q.id === selectedQuizId);
