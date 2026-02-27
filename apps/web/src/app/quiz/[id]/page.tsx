@@ -338,10 +338,11 @@ export default function QuizPage() {
                     </button>
                 ) : (
                     <button
-                        onClick={() => setShowReview(true)}
-                        className="px-10 py-4 rounded-2xl font-bold text-white bg-green-600 hover:bg-green-700 shadow-xl shadow-green-100 transition-all transform hover:-translate-y-1"
+                        onClick={handleSubmit}
+                        disabled={isSubmitting}
+                        className="px-10 py-4 rounded-2xl font-bold text-white bg-green-600 hover:bg-green-700 shadow-xl shadow-green-100 transition-all transform hover:-translate-y-1 disabled:opacity-50"
                     >
-                        Review & Submit
+                        {isSubmitting ? 'Submitting...' : 'Submit Quiz'}
                     </button>
                 )}
             </div>

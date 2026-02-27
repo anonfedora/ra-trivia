@@ -11,22 +11,7 @@ router.post('/start', authenticate, async (req: AuthRequest, res) => {
         const { quizId } = req.body;
         const userId = req.user!.userId;
 
-        // Check retake limit (max 2 attempts)
-        const completedSessions = await prisma.quizSession.count({
-            where: {
-                userId,
-                quizId,
-                endTime: { not: null }
-            }
-        });
-
-        if (completedSessions >= 2) {
-            return res.status(400).json({ 
-                message: 'You have reached the maximum number of attempts (2) for this quiz.' 
-            });
-        }
-
-        // Check quiz scheduling
+        // Check retake limit
         const quiz = await prisma.quiz.findUnique({
             where: { id: quizId }
         });
@@ -35,6 +20,22 @@ router.post('/start', authenticate, async (req: AuthRequest, res) => {
             return res.status(404).json({ message: 'Quiz not found' });
         }
 
+        const completedSessions = await prisma.quizSession.count({
+            where: {
+                userId,
+                quizId,
+                endTime: { not: null }
+            }
+        });
+
+        const retakeLimit = quiz.retakeLimit || 2; // Default to 2 if not set
+        if (completedSessions >= retakeLimit) {
+            return res.status(400).json({ 
+                message: `You have reached the maximum number of attempts (${retakeLimit}) for this quiz.` 
+            });
+        }
+
+        // Check quiz scheduling
         const now = new Date();
         if (quiz.startDate && now < quiz.startDate) {
             return res.status(400).json({ 

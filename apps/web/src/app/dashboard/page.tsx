@@ -12,9 +12,11 @@ interface Quiz {
     retakeLimit?: number | null;
     startDate?: string | null;
     endDate?: string | null;
+    isActive: boolean;
     _count: {
         questions: number;
     };
+    completedAttempts?: number; // Number of completed sessions
 }
 
 interface Session {
@@ -53,8 +55,11 @@ export default function DashboardPage() {
 
     const getTriesLabel = (quiz: Quiz) => {
         if (quiz.retakeLimit === null || quiz.retakeLimit === undefined) return 'Unlimited';
-        if (quiz.retakeLimit === 1) return '1 try';
-        return `${quiz.retakeLimit} tries`;
+        const completed = quiz.completedAttempts || 0;
+        const remaining = Math.max(0, quiz.retakeLimit - completed);
+        if (remaining === 0) return 'No tries left';
+        if (remaining === 1) return '1 try left';
+        return `${remaining} tries left`;
     };
 
     useEffect(() => {
@@ -81,22 +86,21 @@ export default function DashboardPage() {
                     })
                 ]);
 
-                let allQuizzes: Quiz[] = [];
-                let sessions: Session[] = [];
+                if (quizRes.ok && sessionRes.ok) {
+                    const quizzesData = await quizRes.json();
+                    const sessionsData = await sessionRes.json();
 
-                if (quizRes.ok) allQuizzes = await quizRes.json();
-                if (sessionRes.ok) {
-                    sessions = await sessionRes.json();
-                    setPastSessions(sessions);
+                    // Count completed attempts for each quiz
+                    const quizzesWithAttempts = quizzesData.map((quiz: Quiz) => {
+                        const completedAttempts = sessionsData.filter((session: Session) => 
+                            session.quiz.id === quiz.id && session.endTime !== null
+                        ).length;
+                        return { ...quiz, completedAttempts };
+                    });
+
+                    setQuizzes(quizzesWithAttempts);
+                    setPastSessions(sessionsData);
                 }
-
-                // Filter out quizzes the candidate has already COMPLETED
-                const completedQuizIds = new Set(
-                    sessions
-                        .filter(s => s.endTime !== null)
-                        .map(s => s.quiz.id)
-                );
-                setQuizzes(allQuizzes.filter(q => !completedQuizIds.has(q.id)));
             } catch (err) {
                 console.error('Failed to fetch data', err);
             } finally {
@@ -185,12 +189,30 @@ export default function DashboardPage() {
                                                 </div>
                                             </div>
 
-                                            <Link
-                                                href={`/quiz/${quiz.id}/instructions`}
-                                                className="block w-full text-center bg-primary hover:bg-primary/90 text-white py-4 rounded-2xl font-bold shadow-lg shadow-primary/20 transition-all active:scale-95"
-                                            >
-                                                Take Exam
-                                            </Link>
+                                            {(() => {
+                                                const remainingTries = quiz.retakeLimit && quiz.retakeLimit > 0 
+                                                    ? Math.max(0, quiz.retakeLimit - (quiz.completedAttempts || 0))
+                                                    : Infinity;
+                                                
+                                                return (
+                                                    <Link
+                                                        href={remainingTries > 0 ? `/quiz/${quiz.id}/instructions` : '#'}
+                                                        className={`block w-full text-center py-4 rounded-2xl font-bold shadow-lg transition-all active:scale-95 ${
+                                                            remainingTries > 0 
+                                                                ? 'bg-primary hover:bg-primary/90 text-white shadow-primary/20' 
+                                                                : 'bg-slate-300 text-slate-500 cursor-not-allowed'
+                                                        }`}
+                                                        onClick={(e) => {
+                                                            if (remainingTries === 0) {
+                                                                e.preventDefault();
+                                                                alert('You have no attempts left for this exam.');
+                                                            }
+                                                        }}
+                                                    >
+                                                        {remainingTries > 0 ? 'Take Exam' : 'No Attempts Left'}
+                                                    </Link>
+                                                );
+                                            })()}
                                         </div>
                                     ))}
                                 </div>

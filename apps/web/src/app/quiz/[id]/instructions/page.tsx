@@ -2,12 +2,16 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
-import { Clock, AlertCircle, CheckCircle, Info, ArrowLeft, Play } from 'lucide-react';
+import { Clock, AlertCircle, CheckCircle, Info, ArrowLeft, Play, Calendar, Repeat } from 'lucide-react';
 
 interface Quiz {
     id: string;
     title: string;
     duration: number;
+    startDate?: string | null;
+    endDate?: string | null;
+    retakeLimit?: number | null;
+    completedAttempts?: number;
     _count: {
         questions: number;
     };
@@ -20,6 +24,33 @@ export default function InstructionsPage() {
     const params = useParams();
     const quizId = params.id as string;
 
+    const formatDateTime = (value: string) => {
+        const d = new Date(value);
+        if (Number.isNaN(d.getTime())) return value;
+        return d.toLocaleString();
+    };
+
+    const getScheduleLabel = () => {
+        if (!quiz) return '';
+        const start = quiz.startDate ? formatDateTime(quiz.startDate) : null;
+        const end = quiz.endDate ? formatDateTime(quiz.endDate) : null;
+
+        if (start && end) return `${start} - ${end}`;
+        if (start) return `From ${start}`;
+        if (end) return `Until ${end}`;
+        return 'Anytime';
+    };
+
+    const getTriesLabel = () => {
+        if (!quiz) return '';
+        if (quiz.retakeLimit === null || quiz.retakeLimit === undefined) return 'Unlimited';
+        const completed = quiz.completedAttempts || 0;
+        const remaining = Math.max(0, quiz.retakeLimit - completed);
+        if (remaining === 0) return 'No tries left';
+        if (remaining === 1) return '1 try left';
+        return `${remaining} tries left`;
+    };
+
     useEffect(() => {
         const token = localStorage.getItem('token');
         if (!token) {
@@ -30,17 +61,56 @@ export default function InstructionsPage() {
         const fetchQuizDetails = async () => {
             const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
             try {
-                const res = await fetch(`${apiUrl}/quizzes/${quizId}`, {
-                    headers: { 'Authorization': `Bearer ${token}` }
-                });
-                if (res.ok) {
-                    const data = await res.json();
-                    setQuiz(data);
+                // Fetch quiz details and user sessions
+                const [quizRes, sessionRes] = await Promise.all([
+                    fetch(`${apiUrl}/quizzes/${quizId}`, {
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    }),
+                    fetch(`${apiUrl}/quiz/my-sessions`, {
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    })
+                ]);
+
+                if (quizRes.ok && sessionRes.ok) {
+                    const quizData = await quizRes.json();
+                    const sessionsData = await sessionRes.json();
+
+                    // Check scheduling
+                    const now = new Date();
+                    if (quizData.startDate && now < new Date(quizData.startDate)) {
+                        alert('This quiz has not started yet. Please check back later.');
+                        router.push('/dashboard');
+                        return;
+                    }
+
+                    if (quizData.endDate && now > new Date(quizData.endDate)) {
+                        alert('This quiz has ended. You can no longer take this exam.');
+                        router.push('/dashboard');
+                        return;
+                    }
+
+                    // Check retake limit
+                    const completedAttempts = sessionsData.filter((session: any) => 
+                        session.quizId === quizId && session.endTime !== null
+                    ).length;
+
+                    const retakeLimit = quizData.retakeLimit || 2;
+                    if (completedAttempts >= retakeLimit) {
+                        alert(`You have reached the maximum number of attempts (${retakeLimit}) for this quiz.`);
+                        router.push('/dashboard');
+                        return;
+                    }
+
+                    setQuiz({ ...quizData, completedAttempts });
                 } else {
+                    const errorData = await quizRes.json();
+                    alert(errorData.message || 'Failed to load quiz details');
                     router.push('/dashboard');
                 }
             } catch (err) {
                 console.error('Failed to fetch quiz details', err);
+                alert('An error occurred while loading the quiz');
+                router.push('/dashboard');
             } finally {
                 setIsLoading(false);
             }
@@ -96,6 +166,24 @@ export default function InstructionsPage() {
                             <div>
                                 <p className="text-sm text-slate-500 font-medium">Questions</p>
                                 <p className="text-xl font-bold text-slate-900">{quiz._count.questions} Total</p>
+                            </div>
+                        </div>
+                        <div className="bg-slate-50 p-6 rounded-3xl border border-slate-100 items-center flex gap-4">
+                            <div className="bg-primary/10 p-3 rounded-2xl text-primary">
+                                <Calendar size={24} />
+                            </div>
+                            <div>
+                                <p className="text-sm text-slate-500 font-medium">Schedule</p>
+                                <p className="text-sm font-bold text-slate-900">{getScheduleLabel()}</p>
+                            </div>
+                        </div>
+                        <div className="bg-slate-50 p-6 rounded-3xl border border-slate-100 items-center flex gap-4">
+                            <div className="bg-primary/10 p-3 rounded-2xl text-primary">
+                                <Repeat size={24} />
+                            </div>
+                            <div>
+                                <p className="text-sm text-slate-500 font-medium">Attempts</p>
+                                <p className="text-sm font-bold text-slate-900">{getTriesLabel()}</p>
                             </div>
                         </div>
                     </div>

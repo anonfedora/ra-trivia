@@ -36,3 +36,6 @@ coverage/
 
 # Vercel
 .vercel
+#/scripts
+/.kiro
+.vscode
