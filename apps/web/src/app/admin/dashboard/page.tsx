@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import { BookOpen, Clock, PlayCircle, Plus, Upload, Trash2, Power, PowerOff, FileDown, MoreVertical, CheckCircle } from 'lucide-react';
+import { BookOpen, Clock, PlayCircle, Plus, Upload, Trash2, Power, PowerOff, FileDown, MoreVertical, CheckCircle, BarChart3 } from 'lucide-react';
 import Link from 'next/link';
+import { ThemeToggle } from '../../../components/ThemeToggle';
 
 interface Quiz {
     id: string;
@@ -15,6 +16,11 @@ interface Quiz {
     _count: {
         questions: number;
     };
+    createdBy?: {
+        id: string;
+        name: string;
+        email: string;
+    } | null;
 }
 
 interface Attempt {
@@ -45,6 +51,7 @@ export default function AdminDashboard() {
     const [isUploading, setIsUploading] = useState(false);
     const [file, setFile] = useState<File | null>(null);
     const [selectedQuizId, setSelectedQuizId] = useState<string>('');
+    const [user, setUser] = useState<any>(null);
 
     // Edit Selected Quiz
     const [editTitle, setEditTitle] = useState('');
@@ -62,6 +69,11 @@ export default function AdminDashboard() {
     const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
 
     useEffect(() => {
+        const token = localStorage.getItem('token');
+        const userRaw = localStorage.getItem('user');
+        if (userRaw) {
+            setUser(JSON.parse(userRaw));
+        }
         fetchData();
     }, []); // Empty dependency array - runs once on mount
 
@@ -69,10 +81,23 @@ export default function AdminDashboard() {
         const selected = quizzes.find(q => q.id === selectedQuizId);
         if (!selected) return;
 
+        // Check if user has permission to edit this quiz
+        const canEdit = user?.role === 'SUPER_ADMIN' || 
+            (user?.role === 'ADMIN' && selected.createdBy?.id === user?.id);
+
+        if (!canEdit) {
+            // Clear form fields if no permission
+            setEditTitle('');
+            setEditDuration('');
+            setEditRetakeLimit('2');
+            setEditStartDate('');
+            setEditEndDate('');
+            return;
+        }
+
         setEditTitle(selected.title ?? '');
         setEditDuration(String(selected.duration ?? ''));
         setEditRetakeLimit(String(selected.retakeLimit ?? 2));
-
         const toLocalInput = (iso?: string | null) => {
             if (!iso) return '';
             const d = new Date(iso);
@@ -82,7 +107,7 @@ export default function AdminDashboard() {
         };
         setEditStartDate(toLocalInput(selected.startDate));
         setEditEndDate(toLocalInput(selected.endDate));
-    }, [selectedQuizId, quizzes]);
+    }, [selectedQuizId, quizzes, user]);
 
     const fetchData = async () => {
         const token = localStorage.getItem('token');
@@ -276,6 +301,9 @@ export default function AdminDashboard() {
         );
     }
 
+    // Calculate selected quiz for use in JSX
+    const selected = quizzes.find(q => q.id === selectedQuizId);
+
     return (
         <main className="min-h-screen bg-slate-50 p-6 md:p-12">
             <div className="max-w-7xl mx-auto">
@@ -284,10 +312,15 @@ export default function AdminDashboard() {
                         <h1 className="text-4xl font-extrabold text-slate-900 tracking-tight">Admin Dashboard</h1>
                         <p className="text-slate-500 mt-2 font-medium">Manage your exam sessions and candidate records.</p>
                     </div>
-                    <div className="flex gap-4">
+                    <div className="flex gap-3 items-center">
+                        <ThemeToggle />
                         <Link href="/admin/results" className="flex items-center gap-2 bg-primary text-white px-6 py-3 rounded-2xl font-bold shadow-lg shadow-primary/20 hover:shadow-xl transition-all">
                             <BookOpen size={18} />
                             Detailed Results
+                        </Link>
+                        <Link href="/admin/analytics" className="flex items-center gap-2 bg-slate-600 dark:bg-slate-700 text-white px-6 py-3 rounded-2xl font-bold shadow-lg hover:bg-slate-700 dark:hover:bg-slate-800 transition-all">
+                            <BarChart3 size={18} />
+                            Analytics
                         </Link>
                     </div>
                 </header>
@@ -424,13 +457,26 @@ export default function AdminDashboard() {
                                 <p className="text-slate-400 font-medium">Select an exam from the table to edit.</p>
                             ) : (
                                 <div className="space-y-4">
+                                    {/* Permission Check */}
+                                    {user?.role === 'ADMIN' && selected?.createdBy?.id !== user?.id && (
+                                        <div className="bg-amber-50 border border-amber-200 text-amber-800 p-4 rounded-2xl mb-4">
+                                            <div className="flex items-center gap-2">
+                                                <svg className="w-5 h-5 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 20 20">
+                                                    <path fillRule="evenodd" d="M18 10a8 8 0 11-7.422 8-8 8 8 8 8-8 8-8 8-4.422L2 10z" clipRule="evenodd" />
+                                                </svg>
+                                                <span className="font-medium">You can only edit quizzes you created</span>
+                                            </div>
+                                        </div>
+                                    )}
+                                    
                                     <div className="space-y-2">
                                         <label className="text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">Title</label>
                                         <input
                                             type="text"
                                             value={editTitle}
                                             onChange={(e) => setEditTitle(e.target.value)}
-                                            className="w-full px-5 py-3 rounded-2xl bg-slate-50 border border-slate-200 focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all outline-none text-sm"
+                                            disabled={user?.role === 'ADMIN' && selected?.createdBy?.id !== user?.id}
+                                            className="w-full px-5 py-3 rounded-2xl bg-slate-50 border border-slate-200 focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all outline-none text-sm text-slate-900"
                                         />
                                     </div>
 
@@ -442,7 +488,8 @@ export default function AdminDashboard() {
                                                 min={1}
                                                 value={editDuration}
                                                 onChange={(e) => setEditDuration(e.target.value)}
-                                                className="w-full px-5 py-3 rounded-2xl bg-slate-50 border border-slate-200 focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all outline-none text-sm"
+                                                disabled={user?.role === 'ADMIN' && selected?.createdBy?.id !== user?.id}
+                                                className="w-full px-5 py-3 rounded-2xl bg-slate-50 border border-slate-200 focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all outline-none text-sm text-slate-900"
                                             />
                                         </div>
                                         <div className="space-y-2">
@@ -453,28 +500,29 @@ export default function AdminDashboard() {
                                                 max={10}
                                                 value={editRetakeLimit}
                                                 onChange={(e) => setEditRetakeLimit(e.target.value)}
-                                                className="w-full px-5 py-3 rounded-2xl bg-slate-50 border border-slate-200 focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all outline-none text-sm"
+                                                disabled={user?.role === 'ADMIN' && selected?.createdBy?.id !== user?.id}
+                                                className="w-full px-5 py-3 rounded-2xl bg-slate-50 border border-slate-200 focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all outline-none text-sm text-slate-900"
                                             />
                                         </div>
                                     </div>
-
                                     <div className="space-y-2">
                                         <label className="text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">Start Date (optional)</label>
                                         <input
                                             type="datetime-local"
                                             value={editStartDate}
                                             onChange={(e) => setEditStartDate(e.target.value)}
-                                            className="w-full px-5 py-3 rounded-2xl bg-slate-50 border border-slate-200 focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all outline-none text-sm"
+                                            disabled={user?.role === 'ADMIN' && selected?.createdBy?.id !== user?.id}
+                                            className="w-full px-5 py-3 rounded-2xl bg-slate-50 border border-slate-200 focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all outline-none text-sm text-slate-900"
                                         />
                                     </div>
-
                                     <div className="space-y-2">
                                         <label className="text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">End Date (optional)</label>
                                         <input
                                             type="datetime-local"
                                             value={editEndDate}
                                             onChange={(e) => setEditEndDate(e.target.value)}
-                                            className="w-full px-5 py-3 rounded-2xl bg-slate-50 border border-slate-200 focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all outline-none text-sm"
+                                            disabled={user?.role === 'ADMIN' && selected?.createdBy?.id !== user?.id}
+                                            className="w-full px-5 py-3 rounded-2xl bg-slate-50 border border-slate-200 focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all outline-none text-sm text-slate-900"
                                         />
                                     </div>
 
@@ -512,7 +560,7 @@ export default function AdminDashboard() {
                                         value={newTitle}
                                         onChange={(e) => setNewTitle(e.target.value)}
                                         placeholder="e.g. Mathematics Q1"
-                                        className="w-full px-5 py-3 rounded-2xl bg-slate-50 border border-slate-200 focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all outline-none text-sm"
+                                        className="w-full px-5 py-3 rounded-2xl bg-slate-50 border border-slate-200 focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all outline-none text-sm text-slate-900"
                                         required
                                     />
                                 </div>
@@ -522,7 +570,7 @@ export default function AdminDashboard() {
                                         type="number"
                                         value={newDuration}
                                         onChange={(e) => setNewDuration(e.target.value)}
-                                        className="w-full px-5 py-3 rounded-2xl bg-slate-50 border border-slate-200 focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all outline-none text-sm"
+                                        className="w-full px-5 py-3 rounded-2xl bg-slate-50 border border-slate-200 focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all outline-none text-sm text-slate-900"
                                         required
                                     />
                                 </div>

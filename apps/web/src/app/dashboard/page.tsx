@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { BookOpen, Clock, PlayCircle, LogOut, Calendar, Repeat } from 'lucide-react';
+import { ThemeToggle } from '../../components/ThemeToggle';
 
 interface Quiz {
     id: string;
@@ -71,7 +72,15 @@ export default function DashboardPage() {
             return;
         }
 
-        setUser(JSON.parse(storedUser));
+        const userData = JSON.parse(storedUser);
+        
+        // Redirect admins and super admins to admin dashboard
+        if (userData.role === 'ADMIN' || userData.role === 'SUPER_ADMIN') {
+            router.push('/admin/dashboard');
+            return;
+        }
+
+        setUser(userData);
 
         const fetchData = async () => {
             const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
@@ -140,13 +149,16 @@ export default function DashboardPage() {
                             <p className="text-slate-500 mt-2">Welcome back, <span className="font-bold text-primary">{user?.name}</span>. Ready for your next challenge?</p>
                         </div>
                     </div>
-                    <button
-                        onClick={handleLogout}
-                        className="hidden md:flex items-center gap-2 px-6 py-3 bg-white text-slate-600 rounded-2xl font-semibold border border-slate-200 hover:bg-slate-100 transition-all shadow-sm"
-                    >
-                        <LogOut size={18} />
-                        Logout
-                    </button>
+                    <div className="flex items-center gap-3">
+                        <ThemeToggle />
+                        <button
+                            onClick={handleLogout}
+                            className="hidden md:flex items-center gap-2 px-6 py-3 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-2xl font-semibold border border-slate-200 dark:border-slate-600 hover:bg-slate-100 dark:hover:bg-slate-700 transition-all shadow-sm"
+                        >
+                            <LogOut size={18} />
+                            Logout
+                        </button>
+                    </div>
                 </header>
 
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">

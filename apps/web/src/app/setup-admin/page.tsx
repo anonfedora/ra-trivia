@@ -9,6 +9,7 @@ export default function SetupAdminPage() {
     const [name, setName] = useState('');
     const [password, setPassword] = useState('');
     const [church, setChurch] = useState('');
+    const [role, setRole] = useState<'ADMIN' | 'SUPER_ADMIN'>('ADMIN');
     const [error, setError] = useState('');
     const [success, setSuccess] = useState('');
     const [isLoading, setIsLoading] = useState(false);
@@ -29,12 +30,13 @@ export default function SetupAdminPage() {
                 name, 
                 password, 
                 church,
-                role: 'ADMIN'
+                role
             })
         });
 
         if (result.ok && result.data?.user) {
-            setSuccess('Admin account created successfully! Redirecting to login...');
+            const createdRole = result.data.user.role === 'SUPER_ADMIN' ? 'Super Admin' : 'Admin';
+            setSuccess(`${createdRole} account created successfully! Redirecting to login...`);
             setTimeout(() => {
                 router.push('/login');
             }, 2000);
@@ -77,7 +79,7 @@ export default function SetupAdminPage() {
                             type="email"
                             value={email}
                             onChange={(e) => setEmail(e.target.value)}
-                            className="w-full px-6 py-4 rounded-2xl bg-slate-50 border border-slate-200 focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all outline-none"
+                            className="w-full px-6 py-4 rounded-2xl bg-slate-50 border border-slate-200 focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all outline-none text-slate-900 font-medium"
                             placeholder="admin@example.com"
                             required
                         />
@@ -89,10 +91,23 @@ export default function SetupAdminPage() {
                             type="text"
                             value={name}
                             onChange={(e) => setName(e.target.value)}
-                            className="w-full px-6 py-4 rounded-2xl bg-slate-50 border border-slate-200 focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all outline-none"
+                            className="w-full px-6 py-4 rounded-2xl bg-slate-50 border border-slate-200 focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all outline-none text-slate-900 font-medium"
                             placeholder="Administrator Name"
                             required
                         />
+                    </div>
+
+                    <div className="space-y-2">
+                        <label className="text-sm font-semibold text-slate-700 ml-1">Role</label>
+                        <select
+                            value={role}
+                            onChange={(e) => setRole(e.target.value as 'ADMIN' | 'SUPER_ADMIN')}
+                            className="w-full px-6 py-4 rounded-2xl bg-slate-50 border border-slate-200 focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all outline-none text-slate-900 font-medium"
+                            required
+                        >
+                            <option value="ADMIN">Admin - Spec.</option>
+                            <option value="SUPER_ADMIN">Super Admin - *</option>
+                        </select>
                     </div>
 
                     <div className="space-y-2">
@@ -101,7 +116,7 @@ export default function SetupAdminPage() {
                             type="password"
                             value={password}
                             onChange={(e) => setPassword(e.target.value)}
-                            className="w-full px-6 py-4 rounded-2xl bg-slate-50 border border-slate-200 focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all outline-none"
+                            className="w-full px-6 py-4 rounded-2xl bg-slate-50 border border-slate-200 focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all outline-none text-slate-900 font-medium"
                             placeholder="••••••••"
                             required
                         />
@@ -114,7 +129,7 @@ export default function SetupAdminPage() {
                             type="text"
                             value={church}
                             onChange={(e) => setChurch(e.target.value)}
-                            className="w-full px-6 py-4 rounded-2xl bg-slate-50 border border-slate-200 focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all outline-none"
+                            className="w-full px-6 py-4 rounded-2xl bg-slate-50 border border-slate-200 focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all outline-none text-slate-900 font-medium"
                             placeholder="Church Name"
                             required
                         />
@@ -125,7 +140,7 @@ export default function SetupAdminPage() {
                         disabled={isLoading}
                         className="w-full bg-red-600 hover:bg-red-700 text-white py-5 rounded-2xl font-bold shadow-lg shadow-red-600/20 transform transition-all hover:-translate-y-1 active:scale-95 disabled:opacity-50"
                     >
-                        {isLoading ? 'Creating Admin...' : 'Create Administrator'}
+                        {isLoading ? 'Creating Admin...' : `Create ${role === 'SUPER_ADMIN' ? 'Super Admin' : 'Admin'}`}
                     </button>
                 </form>
 

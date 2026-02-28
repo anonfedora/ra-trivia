@@ -5,23 +5,41 @@ import { authenticate, AuthRequest, authorize } from '../middlewares/auth';
 const router = Router();
 
 // Get all quizzes
-// Admin gets all, Candidates get only active ones
+// Super Admin gets all, Admin gets only their created quizzes, Candidates get only active ones
 router.get('/', authenticate, async (req: AuthRequest, res) => {
     try {
         const userRole = req.user?.role;
+        const userId = req.user?.userId;
         const activeOnly = req.query.activeOnly === 'true';
 
-        // If not admin OR if activeOnly is explicitly requested
-        const where = (userRole !== 'ADMIN' || activeOnly) ? { isActive: true } : {};
+        let where: any = {};
 
-        console.log(`[QUIZ_GET] User: ${req.user?.userId}, Role: ${userRole}, activeOnly: ${activeOnly}, Filter: ${JSON.stringify(where)}`);
+        // Role-based filtering
+        if (userRole === 'SUPER_ADMIN') {
+            // Super admins see all quizzes (unless activeOnly is explicitly requested)
+            if (activeOnly) {
+                where.isActive = true;
+            }
+        } else if (userRole === 'ADMIN') {
+            // Regular admins see only their created quizzes
+            where.createdById = userId;
+            if (activeOnly) {
+                where.isActive = true;
+            }
+        } else {
+            // Candidates see only active quizzes
+            where.isActive = true;
+        }
+
+        console.log(`[QUIZ_GET] User: ${userId}, Role: ${userRole}, activeOnly: ${activeOnly}, Filter: ${JSON.stringify(where)}`);
 
         const quizzes = await prisma.quiz.findMany({
             where,
             include: {
                 _count: {
                     select: { questions: true }
-                }
+                },
+                createdBy: true
             },
             orderBy: { createdAt: 'desc' }
         });
@@ -116,15 +134,29 @@ router.post('/', authenticate, authorize(['ADMIN']), async (req: AuthRequest, re
 });
 
 // Admin: Update quiz metadata
-router.patch('/:id', authenticate, authorize(['ADMIN']), async (req: AuthRequest, res) => {
+router.patch('/:id', authenticate, authorize(['ADMIN', 'SUPER_ADMIN']), async (req: AuthRequest, res) => {
     try {
         const id = req.params.id as string;
         const { title, duration, startDate, endDate, retakeLimit } = req.body;
+        const userRole = req.user?.role;
+        const userId = req.user?.userId;
 
-        const quiz = await prisma.quiz.findUnique({ where: { id } });
-        if (!quiz) {
+        // Check if quiz exists and user has permission
+        const existingQuiz = await prisma.quiz.findUnique({
+            where: { id }
+        });
+
+        if (!existingQuiz) {
             return res.status(404).json({ message: 'Quiz not found' });
         }
+
+        // Role-based access control
+        if (userRole === 'ADMIN' && existingQuiz.createdById !== userId) {
+            return res.status(403).json({ message: 'You can only edit quizzes you created' });
+        }
+        // Super admins can edit any quiz, including those with null createdById
+
+        // Super admins can edit any quiz, regular admins only their own
 
         const parsedDuration = duration !== undefined ? Number(duration) : undefined;
         if (parsedDuration !== undefined && (!Number.isFinite(parsedDuration) || parsedDuration <= 0)) {
@@ -167,9 +199,12 @@ router.patch('/:id', authenticate, authorize(['ADMIN']), async (req: AuthRequest
 });
 
 // Toggle quiz activity (Admin only)
-router.patch('/:id/toggle', authenticate, authorize(['ADMIN']), async (req: AuthRequest, res) => {
+router.patch('/:id/toggle', authenticate, authorize(['ADMIN', 'SUPER_ADMIN']), async (req: AuthRequest, res) => {
     try {
         const id = req.params.id as string;
+        const userRole = req.user?.role;
+        const userId = req.user?.userId;
+
         const quiz = await prisma.quiz.findUnique({
             where: { id }
         });
@@ -177,6 +212,12 @@ router.patch('/:id/toggle', authenticate, authorize(['ADMIN']), async (req: Auth
         if (!quiz) {
             return res.status(404).json({ message: 'Quiz not found' });
         }
+
+        // Role-based access control
+        if (userRole === 'ADMIN' && quiz.createdById !== userId) {
+            return res.status(403).json({ message: 'You can only toggle quizzes you created' });
+        }
+        // Super admins can toggle any quiz, including those with null createdById
 
         console.log(`[QUIZ_TOGGLE] QuizID: ${id}, NewState: ${!quiz.isActive}`);
         const updatedQuiz = await prisma.quiz.update({
@@ -192,11 +233,28 @@ router.patch('/:id/toggle', authenticate, authorize(['ADMIN']), async (req: Auth
 });
 
 // Delete quiz (Admin only)
-router.delete('/:id', authenticate, authorize(['ADMIN']), async (req: AuthRequest, res) => {
+router.delete('/:id', authenticate, authorize(['ADMIN', 'SUPER_ADMIN']), async (req: AuthRequest, res) => {
     try {
         const id = req.params.id as string;
+        const userRole = req.user?.role;
+        const userId = req.user?.userId;
 
-        console.log(`[QUIZ_DELETE] QuizID: ${id}`);
+        // Check if quiz exists and user has permission
+        const quiz = await prisma.quiz.findUnique({
+            where: { id }
+        });
+
+        if (!quiz) {
+            return res.status(404).json({ message: 'Quiz not found' });
+        }
+
+        // Role-based access control
+        if (userRole === 'ADMIN' && quiz.createdById !== userId) {
+            return res.status(403).json({ message: 'You can only delete quizzes you created' });
+        }
+        // Super admins can delete any quiz, including those with null createdById
+
+        console.log(`[QUIZ_DELETE] QuizID: ${id}, User: ${userId}, Role: ${userRole}`);
         // Cascade delete: sessions -> questions -> quiz
         await prisma.$transaction([
             prisma.quizSession.deleteMany({ where: { quizId: id } }),

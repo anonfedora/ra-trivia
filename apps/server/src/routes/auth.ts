@@ -29,8 +29,8 @@ const registerValidation = [
         .escape(),
     body('role')
         .optional()
-        .isIn(['ADMIN', 'CANDIDATE'])
-        .withMessage('Role must be either ADMIN or CANDIDATE')
+        .isIn(['SUPER_ADMIN', 'ADMIN', 'CANDIDATE'])
+        .withMessage('Role must be either SUPER_ADMIN, ADMIN, or CANDIDATE')
 ];
 
 // Login validation rules

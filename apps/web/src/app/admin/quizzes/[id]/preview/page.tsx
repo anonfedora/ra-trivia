@@ -39,7 +39,7 @@ export default function AdminQuizPreviewPage() {
         const userRaw = localStorage.getItem('user');
         const user = userRaw ? JSON.parse(userRaw) : null;
 
-        if (!token || !user || user.role !== 'ADMIN') {
+        if (!token || !user || (user.role !== 'ADMIN' && user.role !== 'SUPER_ADMIN')) {
             router.push('/login');
             return;
         }

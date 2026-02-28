@@ -167,7 +167,7 @@ router.post('/submit', authenticate, async (req: AuthRequest, res) => {
             };
         });
 
-        const score = questions.length > 0 ? (correctCount / questions.length) * 100 : 0;
+        const score = questions.length > 0 ? Math.round((correctCount / questions.length) * 100 * 100) / 100 : 0;
 
         const updatedSession = await prisma.quizSession.update({
             where: { id: sessionId },

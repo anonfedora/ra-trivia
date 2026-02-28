@@ -20,6 +20,7 @@ model User {
   createdAt DateTime      @default(now())
   updatedAt DateTime      @updatedAt
   sessions  QuizSession[]
+  quizzes   Quiz[]        @relation("QuizCreator")
 }
 
 model Question {
@@ -44,10 +45,12 @@ model Quiz {
   retakeLimit Int?          @default(2)
   startDate   DateTime?
   endDate     DateTime?
+  createdById String?
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
   questions   Question[]
   sessions    QuizSession[]
+  createdBy   User?         @relation("QuizCreator", fields: [createdById], references: [id])
 }
 
 model QuizSession {
@@ -65,6 +68,7 @@ model QuizSession {
 }
 
 enum Role {
+  SUPER_ADMIN
   ADMIN
   CANDIDATE
 }

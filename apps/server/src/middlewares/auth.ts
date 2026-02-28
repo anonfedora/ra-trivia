@@ -36,8 +36,15 @@ export const authorize = (roles: string[]) => {
 };
 
 export const authorizeAdmin = (req: AuthRequest, res: Response, next: NextFunction) => {
-    if (req.user?.role !== 'ADMIN') {
+    if (req.user?.role !== 'ADMIN' && req.user?.role !== 'SUPER_ADMIN') {
         return res.status(403).json({ message: 'Forbidden: Admin access required' });
+    }
+    next();
+};
+
+export const authorizeSuperAdmin = (req: AuthRequest, res: Response, next: NextFunction) => {
+    if (req.user?.role !== 'SUPER_ADMIN') {
+        return res.status(403).json({ message: 'Forbidden: Super admin access required' });
     }
     next();
 };
