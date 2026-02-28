@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { apiJson } from '../../lib/api';
+import PasswordInput from '../../components/PasswordInput';
 
 export default function RegisterPage() {
     const [email, setEmail] = useState('');
@@ -105,11 +106,9 @@ export default function RegisterPage() {
 
                     <div className="space-y-2">
                         <label className="text-sm font-semibold text-slate-700 ml-1">Password</label>
-                        <input
-                            type="password"
+                        <PasswordInput
                             value={password}
                             onChange={(e) => setPassword(e.target.value)}
-                            className="w-full px-6 py-4 rounded-2xl bg-slate-50 border border-slate-200 focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all outline-none text-slate-900 font-medium"
                             placeholder="••••••••"
                             required
                         />

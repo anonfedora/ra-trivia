@@ -80,23 +80,34 @@ router.post('/start', authenticate, async (req: AuthRequest, res) => {
         }
 
         // Randomize question order and shuffle answers
-        const randomizedQuestions = quizWithQuestions.questions
-            .sort(() => Math.random() - 0.5) // Shuffle questions
-            .map(question => {
-                // Create array of options and shuffle them
-                const options = [
-                    { key: 'A', text: question.optionA },
-                    { key: 'B', text: question.optionB },
-                    { key: 'C', text: question.optionC },
-                    { key: 'D', text: question.optionD }
-                ].filter(opt => opt.text) // Remove empty options
-                 .sort(() => Math.random() - 0.5); // Shuffle options
+        const questions = [...quizWithQuestions.questions];
+        
+        // Fisher-Yates shuffle for questions
+        for (let i = questions.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [questions[i], questions[j]] = [questions[j], questions[i]];
+        }
 
-                return {
-                    ...question,
-                    randomizedOptions: options
-                };
-            });
+        const randomizedQuestions = questions.map(question => {
+            // Create array of options and shuffle them using Fisher-Yates
+            const options = [
+                { key: 'A', text: question.optionA },
+                { key: 'B', text: question.optionB },
+                { key: 'C', text: question.optionC },
+                { key: 'D', text: question.optionD }
+            ].filter(opt => opt.text); // Remove empty options
+
+            // Fisher-Yates shuffle for truly random ordering
+            for (let i = options.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [options[i], options[j]] = [options[j], options[i]];
+            }
+
+            return {
+                ...question,
+                randomizedOptions: options
+            };
+        });
 
         const randomizedQuiz = {
             ...quizWithQuestions,
