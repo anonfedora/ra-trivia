@@ -44,8 +44,15 @@ export default function RegisterPage() {
     return (
         <main className="min-h-screen bg-slate-100 flex items-center justify-center p-6">
             <div className="bg-white p-10 rounded-[2.5rem] shadow-2xl max-w-md w-full border border-slate-100 animate-slide-up">
-                <h2 className="text-3xl font-bold text-slate-900 mb-2">Create Account</h2>
-                <p className="text-slate-500 mb-8">Join the quiz portal to challenge yourself.</p>
+                <div className="text-center mb-8">
+                    <img 
+                        src="/favicon.png" 
+                        alt="RA Logo" 
+                        className="w-16 h-16 mx-auto mb-4 rounded-lg"
+                    />
+                    <h2 className="text-3xl font-bold text-slate-900 mb-2">Create Account</h2>
+                    <p className="text-slate-500">Join the quiz portal to challenge yourself.</p>
+                </div>
 
                 {error && (
                     <div className="bg-red-50 text-red-600 p-4 rounded-2xl mb-6 text-sm font-medium border border-red-100">

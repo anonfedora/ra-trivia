@@ -38,7 +38,7 @@ const loginValidation = [
     body('email')
         .isEmail()
         .withMessage('Please provide a valid email address')
-        .normalizeEmail(),
+        .trim(), // Only trim whitespace, don't normalize
     body('password')
         .notEmpty()
         .withMessage('Password is required')

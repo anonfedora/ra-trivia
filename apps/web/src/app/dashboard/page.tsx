@@ -129,9 +129,16 @@ export default function DashboardPage() {
         <main className="min-h-screen bg-slate-50 p-6 md:p-12">
             <div className="max-w-6xl mx-auto">
                 <header className="flex justify-between items-center mb-12 animate-fade-in text-center md:text-left">
-                    <div>
-                        <h1 className="text-4xl font-bold text-slate-900">Candidate Dashboard</h1>
-                        <p className="text-slate-500 mt-2">Welcome back, <span className="font-bold text-primary">{user?.name}</span>. Ready for your next challenge?</p>
+                    <div className="flex items-center gap-4">
+                        <img 
+                            src="/favicon.png" 
+                            alt="RA Logo" 
+                            className="w-12 h-12 rounded-lg"
+                        />
+                        <div>
+                            <h1 className="text-4xl font-bold text-slate-900">Candidate Dashboard</h1>
+                            <p className="text-slate-500 mt-2">Welcome back, <span className="font-bold text-primary">{user?.name}</span>. Ready for your next challenge?</p>
+                        </div>
                     </div>
                     <button
                         onClick={handleLogout}

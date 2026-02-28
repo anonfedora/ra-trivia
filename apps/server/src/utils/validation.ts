@@ -14,7 +14,7 @@ export const emailValidation = (): ValidationChain => {
     return body('email')
         .isEmail()
         .withMessage('Please provide a valid email address')
-        .normalizeEmail();
+        .trim(); // Only trim whitespace, don't normalize
 };
 
 // Name validation
