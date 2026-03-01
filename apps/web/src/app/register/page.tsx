@@ -30,10 +30,8 @@ export default function RegisterPage() {
         });
 
         if (result.ok && result.data?.user) {
-            // TODO: Revert to email verification flow when re-enabled
-            // Store token and redirect to dashboard
-            // Note: Registration doesn't return token, user needs to login
-            router.push('/login?message=Registration successful, please login');
+            // Redirect to OTP verification page
+            router.push(`/verify-otp?email=${encodeURIComponent(email)}`);
             return;
         } else {
             setError('error' in result ? result.error : 'Registration failed');

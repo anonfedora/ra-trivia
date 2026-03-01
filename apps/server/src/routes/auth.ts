@@ -5,7 +5,8 @@ import crypto from 'crypto';
 import { prisma } from 'database';
 import { body } from 'express-validator';
 import { handleValidationErrors } from '../middlewares/errorHandler';
-import { sendVerificationEmail } from '../services/email';
+import { sendVerificationEmail, generateOTP } from '../services/email';
+import { authenticate, AuthRequest } from '../middlewares/auth';
 import { 
     passwordValidation, 
     emailValidation, 
@@ -63,6 +64,11 @@ router.post('/register', registerValidation, handleValidationErrors, async (req:
         const verifyTokenHash = crypto.createHash('sha256').update(rawVerifyToken).digest('hex');
         const verifyTokenExpiresAt = new Date(Date.now() + 1000 * 60 * 60 * 24); // 24h
         
+        // Generate 6-digit OTP for email verification
+        const otp = generateOTP();
+        const otpHash = crypto.createHash('sha256').update(otp).digest('hex');
+        const otpExpiresAt = new Date(Date.now() + 1000 * 60 * 10); // 10 minutes
+        
         const user = await prisma.user.create({
             data: {
                 email,
@@ -70,9 +76,11 @@ router.post('/register', registerValidation, handleValidationErrors, async (req:
                 password: hashedPassword,
                 church: church || null,
                 role: role || 'CANDIDATE',
-                emailVerified: true, // TODO: Change back to false when email verification is re-enabled
+                emailVerified: false, // Require OTP verification
                 emailVerificationTokenHash: verifyTokenHash,
-                emailVerificationTokenExpiresAt: verifyTokenExpiresAt
+                emailVerificationTokenExpiresAt: verifyTokenExpiresAt,
+                emailOtpHash: otpHash,
+                emailOtpExpiresAt: otpExpiresAt
             }
         });
 
@@ -80,12 +88,11 @@ router.post('/register', registerValidation, handleValidationErrors, async (req:
         const host = (req.header('x-forwarded-host') || req.get('host') || 'localhost:4000').toString();
         const verifyUrl = `${protocol}://${host}/api/auth/verify?token=${rawVerifyToken}`;
         
-        // TODO: Re-enable email verification later
-        // const emailSent = await sendVerificationEmail(user.email, user.name, verifyUrl);
-        const emailSent = true; // Temporarily bypass email sending
+        // Send verification email with OTP
+        const emailSent = await sendVerificationEmail(user.email, user.name, verifyUrl, otp);
 
         res.status(201).json({
-            message: 'Registration successful! You can now log in.', // TODO: Revert to email verification message when re-enabled
+            message: 'Registration successful! Please check your email for a 6-digit verification code.',
             emailSent,
             user: {
                 id: user.id,
@@ -223,7 +230,114 @@ router.post('/login', loginValidation, handleValidationErrors, async (req: Reque
             } 
         });
     } catch (error) {
-        console.error('Login error:', error);
+        console.error('[AUTH] Login error:', error);
+        res.status(500).json({ message: 'Internal server error' });
+    }
+});
+
+// OTP verification endpoint
+router.post('/verify-otp', [
+    body('email').isEmail().withMessage('Please provide a valid email address'),
+    body('otp').isLength({ min: 6, max: 6 }).withMessage('OTP must be 6 digits')
+], handleValidationErrors, async (req: Request, res: Response) => {
+    try {
+        const { email, otp } = req.body;
+
+        const user = await prisma.user.findUnique({ where: { email } });
+        
+        if (!user) {
+            return res.status(404).json({ message: 'User not found' });
+        }
+
+        // Check if OTP is valid and not expired
+        const otpHash = crypto.createHash('sha256').update(otp).digest('hex');
+        const isOtpValid = user.emailOtpHash === otpHash && user.emailOtpExpiresAt && user.emailOtpExpiresAt > new Date();
+
+        if (!isOtpValid) {
+            return res.status(400).json({ message: 'Invalid or expired OTP' });
+        }
+
+        // Mark email as verified and clear OTP
+        await prisma.user.update({
+            where: { id: user.id },
+            data: {
+                emailVerified: true,
+                emailOtpHash: null,
+                emailOtpExpiresAt: null
+            }
+        });
+
+        const token = jwt.sign({ userId: user.id, role: user.role }, JWT_SECRET, { expiresIn: '24h' });
+        
+        res.json({
+            message: 'Email verified successfully!',
+            token,
+            user: {
+                id: user.id,
+                name: user.name,
+                email: user.email,
+                role: user.role,
+                emailVerified: true
+            }
+        });
+    } catch (error) {
+        console.error('[AUTH] OTP verification error:', error);
+        res.status(500).json({ message: 'Internal server error' });
+    }
+});
+
+// Logout endpoint
+router.post('/logout', authenticate, async (req: AuthRequest, res: Response) => {
+    try {
+        // In a real app, you might want to blacklist the token
+        // For now, we'll just return a success message
+        res.json({ message: 'Logged out successfully' });
+    } catch (error) {
+        console.error('[AUTH] Logout error:', error);
+        res.status(500).json({ message: 'Internal server error' });
+    }
+});
+
+// Resend OTP endpoint
+router.post('/resend-verification', [
+    body('email').isEmail().withMessage('Please provide a valid email address')
+], handleValidationErrors, async (req: Request, res: Response) => {
+    try {
+        const { email } = req.body;
+
+        const user = await prisma.user.findUnique({ where: { email } });
+        
+        // Prevent user enumeration
+        if (!user || user.emailVerified) {
+            return res.json({ message: 'If an account exists for this email, a verification code has been sent.' });
+        }
+
+        // Generate new OTP
+        const otp = generateOTP();
+        const otpHash = crypto.createHash('sha256').update(otp).digest('hex');
+        const otpExpiresAt = new Date(Date.now() + 1000 * 60 * 10); // 10 minutes
+
+        await prisma.user.update({
+            where: { id: user.id },
+            data: {
+                emailOtpHash: otpHash,
+                emailOtpExpiresAt: otpExpiresAt
+            }
+        });
+
+        const protocol = (req.header('x-forwarded-proto') || req.protocol || 'http').toString();
+        const host = (req.header('x-forwarded-host') || req.get('host') || 'localhost:4000').toString();
+        const verifyUrl = `${protocol}://${host}/verify-otp?email=${encodeURIComponent(email)}`;
+        
+        // Send verification email with new OTP
+        const emailSent = await sendVerificationEmail(user.email, user.name, verifyUrl, otp);
+
+        res.json({
+            message: 'Verification code sent successfully!',
+            emailSent
+        });
+    } catch (error) {
+        console.error('[AUTH] Resend OTP error:', error);
         res.status(500).json({ message: 'Internal server error' });
     }
 });
