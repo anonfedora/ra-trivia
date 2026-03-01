@@ -13,6 +13,7 @@ function VerifyOTPContent() {
     const router = useRouter();
     const searchParams = useSearchParams();
     const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
+    const isSubmitting = useRef(false);
 
     // Get email from URL params if provided
     useEffect(() => {
@@ -23,9 +24,14 @@ function VerifyOTPContent() {
     }, [searchParams]);
 
     const handleInputChange = (index: number, value: string) => {
+        // Reset submitting flag when user changes OTP
+        if (error) {
+            isSubmitting.current = false;
+        }
+
         // Only allow numbers
         const numValue = value.replace(/\D/g, '');
-        
+
         const newOtp = [...otp];
         newOtp[index] = numValue.slice(-1); // Only take last digit
         setOtp(newOtp);
@@ -34,22 +40,39 @@ function VerifyOTPContent() {
         if (numValue && index < 5) {
             inputRefs.current[index + 1]?.focus();
         }
-
-        // Auto-submit when all 6 digits are entered
-        const otpString = newOtp.join('');
-        if (otpString.length === 6) {
-            setTimeout(() => {
-                handleVerifyOTP({ preventDefault: () => {} } as React.FormEvent);
-            }, 100);
-        }
     };
+
+    // Auto-submit when all 6 digits are entered
+    useEffect(() => {
+        const otpString = otp.join('');
+        // Only trigger if we have 6 digits, we aren't already loading, 
+        // we haven't already succeeded, and we aren't already in the middle of a submission timer
+        if (otpString.length === 6 && !isLoading && !isSubmitting.current && !success) {
+            isSubmitting.current = true;
+            const timer = setTimeout(() => {
+                handleVerifyOTP({ preventDefault: () => { } } as React.FormEvent);
+            }, 500);
+
+            return () => {
+                clearTimeout(timer);
+            };
+        }
+
+        // Reset submitting flag if OTP changes and is not 6 digits
+        if (otpString.length !== 6) {
+            isSubmitting.current = false;
+        }
+    }, [otp.join(''), success]); // Removed isLoading from deps to prevent re-triggering after successful verification
 
     const handlePaste = (e: React.ClipboardEvent) => {
         e.preventDefault();
         const pastedData = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, 6);
         const newOtp = pastedData.split('').concat(Array(6 - pastedData.length).fill(''));
         setOtp(newOtp);
-        
+
+        // Reset auto-submit flag when pasting to allow auto-submit
+        isSubmitting.current = false;
+
         // Focus the next empty input or the last filled one
         const nextIndex = Math.min(pastedData.length, 5);
         setTimeout(() => {
@@ -75,35 +98,43 @@ function VerifyOTPContent() {
 
     const handleVerifyOTP = async (e: React.FormEvent) => {
         e.preventDefault();
+
+        // Prevent multiple submissions if already loading or already successful
+        if (isLoading || success) return;
+
         setError('');
         setSuccess('');
         setIsLoading(true);
 
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
+
         try {
-            const response = await apiJson('/auth/verify-otp', {
+            const response = await apiJson(`${apiUrl}/auth/verify-otp`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
                 body: JSON.stringify({ email, otp: otpString }),
             });
-            
+
             if (response.ok && response.data) {
                 const data = response.data as any;
                 if (data.token) {
                     localStorage.setItem('token', data.token);
                     localStorage.setItem('user', JSON.stringify(data.user));
                     setSuccess('Email verified successfully! Redirecting...');
-                    
+
                     setTimeout(() => {
                         router.push('/dashboard');
                     }, 1500);
                 }
             } else {
                 setError(!response.ok ? (response as any).error : 'Verification failed. Please try again.');
+                isSubmitting.current = false; // Reset flag on error
             }
         } catch (err: any) {
             setError('Verification failed. Please try again.');
+            isSubmitting.current = false; // Reset flag on error
         } finally {
             setIsLoading(false);
         }
@@ -114,15 +145,17 @@ function VerifyOTPContent() {
         setSuccess('');
         setIsLoading(true);
 
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
+
         try {
-            const response = await apiJson('/auth/resend-verification', {
+            const response = await apiJson(`${apiUrl}/auth/resend-verification`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
                 body: JSON.stringify({ email }),
             });
-            
+
             if (response.ok) {
                 setSuccess('New OTP sent to your email!');
                 // Clear OTP inputs

@@ -4,18 +4,18 @@ const resend = new Resend(process.env.RESEND_API_KEY);
 const fromEmail = process.env.RESEND_FROM_EMAIL || 'onboarding@resend.dev';
 const fromName = process.env.RESEND_FROM_NAME || 'Quiz System';
 
-// Development email logging - only activate when using fake API key
+// Development email logging
 const logEmailForDev = (to: string, subject: string, html: string, otp?: string) => {
-  if (process.env.NODE_ENV === 'development' && process.env.RESEND_API_KEY) {
+  if (process.env.NODE_ENV === 'development') {
     console.log('\n📧 === DEVELOPMENT EMAIL LOG ===');
     console.log(`To: ${to}`);
     console.log(`Subject: ${subject}`);
     if (otp) console.log(`OTP: ${otp}`);
     console.log(`HTML: ${html.substring(0, 200)}...`);
     console.log('=== END EMAIL LOG ===\n');
-    return true; // Pretend email was sent
   }
-  return false;
+
+  return process.env.RESEND_SIMULATE === 'true';
 };
 
 interface AnswerDetail {
@@ -73,13 +73,13 @@ export const sendQuizResultEmail = async (email: string, name: string, score: nu
 };
 
 export const generateOTP = (): string => {
-    return Math.floor(100000 + Math.random() * 900000).toString().padStart(6, '0');
+  return Math.floor(100000 + Math.random() * 900000).toString().padStart(6, '0');
 };
 
 export const sendVerificationEmail = async (email: string, name: string, verifyUrl: string, otp?: string) => {
   console.log(`[EMAIL] Verification link: ${verifyUrl}`);
   console.log(`[EMAIL] OTP: ${otp || 'N/A'}`);
-  
+
   // Log email in development if using fake API key
   const devEmailHtml = `
     <div style="font-family: sans-serif; max-width: 600px; margin: auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 10px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
@@ -122,11 +122,11 @@ export const sendVerificationEmail = async (email: string, name: string, verifyU
       </div>
     </div>
   `;
-  
+
   if (logEmailForDev(email, 'Verify your email address', devEmailHtml, otp)) {
     return true;
   }
-  
+
   try {
     const data = await resend.emails.send({
       from: `${fromName} <${fromEmail}>`,
