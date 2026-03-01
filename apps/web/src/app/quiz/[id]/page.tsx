@@ -196,8 +196,8 @@ export default function QuizPage() {
                                     <div
                                         key={question.id}
                                         className={`p-4 rounded-2xl border-2 cursor-pointer transition-all ${hasAnswer
-                                                ? 'bg-green-50 border-green-200 hover:bg-green-100'
-                                                : 'bg-red-50 border-red-200 hover:bg-red-100'
+                                            ? 'bg-green-50 border-green-200 hover:bg-green-100'
+                                            : 'bg-red-50 border-red-200 hover:bg-red-100'
                                             }`}
                                         onClick={() => {
                                             setShowReview(false);
@@ -210,8 +210,8 @@ export default function QuizPage() {
                                                 <span className="ml-2 text-slate-600">{question.text.substring(0, 80)}...</span>
                                             </div>
                                             <div className={`px-3 py-1 rounded-full text-sm font-bold ${hasAnswer
-                                                    ? 'bg-green-100 text-green-700'
-                                                    : 'bg-red-100 text-red-700'
+                                                ? 'bg-green-100 text-green-700'
+                                                : 'bg-red-100 text-red-700'
                                                 }`}>
                                                 {hasAnswer ? 'Answered' : 'Not Answered'}
                                             </div>
@@ -295,18 +295,18 @@ export default function QuizPage() {
                 >
                     Previous
                 </button>
-                
+
                 <button
                     onClick={() => {
                         saveAnswer(currentQuestion.id, answers[currentQuestion.id]);
-                        handleSubmit();
+                        setShowReview(true);
                     }}
                     disabled={isSubmitting || !answers[currentQuestion.id]}
-                    className="flex-1 px-8 py-4 rounded-2xl font-bold text-white bg-green-600 hover:bg-green-700 shadow-xl shadow-green-100 transition-all transform hover:-translate-y-1 disabled:opacity-50"
+                    className="flex-1 px-8 py-4 rounded-2xl font-bold text-white bg-red-600 hover:bg-red-700 shadow-xl shadow-red-100 transition-all transform hover:-translate-y-1 disabled:opacity-50"
                 >
-                    {isSubmitting ? 'Submitting...' : 'Submit Answer'}
+                    {isSubmitting ? 'Submitting...' : 'Review and Submit'}
                 </button>
-                
+
                 {currentIndex < quiz.questions.length - 1 ? (
                     <button
                         onClick={() => setCurrentIndex(prev => Math.min(quiz.questions.length - 1, prev + 1))}

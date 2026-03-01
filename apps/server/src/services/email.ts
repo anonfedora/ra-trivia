@@ -76,54 +76,46 @@ export const generateOTP = (): string => {
   return Math.floor(100000 + Math.random() * 900000).toString().padStart(6, '0');
 };
 
-export const sendVerificationEmail = async (email: string, name: string, verifyUrl: string, otp?: string) => {
-  console.log(`[EMAIL] Verification link: ${verifyUrl}`);
-  console.log(`[EMAIL] OTP: ${otp || 'N/A'}`);
+export const sendVerificationEmail = async (email: string, name: string, verifyUrl?: string, otp?: string) => {
+  if (verifyUrl) console.log(`[EMAIL] Verification link: ${verifyUrl}`);
+  if (otp) console.log(`[EMAIL] OTP: ${otp}`);
 
-  // Log email in development if using fake API key
-  const devEmailHtml = `
-    <div style="font-family: sans-serif; max-width: 600px; margin: auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 10px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
-      <div style="text-align: center; margin-bottom: 30px;">
-        <div style="display: inline-block; width: 80px; height: 80px; background: white; border-radius: 50%; padding: 15px; margin-bottom: 20px;">
-          <div style="font-size: 24px; font-weight: bold; color: #667eea;">RA</div>
-        </div>
-        <h1 style="color: white; margin: 0; font-size: 28px;">Royal Ambassadors</h1>
-        <p style="color: rgba(255,255,255,0.9); font-size: 16px; margin: 10px 0;">Quiz Portal</p>
+  const emailHtml = `
+    <div style="font-family: sans-serif; max-width: 600px; margin: auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 10px;">
+      <div style="text-align: center; margin-bottom: 20px;">
+        <h1 style="color: #1e293b;">Action Required: Verify Your Email</h1>
       </div>
       
-      <div style="background: white; padding: 30px; border-radius: 10px; margin-bottom: 20px;">
-        <h2 style="color: #1e293b; margin-top: 0;">Hi ${name},</h2>
-        <p style="font-size: 16px; color: #334155; margin-bottom: 20px;">Please verify your email address to activate your account.</p>
-        
-        ${otp ? `
-        <div style="background: #f8fafc; border: 2px dashed #cbd5e1; border-radius: 10px; padding: 20px; margin: 20px 0; text-align: center;">
-          <p style="margin: 0 0 10px 0; color: #64748b; font-size: 14px;">Your 6-digit verification code is:</p>
-          <div style="display: flex; align-items: center; justify-content: center; gap: 15px; flex-wrap: wrap;">
-            <div style="font-size: 32px; font-weight: bold; color: #1e293b; letter-spacing: 8px; font-family: monospace; background: #e2e8f0; padding: 15px; border-radius: 8px; user-select: all; -webkit-user-select: all; -moz-user-select: all; -ms-user-select: all;">${otp}</div>
-            <div style="font-size: 12px; color: #64748b; text-align: center;">
-              <button onclick="navigator.clipboard.writeText('${otp}').then(() => { this.textContent = 'Copied!'; setTimeout(() => { this.textContent = 'Copy Code'; }, 2000); })" style="background: #3b82f6; color: white; border: none; padding: 8px 12px; border-radius: 6px; cursor: pointer; font-size: 12px; margin-top: 10px; transition: all 0.3s ease;">Copy Code</button>
-              <p style="margin: 5px 0 0 0; color: #94a3b8;">Click to copy to clipboard</p>
-            </div>
-          </div>
-          <p style="margin: 10px 0 0 0; color: #64748b; font-size: 12px;">This code will expire in 10 minutes.</p>
-        </div>
-        ` : ''}
-        
-        <div style="text-align: center; margin: 24px 0;">
-          <a href="${verifyUrl}" style="display: inline-block; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; text-decoration: none; padding: 15px 25px; border-radius: 10px; font-weight: 700; transition: all 0.3s ease;">Verify Email</a>
-        </div>
-        <p style="font-size: 14px; color: #64748b; text-align: center;">If the button doesn't work, copy and paste this link into your browser:</p>
-        <p style="font-size: 12px; color: #64748b; word-break: break-all; text-align: center; background: #f8fafc; padding: 10px; border-radius: 5px;">${verifyUrl}</p>
+      <p style="font-size: 16px; color: #334155;">Hi ${name},</p>
+      <p style="font-size: 16px; color: #334155;">Please use the following verification code to complete your registration and access the quiz portal.</p>
+      
+      ${otp ? `
+      <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 20px; text-align: center; margin: 20px 0;">
+        <p style="margin: 0 0 10px 0; color: #64748b; font-size: 14px;">Your 6-digit verification code:</p>
+        <div style="font-size: 32px; font-weight: bold; color: #2563eb; letter-spacing: 4px;">${otp}</div>
+      </div>
+      ` : ''}
+      
+      ${verifyUrl && !otp ? `
+      <div style="text-align: center; margin: 30px 0;">
+        <a href="${verifyUrl}" style="background-color: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">Verify Email Address</a>
       </div>
       
-      <div style="text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid #e2e8f0;">
-        <p style="margin: 0; color: #64748b; font-size: 12px;">This is an automated message. Please do not reply.</p>
-        <p style="margin: 5px 0 0 0; color: #64748b; font-size: 12px;">© 2024 Royal Ambassadors Quiz Portal. All rights reserved.</p>
-      </div>
+      <p style="font-size: 14px; color: #64748b; margin-top: 30px;">
+        If the button above doesn't work, copy and paste this link into your browser:
+      </p>
+      <p style="font-size: 12px; color: #2563eb; word-break: break-all; background: #f8fafc; padding: 10px; border-radius: 4px;">
+        ${verifyUrl}
+      </p>
+      ` : ''}
+      
+      <p style="margin-top: 30px; color: #94a3b8; font-size: 12px; border-top: 1px solid #eee; padding-top: 20px;">
+        This is an automated message. Please do not reply.
+      </p>
     </div>
   `;
 
-  if (logEmailForDev(email, 'Verify your email address', devEmailHtml, otp)) {
+  if (logEmailForDev(email, 'Verify your email address', emailHtml, otp)) {
     return true;
   }
 
@@ -132,7 +124,7 @@ export const sendVerificationEmail = async (email: string, name: string, verifyU
       from: `${fromName} <${fromEmail}>`,
       to: email,
       subject: 'Verify your email address',
-      html: devEmailHtml
+      html: emailHtml
     });
     console.log(`[EMAIL] Verification sent to ${email}, ID: ${data.data?.id || 'unknown'}`);
     return true;
