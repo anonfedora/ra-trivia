@@ -25,6 +25,11 @@ export default function QuizPage() {
             }
 
             try {
+                // Clear any existing backup to force fresh randomization
+                const quizId = params.id as string;
+                const backupKeys = Object.keys(localStorage).filter(key => key.startsWith('quiz_backup_'));
+                backupKeys.forEach(key => localStorage.removeItem(key));
+
                 // For development, we assume there's a quiz with ID 'default'
                 const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
                 const res = await fetch(`${apiUrl}/quiz/start`, {
@@ -40,31 +45,9 @@ export default function QuizPage() {
                 if (res.ok) {
                     setQuiz(data.quiz);
                     setSession(data.session);
-                    
-                    // Recover answers from localStorage backup
-                    const backupAnswers = localStorage.getItem(`quiz_backup_${data.session.id}`);
-                    if (backupAnswers) {
-                        const parsedAnswers = JSON.parse(backupAnswers);
-                        setAnswers(parsedAnswers);
-                        
-                        // Sync with server
-                        Object.entries(parsedAnswers).forEach(([questionId, selectedOption]) => {
-                            fetch(`${apiUrl}/quiz/update-answer`, {
-                                method: 'POST',
-                                headers: {
-                                    'Content-Type': 'application/json',
-                                    'Authorization': `Bearer ${token}`
-                                },
-                                body: JSON.stringify({
-                                    sessionId: data.session.id,
-                                    questionId,
-                                    selectedOption
-                                }),
-                            }).catch(err => console.error('Failed to sync backup answer:', err));
-                        });
-                    } else {
-                        setAnswers(data.session.answers || {});
-                    }
+
+                    // Start fresh - don't recover old answers to ensure new randomization
+                    setAnswers(data.session.answers || {});
 
                     // Initialize timer
                     const durationSeconds = data.quiz.duration * 60;
@@ -88,7 +71,7 @@ export default function QuizPage() {
                     handleSubmit();
                     return 0;
                 }
-                
+
                 // Show warnings
                 if (prev === 300) { // 5 minutes
                     setShowWarning('5 minutes remaining!');
@@ -100,7 +83,7 @@ export default function QuizPage() {
                     setShowWarning('30 seconds remaining!');
                     setTimeout(() => setShowWarning(null), 3000);
                 }
-                
+
                 return prev - 1;
             });
         }, 1000);
@@ -190,7 +173,7 @@ export default function QuizPage() {
                 <div className="max-w-4xl w-full">
                     <div className="bg-white rounded-[2.5rem] shadow-xl p-10 border border-slate-100 mb-8">
                         <h1 className="text-3xl font-bold text-slate-900 mb-6">Review Your Answers</h1>
-                        
+
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
                             <div className="bg-blue-50 p-4 rounded-2xl text-center">
                                 <div className="text-2xl font-bold text-blue-600">{answeredCount}</div>
@@ -210,13 +193,12 @@ export default function QuizPage() {
                             {quiz.questions.map((question: any, index: number) => {
                                 const hasAnswer = answers[question.id];
                                 return (
-                                    <div 
+                                    <div
                                         key={question.id}
-                                        className={`p-4 rounded-2xl border-2 cursor-pointer transition-all ${
-                                            hasAnswer 
-                                                ? 'bg-green-50 border-green-200 hover:bg-green-100' 
+                                        className={`p-4 rounded-2xl border-2 cursor-pointer transition-all ${hasAnswer
+                                                ? 'bg-green-50 border-green-200 hover:bg-green-100'
                                                 : 'bg-red-50 border-red-200 hover:bg-red-100'
-                                        }`}
+                                            }`}
                                         onClick={() => {
                                             setShowReview(false);
                                             setCurrentIndex(index);
@@ -227,11 +209,10 @@ export default function QuizPage() {
                                                 <span className="font-bold text-slate-700">Q{index + 1}:</span>
                                                 <span className="ml-2 text-slate-600">{question.text.substring(0, 80)}...</span>
                                             </div>
-                                            <div className={`px-3 py-1 rounded-full text-sm font-bold ${
-                                                hasAnswer 
-                                                    ? 'bg-green-100 text-green-700' 
+                                            <div className={`px-3 py-1 rounded-full text-sm font-bold ${hasAnswer
+                                                    ? 'bg-green-100 text-green-700'
                                                     : 'bg-red-100 text-red-700'
-                                            }`}>
+                                                }`}>
                                                 {hasAnswer ? 'Answered' : 'Not Answered'}
                                             </div>
                                         </div>
@@ -288,7 +269,7 @@ export default function QuizPage() {
                 </h2>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-auto">
-                    {currentQuestion.randomizedOptions?.map((opt: any) => (
+                    {currentQuestion.randomizedOptions?.map((opt: any, index: number) => (
                         <button
                             key={opt.key}
                             onClick={() => saveAnswer(currentQuestion.id, opt.key)}
@@ -298,23 +279,9 @@ export default function QuizPage() {
                                 }`}
                         >
                             <span className={`inline-flex items-center justify-center w-8 h-8 rounded-lg mr-3 shadow-sm ${answers[currentQuestion.id] === opt.key ? 'bg-primary text-white' : 'bg-white text-slate-400'}`}>
-                                {opt.key}
+                                {String.fromCharCode(65 + index)}
                             </span>
                             {opt.text}
-                        </button>
-                    )) || ['A', 'B', 'C', 'D'].map((opt) => (
-                        <button
-                            key={opt}
-                            onClick={() => saveAnswer(currentQuestion.id, opt)}
-                            className={`p-6 rounded-2xl text-left font-semibold transition-all border-2 ${answers[currentQuestion.id] === opt
-                                ? 'bg-primary/5 border-primary text-primary shadow-md'
-                                : 'bg-slate-50 border-transparent text-slate-600 hover:bg-slate-100'
-                                }`}
-                        >
-                            <span className={`inline-flex items-center justify-center w-8 h-8 rounded-lg mr-3 shadow-sm ${answers[currentQuestion.id] === opt ? 'bg-primary text-white' : 'bg-white text-slate-400'}`}>
-                                {opt}
-                            </span>
-                            {currentQuestion[`option${opt}`]}
                         </button>
                     ))}
                 </div>

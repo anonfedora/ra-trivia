@@ -30,22 +30,22 @@ router.post('/start', authenticate, async (req: AuthRequest, res) => {
 
         const retakeLimit = quiz.retakeLimit || 2; // Default to 2 if not set
         if (completedSessions >= retakeLimit) {
-            return res.status(400).json({ 
-                message: `You have reached the maximum number of attempts (${retakeLimit}) for this quiz.` 
+            return res.status(400).json({
+                message: `You have reached the maximum number of attempts (${retakeLimit}) for this quiz.`
             });
         }
 
         // Check quiz scheduling
         const now = new Date();
         if (quiz.startDate && now < quiz.startDate) {
-            return res.status(400).json({ 
-                message: 'This quiz has not started yet.' 
+            return res.status(400).json({
+                message: 'This quiz has not started yet.'
             });
         }
 
         if (quiz.endDate && now > quiz.endDate) {
-            return res.status(400).json({ 
-                message: 'This quiz has ended.' 
+            return res.status(400).json({
+                message: 'This quiz has ended.'
             });
         }
 
@@ -64,6 +64,7 @@ router.post('/start', authenticate, async (req: AuthRequest, res) => {
                     userId,
                     quizId,
                     startTime: new Date(),
+                    // __remap__ will be added after randomizing questions (see below)
                     answers: {}
                 }
             });
@@ -81,12 +82,14 @@ router.post('/start', authenticate, async (req: AuthRequest, res) => {
 
         // Randomize question order and shuffle answers
         const questions = [...quizWithQuestions.questions];
-        
+
         // Fisher-Yates shuffle for questions
         for (let i = questions.length - 1; i > 0; i--) {
             const j = Math.floor(Math.random() * (i + 1));
             [questions[i], questions[j]] = [questions[j], questions[i]];
         }
+
+        console.log('[QUIZ_RANDOMIZATION] Shuffled questions:', questions.map(q => ({ id: q.id, originalOrder: quizWithQuestions.questions.findIndex(orig => orig.id === q.id) })));
 
         const randomizedQuestions = questions.map(question => {
             // Create array of options and shuffle them using Fisher-Yates
@@ -103,10 +106,51 @@ router.post('/start', authenticate, async (req: AuthRequest, res) => {
                 [options[i], options[j]] = [options[j], options[i]];
             }
 
+            // Remap keys to positional labels (A=index 0, B=index 1, etc.)
+            // This ensures that the correct answer key is distributed uniformly
+            // rather than always matching the original DB key (e.g. always 'B' or 'C').
+            const positionLabels = ['A', 'B', 'C', 'D'];
+            const remappedOptions = options.map((opt, index) => ({
+                originalKey: opt.key,       // keep originalKey for debugging
+                key: positionLabels[index], // new label based on position
+                text: opt.text
+            }));
+
+            // Find the new label for the correct option
+            const correctOriginalKey = question.correctOption;
+            const remappedCorrectOption = remappedOptions.find(
+                o => o.originalKey === correctOriginalKey
+            )?.key ?? correctOriginalKey;
+
+            console.log(`[QUIZ_RANDOMIZATION] Question ${question.id}: DB correctOption=${correctOriginalKey} -> remapped correctOption=${remappedCorrectOption}`);
+
             return {
                 ...question,
-                randomizedOptions: options
+                correctOption: remappedCorrectOption, // used for scoring
+                randomizedOptions: remappedOptions
             };
+        });
+
+        // Build remap: questionId -> { correctOption, options (in shuffled order) }
+        // Store this in the session so submit/results can use remapped keys correctly
+        const remap: Record<string, string> = {};
+        const optmap: Record<string, Array<{ key: string; text: string }>> = {};
+        randomizedQuestions.forEach(q => {
+            remap[q.id] = q.correctOption;
+            optmap[q.id] = q.randomizedOptions.map(o => ({ key: o.key, text: o.text }));
+        });
+
+        // Persist the remap and optmap into the session's answers JSON under reserved keys
+        const currentAnswers = (session.answers as Record<string, string>) || {};
+        await prisma.quizSession.update({
+            where: { id: session.id },
+            data: {
+                answers: {
+                    ...currentAnswers,
+                    __remap__: JSON.stringify(remap),
+                    __optmap__: JSON.stringify(optmap)
+                }
+            }
         });
 
         const randomizedQuiz = {
@@ -165,15 +209,23 @@ router.post('/submit', authenticate, async (req: AuthRequest, res) => {
 
         const answers = (session.answers as any) || {};
         const questions = session.quiz.questions;
+
+        // Retrieve the remap stored during quiz start (questionId -> remapped correct key)
+        // If not found, fall back to original DB correctOption
+        const remapRaw = answers.__remap__;
+        const remap: Record<string, string> = remapRaw ? JSON.parse(remapRaw) : {};
+
         let correctCount = 0;
         const answerDetails = questions.map((q: any) => {
             const selectedOption = answers[q.id];
-            const isCorrect = selectedOption === q.correctOption;
+            // Use remapped correct option if available, else fall back to DB key
+            const correctOption = remap[q.id] ?? q.correctOption;
+            const isCorrect = selectedOption === correctOption;
             if (isCorrect) correctCount++;
             return {
                 question: q.text,
                 selectedOption: selectedOption || 'No answer',
-                correctOption: q.correctOption,
+                correctOption,
                 isCorrect
             };
         });
@@ -253,21 +305,34 @@ router.get('/session/:id', authenticate, async (req: AuthRequest, res) => {
         const questions = session.quiz.questions;
         let correctCount = 0;
 
+        // Retrieve remap (questionId -> remapped correct key) and optmap (questionId -> shuffled options)
+        const remapRaw = (answers as any).__remap__;
+        const optmapRaw = (answers as any).__optmap__;
+        const remap: Record<string, string> = remapRaw ? JSON.parse(remapRaw) : {};
+        const optmap: Record<string, Array<{ key: string; text: string }>> = optmapRaw ? JSON.parse(optmapRaw) : {};
+
         const breakdown = questions.map((q: any) => {
             const selected = answers[q.id] ?? null;
-            const isCorrect = selected === q.correctOption;
+            // Use remapped correct option if available, else fall back to DB key
+            const correctOption = remap[q.id] ?? q.correctOption;
+            const isCorrect = selected === correctOption;
             if (isCorrect) correctCount++;
+
+            // Use the shuffled option order from optmap if available (so results match what was shown during quiz)
+            // Fall back to original DB order if no optmap entry
+            const options = optmap[q.id] ?? [
+                { key: 'A', text: q.optionA },
+                { key: 'B', text: q.optionB },
+                { key: 'C', text: q.optionC },
+                { key: 'D', text: q.optionD }
+            ].filter((opt: any) => Boolean(opt.text));
+
             return {
                 questionId: q.id,
                 text: q.text,
-                options: [
-                    { key: 'A', text: q.optionA },
-                    { key: 'B', text: q.optionB },
-                    { key: 'C', text: q.optionC },
-                    { key: 'D', text: q.optionD }
-                ].filter((opt: any) => Boolean(opt.text)),
+                options,
                 selectedOption: selected,
-                correctOption: q.correctOption,
+                correctOption,
                 isCorrect
             };
         });
