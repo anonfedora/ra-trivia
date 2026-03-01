@@ -1,7 +1,7 @@
 import { Resend } from 'resend';
 
 const resend = new Resend(process.env.RESEND_API_KEY);
-const fromEmail = process.env.RESEND_FROM_EMAIL || 'onboarding@resend.dev';
+const fromEmail = process.env.RESEND_FROM_EMAIL;
 const fromName = process.env.RESEND_FROM_NAME || 'Quiz System';
 
 // Development email logging
@@ -92,7 +92,8 @@ export const sendVerificationEmail = async (email: string, name: string, verifyU
       ${otp ? `
       <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 20px; text-align: center; margin: 20px 0;">
         <p style="margin: 0 0 10px 0; color: #64748b; font-size: 14px;">Your 6-digit verification code:</p>
-        <div style="font-size: 32px; font-weight: bold; color: #2563eb; letter-spacing: 4px;">${otp}</div>
+        <div style="font-size: 32px; font-weight: bold; color: #2563eb; letter-spacing: 4px; margin-bottom: 10px;">${otp}</div>
+        <p style="margin: 10px 0 0 0; color: #94a3b8; font-size: 12px;">(Please copy and paste this code into the verification page)</p>
       </div>
       ` : ''}
       
