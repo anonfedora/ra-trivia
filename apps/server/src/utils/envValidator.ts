@@ -34,7 +34,7 @@ export const validateEnv = () => {
     }
 
     console.log('✅ Environment variables validated successfully');
-    const fromEmail = process.env.RESEND_FROM_EMAIL;
+    const fromEmail = process.env.RESEND_FROM_EMAIL || 'onboarding@resend.dev';
     const fromName = process.env.RESEND_FROM_NAME || 'Quiz System';
     console.log(`📧 Email config: ${fromName} <${fromEmail}>`);
 };
