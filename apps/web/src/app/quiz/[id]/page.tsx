@@ -16,111 +16,48 @@ export default function QuizPage() {
     const [showReview, setShowReview] = useState(false);
     const router = useRouter();
 
-    useEffect(() => {
-        const fetchQuiz = async () => {
-            const token = localStorage.getItem('token');
-            if (!token) {
-                router.push('/login');
-                return;
-            }
-
-            try {
-                // Clear any existing backup to force fresh randomization
-                const quizId = params.id as string;
-                const backupKeys = Object.keys(localStorage).filter(key => key.startsWith('quiz_backup_'));
-                backupKeys.forEach(key => localStorage.removeItem(key));
-
-                // For development, we assume there's a quiz with ID 'default'
-                const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
-                const res = await fetch(`${apiUrl}/quiz/start`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${token}`
-                    },
-                    body: JSON.stringify({ quizId }),
-                });
-
-                const data = await res.json();
-                if (res.ok) {
-                    setQuiz(data.quiz);
-                    setSession(data.session);
-
-                    // Start fresh - don't recover old answers to ensure new randomization
-                    setAnswers(data.session.answers || {});
-
-                    // Initialize timer
-                    const durationSeconds = data.quiz.duration * 60;
-                    const elapsedSeconds = Math.floor((new Date().getTime() - new Date(data.session.startTime).getTime()) / 1000);
-                    setTimeLeft(Math.max(0, durationSeconds - elapsedSeconds));
-                }
-            } catch (err) {
-                console.error('Failed to load quiz');
-            }
-        };
-
-        fetchQuiz();
-    }, [router, quizId]);
-
-    useEffect(() => {
-        if (timeLeft <= 0) return;
-        const timer = setInterval(() => {
-            setTimeLeft((prev) => {
-                if (prev <= 1) {
-                    clearInterval(timer);
-                    handleSubmit();
-                    return 0;
-                }
-
-                // Show warnings
-                if (prev === 300) { // 5 minutes
-                    setShowWarning('5 minutes remaining!');
-                    setTimeout(() => setShowWarning(null), 3000);
-                } else if (prev === 60) { // 1 minute
-                    setShowWarning('1 minute remaining!');
-                    setTimeout(() => setShowWarning(null), 3000);
-                } else if (prev === 30) { // 30 seconds
-                    setShowWarning('30 seconds remaining!');
-                    setTimeout(() => setShowWarning(null), 3000);
-                }
-
-                return prev - 1;
-            });
-        }, 1000);
-        return () => clearInterval(timer);
-    }, [timeLeft]);
-
-    const saveAnswer = async (questionId: string, option: string) => {
-        const newAnswers = { ...answers, [questionId]: option };
-        setAnswers(newAnswers);
-
-        // Backup to localStorage for recovery
-        if (session?.id) {
-            localStorage.setItem(`quiz_backup_${session.id}`, JSON.stringify(newAnswers));
+    const fetchQuiz = useCallback(async () => {
+        const token = localStorage.getItem('token');
+        if (!token) {
+            router.push('/login');
+            return;
         }
 
-        // Auto-save to server
         try {
-            const token = localStorage.getItem('token');
+            // Clear any existing backup to force fresh randomization
+            const backupKeys = Object.keys(localStorage).filter(key => key.startsWith('quiz_backup_'));
+            backupKeys.forEach(key => localStorage.removeItem(key));
+
+            // For development, we assume there's a quiz with ID 'default'
             const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
-            await fetch(`${apiUrl}/quiz/update-answer`, {
+            const res = await fetch(`${apiUrl}/quiz/start`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${token}`
                 },
-                body: JSON.stringify({
-                    sessionId: session.id,
-                    questionId,
-                    selectedOption: option
-                }),
+                body: JSON.stringify({ quizId }),
             });
-        } catch (err) {
-            console.error('Auto-save failed');
-        }
-    };
 
-    const handleSubmit = async () => {
+            const data = await res.json();
+            if (res.ok) {
+                setQuiz(data.quiz);
+                setSession(data.session);
+
+                // Start fresh - don't recover old answers to ensure new randomization
+                setAnswers(data.session.answers || {});
+
+                // Initialize timer
+                const durationSeconds = data.quiz.duration * 60;
+                const elapsedSeconds = Math.floor((new Date().getTime() - new Date(data.session.startTime).getTime()) / 1000);
+                setTimeLeft(Math.max(0, durationSeconds - elapsedSeconds));
+            }
+        } catch (err) {
+            console.error('Failed to load quiz');
+        }
+    }, [quizId, router]);
+
+    const handleSubmit = useCallback(async () => {
         if (isSubmitting) return;
         setIsSubmitting(true);
 
@@ -152,7 +89,75 @@ export default function QuizPage() {
             alert('An error occurred during submission');
             setIsSubmitting(false);
         }
+    }, [isSubmitting, session?.id, router, quizId]);
+
+    useEffect(() => {
+        fetchQuiz();
+    }, [fetchQuiz]);
+
+    useEffect(() => {
+        if (timeLeft <= 0) {
+            if (quiz && session) {
+                handleSubmit();
+            }
+            return;
+        }
+        const timer = setInterval(() => {
+            setTimeLeft((prev) => {
+                if (prev <= 1) {
+                    clearInterval(timer);
+                    handleSubmit();
+                    return 0;
+                }
+
+                // Show warnings
+                if (prev === 300) { // 5 minutes
+                    setShowWarning('5 minutes remaining!');
+                    setTimeout(() => setShowWarning(null), 3000);
+                } else if (prev === 60) { // 1 minute
+                    setShowWarning('1 minute remaining!');
+                    setTimeout(() => setShowWarning(null), 3000);
+                } else if (prev === 30) { // 30 seconds
+                    setShowWarning('30 seconds remaining!');
+                    setTimeout(() => setShowWarning(null), 3000);
+                }
+
+                return prev - 1;
+            });
+        }, 1000);
+        return () => clearInterval(timer);
+    }, [timeLeft, handleSubmit, quiz, session]);
+
+    const saveAnswer = async (questionId: string, option: string) => {
+        const newAnswers = { ...answers, [questionId]: option };
+        setAnswers(newAnswers);
+
+        // Backup to localStorage for recovery
+        if (session?.id) {
+            localStorage.setItem(`quiz_backup_${session.id}`, JSON.stringify(newAnswers));
+        }
+
+        // Auto-save to server
+        try {
+            const token = localStorage.getItem('token');
+            const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
+            await fetch(`${apiUrl}/quiz/update-answer`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({
+                    sessionId: session.id,
+                    questionId,
+                    selectedOption: option
+                }),
+            });
+        } catch (err) {
+            console.error('Auto-save failed');
+        }
     };
+
 
     const formatTime = (seconds: number) => {
         const mins = Math.floor(seconds / 60);

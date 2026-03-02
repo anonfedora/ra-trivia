@@ -14,6 +14,7 @@ import quizRoutes from './routes/quiz';
 import adminRoutes from './routes/admin';
 import quizzesRoutes from './routes/quizzes';
 import passwordRequirementsRoutes from './routes/password-requirements';
+import { initScheduler } from './services/scheduler';
 
 // Validate environment variables on startup
 validateEnv();
@@ -54,7 +55,7 @@ app.use(cors({
     origin: (origin, callback) => {
         // Allow requests with no origin (like mobile apps or curl requests)
         if (!origin) return callback(null, true);
-        
+
         if (allowedOrigins.includes(origin)) {
             callback(null, true);
         } else {
@@ -117,4 +118,7 @@ app.use(globalErrorHandler);
 app.listen(PORT, () => {
     console.log(`🚀 Server is running on port ${PORT}`);
     console.log(`📝 Environment: ${process.env.NODE_ENV || 'development'}`);
+
+    // Initialize scheduled tasks
+    initScheduler();
 });

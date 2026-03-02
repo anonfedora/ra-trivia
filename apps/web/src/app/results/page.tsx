@@ -29,6 +29,7 @@ function ResultsContent() {
     const sessionId = searchParams.get('sessionId');
     const [result, setResult] = useState<SessionResult | null>(null);
     const [isLoading, setIsLoading] = useState(true);
+    const [lockedAt, setLockedAt] = useState<string | null>(null);
 
     const fetchSession = useCallback(async () => {
         if (!sessionId) { setIsLoading(false); return; }
@@ -38,7 +39,12 @@ function ResultsContent() {
             const res = await fetch(`${apiUrl}/quiz/session/${sessionId}`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
-            if (res.ok) setResult(await res.json());
+            if (res.status === 423) {
+                const data = await res.json();
+                setLockedAt(data.releaseAt);
+            } else if (res.ok) {
+                setResult(await res.json());
+            }
         } catch (err) {
             console.error('Failed to fetch result:', err);
         } finally {
@@ -53,6 +59,44 @@ function ResultsContent() {
             <div className="min-h-screen flex items-center justify-center bg-slate-50">
                 <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary" />
             </div>
+        );
+    }
+
+    if (lockedAt) {
+        const releaseDate = new Date(lockedAt);
+        return (
+            <main className="min-h-screen flex flex-col items-center justify-center bg-slate-50 p-6">
+                <div className="max-w-md w-full bg-white rounded-[2.5rem] shadow-xl p-10 text-center space-y-6 border border-slate-100 animate-scale-in">
+                    <div className="w-20 h-20 bg-amber-50 text-amber-500 rounded-full flex items-center justify-center mx-auto mb-2">
+                        <BookOpen size={40} />
+                    </div>
+                    <h1 className="text-2xl font-bold text-slate-900">Results Locked</h1>
+                    <p className="text-slate-500 leading-relaxed font-medium">
+                        Your exam has been submitted successfully! However, results are only released daily at <span className="text-slate-900 font-bold">10:00 PM</span>.
+                    </p>
+
+                    <div className="bg-slate-50 rounded-2xl p-6 border border-slate-100">
+                        <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-2">Available on</p>
+                        <p className="text-xl font-black text-primary">
+                            {releaseDate.toLocaleDateString(undefined, {
+                                month: 'long',
+                                day: 'numeric',
+                                hour: '2-digit',
+                                minute: '2-digit'
+                            })}
+                        </p>
+                    </div>
+
+                    <Link
+                        href="/dashboard"
+                        className="flex items-center justify-center gap-2 w-full bg-slate-900 text-white py-4 rounded-xl font-bold hover:bg-slate-800 transition-all shadow-lg active:scale-95"
+                    >
+                        <Home size={18} />
+                        Back to Dashboard
+                    </Link>
+                    <p className="text-[10px] text-slate-300 font-bold uppercase tracking-widest">You will receive an email once results are released</p>
+                </div>
+            </main>
         );
     }
 

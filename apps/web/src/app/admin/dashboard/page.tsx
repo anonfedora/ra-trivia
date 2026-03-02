@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { BookOpen, Clock, PlayCircle, Plus, Upload, Trash2, Power, PowerOff, FileDown, MoreVertical, CheckCircle, BarChart3 } from 'lucide-react';
 import Link from 'next/link';
 import { ThemeToggle } from '../../../components/ThemeToggle';
@@ -68,48 +68,7 @@ export default function AdminDashboard() {
 
     const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
 
-    useEffect(() => {
-        const token = localStorage.getItem('token');
-        const userRaw = localStorage.getItem('user');
-        if (userRaw) {
-            setUser(JSON.parse(userRaw));
-        }
-        fetchData();
-    }, []); // Empty dependency array - runs once on mount
-
-    useEffect(() => {
-        const selected = quizzes.find(q => q.id === selectedQuizId);
-        if (!selected) return;
-
-        // Check if user has permission to edit this quiz
-        const canEdit = user?.role === 'SUPER_ADMIN' || 
-            (user?.role === 'ADMIN' && selected.createdBy?.id === user?.id);
-
-        if (!canEdit) {
-            // Clear form fields if no permission
-            setEditTitle('');
-            setEditDuration('');
-            setEditRetakeLimit('2');
-            setEditStartDate('');
-            setEditEndDate('');
-            return;
-        }
-
-        setEditTitle(selected.title ?? '');
-        setEditDuration(String(selected.duration ?? ''));
-        setEditRetakeLimit(String(selected.retakeLimit ?? 2));
-        const toLocalInput = (iso?: string | null) => {
-            if (!iso) return '';
-            const d = new Date(iso);
-            if (Number.isNaN(d.getTime())) return '';
-            const pad = (n: number) => String(n).padStart(2, '0');
-            return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-        };
-        setEditStartDate(toLocalInput(selected.startDate));
-        setEditEndDate(toLocalInput(selected.endDate));
-    }, [selectedQuizId, quizzes, user]);
-
-    const fetchData = async () => {
+    const fetchData = useCallback(async () => {
         const token = localStorage.getItem('token');
         try {
             // Fetch Quizzes — cache-bust to always get fresh data
@@ -136,7 +95,49 @@ export default function AdminDashboard() {
         } finally {
             setIsLoading(false);
         }
-    };
+    }, [apiUrl]);
+
+    useEffect(() => {
+        const token = localStorage.getItem('token');
+        const userRaw = localStorage.getItem('user');
+        if (userRaw) {
+            setUser(JSON.parse(userRaw));
+        }
+        fetchData();
+    }, [fetchData]);
+
+    useEffect(() => {
+        const selected = quizzes.find(q => q.id === selectedQuizId);
+        if (!selected) return;
+
+        // Check if user has permission to edit this quiz
+        const canEdit = user?.role === 'SUPER_ADMIN' ||
+            (user?.role === 'ADMIN' && selected.createdBy?.id === user?.id);
+
+        if (!canEdit) {
+            // Clear form fields if no permission
+            setEditTitle('');
+            setEditDuration('');
+            setEditRetakeLimit('2');
+            setEditStartDate('');
+            setEditEndDate('');
+            return;
+        }
+
+        setEditTitle(selected.title ?? '');
+        setEditDuration(String(selected.duration ?? ''));
+        setEditRetakeLimit(String(selected.retakeLimit ?? 2));
+
+        const toLocalInput = (iso?: string | null) => {
+            if (!iso) return '';
+            const d = new Date(iso);
+            if (Number.isNaN(d.getTime())) return '';
+            const pad = (n: number) => String(n).padStart(2, '0');
+            return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+        };
+        setEditStartDate(toLocalInput(selected.startDate));
+        setEditEndDate(toLocalInput(selected.endDate));
+    }, [selectedQuizId, quizzes, user]);
 
     const handleSaveQuizMeta = async () => {
         if (!selectedQuizId) return;
@@ -468,7 +469,7 @@ export default function AdminDashboard() {
                                             </div>
                                         </div>
                                     )}
-                                    
+
                                     <div className="space-y-2">
                                         <label className="text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">Title</label>
                                         <input

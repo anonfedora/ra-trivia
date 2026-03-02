@@ -25,6 +25,7 @@ interface Session {
     startTime: string;
     endTime: string | null;
     score: number | null;
+    resultReleasesAt?: string | null;
     quiz: {
         id: string;
         title: string;
@@ -73,7 +74,7 @@ export default function DashboardPage() {
         }
 
         const userData = JSON.parse(storedUser);
-        
+
         // Redirect admins and super admins to admin dashboard
         if (userData.role === 'ADMIN' || userData.role === 'SUPER_ADMIN') {
             router.push('/admin/dashboard');
@@ -101,7 +102,7 @@ export default function DashboardPage() {
 
                     // Count completed attempts for each quiz
                     const quizzesWithAttempts = quizzesData.map((quiz: Quiz) => {
-                        const completedAttempts = sessionsData.filter((session: Session) => 
+                        const completedAttempts = sessionsData.filter((session: Session) =>
                             session.quiz.id === quiz.id && session.endTime !== null
                         ).length;
                         return { ...quiz, completedAttempts };
@@ -139,9 +140,9 @@ export default function DashboardPage() {
             <div className="max-w-6xl mx-auto">
                 <header className="flex justify-between items-center mb-12 animate-fade-in text-center md:text-left">
                     <div className="flex items-center gap-4">
-                        <img 
-                            src="/favicon.png" 
-                            alt="RA Logo" 
+                        <img
+                            src="/favicon.png"
+                            alt="RA Logo"
                             className="w-12 h-12 rounded-lg"
                         />
                         <div>
@@ -209,18 +210,17 @@ export default function DashboardPage() {
                                             </div>
 
                                             {(() => {
-                                                const remainingTries = quiz.retakeLimit && quiz.retakeLimit > 0 
+                                                const remainingTries = quiz.retakeLimit && quiz.retakeLimit > 0
                                                     ? Math.max(0, quiz.retakeLimit - (quiz.completedAttempts || 0))
                                                     : Infinity;
-                                                
+
                                                 return (
                                                     <Link
                                                         href={remainingTries > 0 ? `/quiz/${quiz.id}/instructions` : '#'}
-                                                        className={`block w-full text-center py-4 rounded-2xl font-bold shadow-lg transition-all active:scale-95 ${
-                                                            remainingTries > 0 
-                                                                ? 'bg-primary hover:bg-primary/90 text-white shadow-primary/20' 
-                                                                : 'bg-slate-300 text-slate-500 cursor-not-allowed'
-                                                        }`}
+                                                        className={`block w-full text-center py-4 rounded-2xl font-bold shadow-lg transition-all active:scale-95 ${remainingTries > 0
+                                                            ? 'bg-primary hover:bg-primary/90 text-white shadow-primary/20'
+                                                            : 'bg-slate-300 text-slate-500 cursor-not-allowed'
+                                                            }`}
                                                         onClick={(e) => {
                                                             if (remainingTries === 0) {
                                                                 e.preventDefault();
@@ -249,22 +249,47 @@ export default function DashboardPage() {
                                 {pastSessions.length === 0 ? (
                                     <p className="text-slate-400 text-center py-8 italic font-medium">No previous attempts recorded.</p>
                                 ) : (
-                                    pastSessions.map((session) => (
-                                        <div key={session.id} className="p-5 rounded-2xl bg-slate-50 border border-slate-100 hover:border-primary/20 transition-all">
-                                            <div className="font-bold text-slate-900 mb-1">{session.quiz.title}</div>
-                                            <div className="flex justify-between items-center mt-2">
-                                                <span className="text-xs text-slate-400 font-bold uppercase tracking-wider">
-                                                    {new Date(session.startTime).toLocaleDateString()}
-                                                </span>
-                                                <span className={`px-3 py-1 rounded-full text-xs font-black ${session.endTime
-                                                    ? 'bg-emerald-100 text-emerald-600'
-                                                    : 'bg-blue-100 text-blue-600'
-                                                    }`}>
-                                                    {session.endTime ? `${session.score?.toFixed(1)}%` : 'Running'}
-                                                </span>
+                                    pastSessions.map((session) => {
+                                        const now = new Date();
+                                        const isReleased = !session.resultReleasesAt || now >= new Date(session.resultReleasesAt);
+                                        const isRunning = !session.endTime;
+
+                                        return (
+                                            <div
+                                                key={session.id}
+                                                className={`p-5 rounded-2xl bg-slate-50 border border-slate-100 transition-all ${!isRunning ? 'cursor-pointer hover:border-primary/20 hover:bg-white active:scale-95' : ''}`}
+                                                onClick={() => {
+                                                    if (!isRunning) {
+                                                        router.push(`/results?quizId=${session.quiz.id}&sessionId=${session.id}`);
+                                                    }
+                                                }}
+                                            >
+                                                <div className="flex justify-between items-start mb-1">
+                                                    <div className="font-bold text-slate-900">{session.quiz.title}</div>
+                                                    {!isRunning && (
+                                                        <span className="text-[10px] font-bold text-primary bg-primary/5 px-2 py-1 rounded-lg">View Details</span>
+                                                    )}
+                                                </div>
+                                                <div className="flex justify-between items-center mt-2">
+                                                    <span className="text-xs text-slate-400 font-bold uppercase tracking-wider">
+                                                        {new Date(session.startTime).toLocaleDateString()}
+                                                    </span>
+                                                    <span className={`px-3 py-1 rounded-full text-xs font-black ${isRunning
+                                                        ? 'bg-blue-100 text-blue-600'
+                                                        : isReleased
+                                                            ? 'bg-emerald-100 text-emerald-600'
+                                                            : 'bg-orange-100 text-orange-600'
+                                                        }`}>
+                                                        {isRunning
+                                                            ? 'Running'
+                                                            : isReleased
+                                                                ? `${session.score?.toFixed(1)}%`
+                                                                : 'Locked until 10 PM'}
+                                                    </span>
+                                                </div>
                                             </div>
-                                        </div>
-                                    ))
+                                        );
+                                    })
                                 )}
                             </div>
                         </section>

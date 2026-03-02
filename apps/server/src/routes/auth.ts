@@ -7,10 +7,10 @@ import { body } from 'express-validator';
 import { handleValidationErrors } from '../middlewares/errorHandler';
 import { sendVerificationEmail, generateOTP } from '../services/email';
 import { authenticate, AuthRequest } from '../middlewares/auth';
-import { 
-    passwordValidation, 
-    emailValidation, 
-    nameValidation 
+import {
+    passwordValidation,
+    emailValidation,
+    nameValidation
 } from '../utils/validation';
 
 const router = Router();
@@ -54,6 +54,13 @@ router.post('/register', registerValidation, handleValidationErrors, async (req:
         });
 
         if (existingUser) {
+            if (!existingUser.emailVerified) {
+                return res.status(200).json({
+                    message: 'An unverified account already exists. Redirecting to verification page...',
+                    isUnverified: true,
+                    email: existingUser.email
+                });
+            }
             return res.status(400).json({ message: 'User with this email already exists' });
         }
 
@@ -63,12 +70,12 @@ router.post('/register', registerValidation, handleValidationErrors, async (req:
         const rawVerifyToken = crypto.randomBytes(32).toString('hex');
         const verifyTokenHash = crypto.createHash('sha256').update(rawVerifyToken).digest('hex');
         const verifyTokenExpiresAt = new Date(Date.now() + 1000 * 60 * 60 * 24); // 24h
-        
+
         // Generate 6-digit OTP for email verification
         const otp = generateOTP();
         const otpHash = crypto.createHash('sha256').update(otp).digest('hex');
         const otpExpiresAt = new Date(Date.now() + 1000 * 60 * 10); // 10 minutes
-        
+
         const user = await prisma.user.create({
             data: {
                 email,
@@ -87,13 +94,13 @@ router.post('/register', registerValidation, handleValidationErrors, async (req:
         const protocol = (req.header('x-forwarded-proto') || req.protocol || 'http').toString();
         const host = (req.header('x-forwarded-host') || req.get('host') || 'localhost:4000').toString();
         const verifyUrl = `${protocol}://${host}/api/auth/verify?token=${rawVerifyToken}`;
-        
-        // Send verification email with OTP
-        const emailSent = await sendVerificationEmail(user.email, user.name, verifyUrl, otp);
+
+        // Send verification email with OTP in the background to avoid latency
+        sendVerificationEmail(user.email, user.name, verifyUrl, otp)
+            .catch(err => console.error('[AUTH] Background verification email failed:', err));
 
         res.status(201).json({
             message: 'Registration successful! Please check your email for a 6-digit verification code.',
-            emailSent,
             user: {
                 id: user.id,
                 name: user.name,
@@ -104,23 +111,23 @@ router.post('/register', registerValidation, handleValidationErrors, async (req:
         });
     } catch (error) {
         console.error('Registration error:', error);
-        
+
         // Log more detailed error information
         if (error instanceof Error) {
             console.error('Error name:', error.name);
             console.error('Error message:', error.message);
             console.error('Error stack:', error.stack);
         }
-        
+
         // Check for specific database connection errors
         if (error && typeof error === 'object' && 'code' in error) {
             console.error('Database error code:', (error as any).code);
         }
-        
-        res.status(500).json({ 
+
+        res.status(500).json({
             message: 'Internal server error',
-            ...(process.env.NODE_ENV === 'development' && { 
-                error: error instanceof Error ? error.message : 'Unknown error' 
+            ...(process.env.NODE_ENV === 'development' && {
+                error: error instanceof Error ? error.message : 'Unknown error'
             })
         });
     }
@@ -158,8 +165,10 @@ router.post('/resend-verification-link', [
         const host = (req.header('x-forwarded-host') || req.get('host') || 'localhost:4000').toString();
         const verifyUrl = `${protocol}://${host}/api/auth/verify?token=${rawVerifyToken}`;
 
-        const emailSent = await sendVerificationEmail(user.email, user.name, verifyUrl);
-        return res.json({ message: 'If an account exists for this email, a verification email has been sent.', emailSent });
+        sendVerificationEmail(user.email, user.name, verifyUrl)
+            .catch(err => console.error('[AUTH] Background resend verification failed:', err));
+
+        return res.json({ message: 'If an account exists for this email, a verification email has been sent.' });
     } catch (error) {
         console.error('Resend verification error:', error);
         return res.status(500).json({ message: 'Internal server error' });
@@ -219,15 +228,15 @@ router.post('/login', loginValidation, handleValidationErrors, async (req: Reque
         }
 
         const token = jwt.sign({ userId: user.id, role: user.role }, JWT_SECRET, { expiresIn: '24h' });
-        res.json({ 
-            token, 
-            user: { 
-                id: user.id, 
-                name: user.name, 
-                email: user.email, 
+        res.json({
+            token,
+            user: {
+                id: user.id,
+                name: user.name,
+                email: user.email,
                 role: user.role,
                 emailVerified: user.emailVerified
-            } 
+            }
         });
     } catch (error) {
         console.error('[AUTH] Login error:', error);
@@ -244,7 +253,7 @@ router.post('/verify-otp', [
         const { email, otp } = req.body;
 
         const user = await prisma.user.findUnique({ where: { email } });
-        
+
         if (!user) {
             return res.status(404).json({ message: 'User not found' });
         }
@@ -268,7 +277,7 @@ router.post('/verify-otp', [
         });
 
         const token = jwt.sign({ userId: user.id, role: user.role }, JWT_SECRET, { expiresIn: '24h' });
-        
+
         res.json({
             message: 'Email verified successfully!',
             token,
@@ -306,7 +315,7 @@ router.post('/resend-verification', [
         const { email } = req.body;
 
         const user = await prisma.user.findUnique({ where: { email } });
-        
+
         // Prevent user enumeration
         if (!user || user.emailVerified) {
             return res.json({ message: 'If an account exists for this email, a verification code has been sent.' });
@@ -328,7 +337,7 @@ router.post('/resend-verification', [
         const protocol = (req.header('x-forwarded-proto') || req.protocol || 'http').toString();
         const host = (req.header('x-forwarded-host') || req.get('host') || 'localhost:4000').toString();
         const verifyUrl = `${protocol}://${host}/verify-otp?email=${encodeURIComponent(email)}`;
-        
+
         // Send verification email with new OTP
         const emailSent = await sendVerificationEmail(user.email, user.name, verifyUrl, otp);
 

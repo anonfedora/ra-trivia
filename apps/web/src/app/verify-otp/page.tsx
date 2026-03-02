@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, Suspense, useRef } from 'react';
+import { useState, useEffect, Suspense, useRef, useCallback } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { apiJson } from '../../lib/api';
 
@@ -42,27 +42,7 @@ function VerifyOTPContent() {
         }
     };
 
-    // Auto-submit when all 6 digits are entered
-    useEffect(() => {
-        const otpString = otp.join('');
-        // Only trigger if we have 6 digits, we aren't already loading, 
-        // we haven't already succeeded, and we aren't already in the middle of a submission timer
-        if (otpString.length === 6 && !isLoading && !isSubmitting.current && !success) {
-            isSubmitting.current = true;
-            const timer = setTimeout(() => {
-                handleVerifyOTP({ preventDefault: () => { } } as React.FormEvent);
-            }, 500);
-
-            return () => {
-                clearTimeout(timer);
-            };
-        }
-
-        // Reset submitting flag if OTP changes and is not 6 digits
-        if (otpString.length !== 6) {
-            isSubmitting.current = false;
-        }
-    }, [otp.join(''), success]); // Removed isLoading from deps to prevent re-triggering after successful verification
+    const otpString = otp.join('');
 
     const handlePaste = (e: React.ClipboardEvent) => {
         e.preventDefault();
@@ -94,9 +74,7 @@ function VerifyOTPContent() {
         }
     };
 
-    const otpString = otp.join('');
-
-    const handleVerifyOTP = async (e: React.FormEvent) => {
+    const handleVerifyOTP = useCallback(async (e: React.FormEvent) => {
         e.preventDefault();
 
         // Prevent multiple submissions if already loading or already successful
@@ -138,7 +116,28 @@ function VerifyOTPContent() {
         } finally {
             setIsLoading(false);
         }
-    };
+    }, [email, isLoading, otpString, router, success]);
+
+    // Auto-submit when all 6 digits are entered
+    useEffect(() => {
+        // Only trigger if we have 6 digits, we aren't already loading, 
+        // we haven't already succeeded, and we aren't already in the middle of a submission timer
+        if (otpString.length === 6 && !isLoading && !isSubmitting.current && !success) {
+            isSubmitting.current = true;
+            const timer = setTimeout(() => {
+                handleVerifyOTP({ preventDefault: () => { } } as React.FormEvent);
+            }, 500);
+
+            return () => {
+                clearTimeout(timer);
+            };
+        }
+
+        // Reset submitting flag if OTP changes and is not 6 digits
+        if (otpString.length !== 6) {
+            isSubmitting.current = false;
+        }
+    }, [otpString, success, isLoading, handleVerifyOTP]);
 
     const handleResendOTP = async () => {
         setError('');

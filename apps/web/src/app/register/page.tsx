@@ -23,13 +23,13 @@ export default function RegisterPage() {
         setIsLoading(true);
 
         const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
-        const result = await apiJson<{ user: any; message?: string }>(`${apiUrl}/auth/register`, {
+        const result = await apiJson<{ user: any; message?: string; isUnverified?: boolean }>(`${apiUrl}/auth/register`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ email, name, password, church })
         });
 
-        if (result.ok && result.data?.user) {
+        if (result.ok && (result.data?.user || result.data?.isUnverified)) {
             // Redirect to OTP verification page
             router.push(`/verify-otp?email=${encodeURIComponent(email)}`);
             return;
@@ -44,9 +44,9 @@ export default function RegisterPage() {
         <main className="min-h-screen bg-slate-100 flex items-center justify-center p-6">
             <div className="bg-white p-10 rounded-[2.5rem] shadow-2xl max-w-md w-full border border-slate-100 animate-slide-up">
                 <div className="text-center mb-8">
-                    <img 
-                        src="/favicon.png" 
-                        alt="RA Logo" 
+                    <img
+                        src="/favicon.png"
+                        alt="RA Logo"
                         className="w-16 h-16 mx-auto mb-4 rounded-lg"
                     />
                     <h2 className="text-3xl font-bold text-slate-900 mb-2">Create Account</h2>

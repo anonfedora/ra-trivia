@@ -11,6 +11,7 @@ export default function LoginPage() {
     const [password, setPassword] = useState('');
     const [error, setError] = useState('');
     const [info, setInfo] = useState('');
+    const [isLoading, setIsLoading] = useState(false);
     const router = useRouter();
 
     useEffect(() => {
@@ -23,6 +24,7 @@ export default function LoginPage() {
     const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();
         setError('');
+        setIsLoading(true);
 
         const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
         const result = await apiJson<{ token: string; user: any; message?: string }>(`${apiUrl}/auth/login`, {
@@ -37,6 +39,7 @@ export default function LoginPage() {
             router.push(result.data.user.role === 'ADMIN' ? '/admin/dashboard' : '/dashboard');
         } else {
             setError(('error' in result && result.error) ? result.error : 'Login failed');
+            setIsLoading(false);
         }
     };
 
@@ -44,9 +47,9 @@ export default function LoginPage() {
         <main className="min-h-screen bg-slate-100 flex items-center justify-center p-6">
             <div className="bg-white p-10 rounded-[2.5rem] shadow-2xl max-w-md w-full border border-slate-100 animate-slide-up">
                 <div className="text-center mb-8">
-                    <img 
-                        src="/favicon.png" 
-                        alt="RA Logo" 
+                    <img
+                        src="/favicon.png"
+                        alt="RA Logo"
                         className="w-16 h-16 mx-auto mb-4 rounded-lg"
                     />
                     <h2 className="text-3xl font-bold text-slate-900 mb-2">Welcome Back</h2>
@@ -90,9 +93,10 @@ export default function LoginPage() {
 
                     <button
                         type="submit"
-                        className="w-full bg-primary hover:bg-primary/90 text-white py-5 rounded-2xl font-bold shadow-lg shadow-primary/20 transform transition-all hover:-translate-y-1 active:scale-95 mt-4"
+                        disabled={isLoading}
+                        className="w-full bg-primary hover:bg-primary/90 text-white py-5 rounded-2xl font-bold shadow-lg shadow-primary/20 transform transition-all hover:-translate-y-1 active:scale-95 mt-4 disabled:opacity-50"
                     >
-                        Sign In
+                        {isLoading ? 'Signing In...' : 'Sign In'}
                     </button>
                 </form>
 

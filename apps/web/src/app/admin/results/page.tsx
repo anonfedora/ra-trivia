@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Search, FileDown, ArrowLeft, User, Mail, GraduationCap, Award, Calendar } from 'lucide-react';
 import Link from 'next/link';
 
@@ -37,7 +37,7 @@ export default function AdminResults() {
 
     const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
 
-    const fetchResults = async (overridePage?: number) => {
+    const fetchResults = useCallback(async (overridePage?: number) => {
         const token = localStorage.getItem('token');
         const effectivePage = overridePage ?? page;
         try {
@@ -60,11 +60,11 @@ export default function AdminResults() {
         } finally {
             setIsLoading(false);
         }
-    };
+    }, [apiUrl, page, pageSize, searchTerm, status]);
 
     useEffect(() => {
         fetchResults();
-    }, [page, pageSize, status]);
+    }, [fetchResults]);
 
     useEffect(() => {
         const t = setTimeout(() => {

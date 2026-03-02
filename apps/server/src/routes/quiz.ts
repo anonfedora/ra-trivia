@@ -232,22 +232,29 @@ router.post('/submit', authenticate, async (req: AuthRequest, res) => {
 
         const score = questions.length > 0 ? Math.round((correctCount / questions.length) * 100 * 100) / 100 : 0;
 
+        // Calculate Results Release Time (10 PM Daily)
+        const now = new Date();
+        const minReleaseTime = new Date(now.getTime() + 90 * 60 * 1000); // Now + 90 minutes
+
+        let releaseDate = new Date(now);
+        releaseDate.setHours(22, 0, 0, 0); // 10 PM today
+
+        // If 10 PM today is earlier than minReleaseTime, move to 10 PM tomorrow
+        if (releaseDate < minReleaseTime) {
+            releaseDate.setDate(releaseDate.getDate() + 1);
+            releaseDate.setHours(22, 0, 0, 0);
+        }
+
         const updatedSession = await prisma.quizSession.update({
             where: { id: sessionId },
             data: {
                 endTime: new Date(),
-                score
+                score,
+                resultReleasesAt: releaseDate,
+                emailSent: false
             },
             include: { user: true }
         });
-
-        // Send email via Resend (don't await to avoid blocking the response)
-        sendQuizResultEmail(
-            updatedSession.user.email,
-            updatedSession.user.name,
-            score,
-            answerDetails
-        ).catch(err => console.error('Background email sending failed:', err));
 
         res.json(updatedSession);
     } catch (error) {
@@ -269,7 +276,18 @@ router.get('/my-sessions', authenticate, async (req: AuthRequest, res) => {
             },
             orderBy: { startTime: 'desc' }
         });
-        res.json(sessions);
+
+        // Mask scores if results are not yet released
+        const now = new Date();
+        const processedSessions = sessions.map(session => {
+            const isReleased = !session.resultReleasesAt || now >= session.resultReleasesAt;
+            return {
+                ...session,
+                score: isReleased ? session.score : null
+            };
+        });
+
+        res.json(processedSessions);
     } catch (error) {
         console.error(error);
         res.status(500).json({ message: 'Internal server error' });
@@ -298,6 +316,14 @@ router.get('/session/:id', authenticate, async (req: AuthRequest, res) => {
         // Only owner or admin can view
         if (session.userId !== userId && req.user!.role !== 'ADMIN') {
             return res.status(403).json({ message: 'Forbidden' });
+        }
+
+        // Check for results release delay
+        if (req.user!.role !== 'ADMIN' && session.resultReleasesAt && new Date() < session.resultReleasesAt) {
+            return res.status(423).json({
+                message: 'Results are not yet available. They will be released soon.',
+                releaseAt: session.resultReleasesAt
+            });
         }
 
         // Compute per-question breakdown from stored answers
