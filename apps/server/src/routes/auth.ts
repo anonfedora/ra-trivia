@@ -126,7 +126,7 @@ router.post('/register', registerValidation, handleValidationErrors, async (req:
     }
 });
 
-router.post('/resend-verification', [
+router.post('/resend-verification-link', [
     body('email')
         .isEmail()
         .withMessage('Please provide a valid email address')
@@ -158,8 +158,8 @@ router.post('/resend-verification', [
         const host = (req.header('x-forwarded-host') || req.get('host') || 'localhost:4000').toString();
         const verifyUrl = `${protocol}://${host}/api/auth/verify?token=${rawVerifyToken}`;
 
-        await sendVerificationEmail(user.email, user.name, verifyUrl);
-        return res.json({ message: 'If an account exists for this email, a verification email has been sent.' });
+        const emailSent = await sendVerificationEmail(user.email, user.name, verifyUrl);
+        return res.json({ message: 'If an account exists for this email, a verification email has been sent.', emailSent });
     } catch (error) {
         console.error('Resend verification error:', error);
         return res.status(500).json({ message: 'Internal server error' });
