@@ -15,10 +15,12 @@ const getTransporter = () =>
       user: process.env.GMAIL_USER,
       pass: process.env.GMAIL_APP_PASSWORD,
     },
-    connectionTimeout: 10000, // 10 seconds
+    // Force IPv4 because Render instances often have ENETUNREACH issues with IPv6
+    family: 4,
+    connectionTimeout: 10000,
     greetingTimeout: 10000,
     socketTimeout: 15000,
-  });
+  } as any);
 
 // ─────────────────────────────────────────────────────────────────────────────
 // RESEND (commented out – keep for potential future use)
