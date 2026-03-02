@@ -80,6 +80,37 @@ const sendMail = async (
   html: string,
   text?: string
 ): Promise<boolean> => {
+  const preferResend = (process.env.EMAIL_TRANSPORT || '').toUpperCase() === 'RESEND';
+  const domain = (resendFrom.split('@')[1] || '').toLowerCase();
+  const invalid = ['gmail.com', 'yahoo.com', 'outlook.com', 'hotmail.com', 'icloud.com'];
+  const safeFrom = invalid.some(d => domain.endsWith(d)) ? 'onboarding@resend.dev' : resendFrom;
+
+  const sendViaResend = async (): Promise<boolean> => {
+    try {
+      const resp = await getResend().emails.send({
+        from: `${fromName} <${safeFrom}>`,
+        to,
+        subject,
+        html,
+        ...(text ? { text } : {}),
+      });
+      console.log('[EMAIL] Resend response:', JSON.stringify(resp));
+      const id = (resp as any)?.data?.id;
+      console.log(`[EMAIL] Resend ${to}: id=${id || 'unknown'}`);
+      return !!id || true;
+    } catch (err: any) {
+      const msg = err?.message || String(err);
+      const body = err?.response?.data || err?.name || null;
+      console.error('[EMAIL] Resend error:', msg, body ? JSON.stringify(body) : '');
+      return false;
+    }
+  };
+
+  if (preferResend) {
+    const ok = await sendViaResend();
+    if (ok) return true;
+  }
+
   try {
     const transporter = createTransporter(465, true);
     const info = await transporter.sendMail({
@@ -106,24 +137,8 @@ const sendMail = async (
       return true;
     } catch (e: any) {
       console.error('[EMAIL] 587 send error:', e?.message || e);
-      const domain = (resendFrom.split('@')[1] || '').toLowerCase();
-      const invalid = ['gmail.com', 'yahoo.com', 'outlook.com', 'hotmail.com', 'icloud.com'];
-      const safeFrom = invalid.some(d => domain.endsWith(d)) ? 'onboarding@resend.dev' : resendFrom;
-      try {
-        const data = await getResend().emails.send({
-          from: `${fromName} <${safeFrom}>`,
-          to,
-          subject,
-          html,
-          ...(text ? { text } : {}),
-        });
-        const id = (data as any)?.data?.id;
-        console.log(`[EMAIL] Resend fallback to ${to}, id: ${id || 'unknown'}`);
-        return true;
-      } catch (resendErr: any) {
-        console.error('[EMAIL] Resend fallback error:', resendErr?.message || resendErr);
-        return false;
-      }
+      const ok = await sendViaResend();
+      return ok;
     }
   }
 };
