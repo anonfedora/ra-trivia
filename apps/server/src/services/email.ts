@@ -1,5 +1,6 @@
 import nodemailer from 'nodemailer';
 import dns from 'dns';
+import { Resend } from 'resend';
 
 // Prefer IPv4 resolution to avoid ENETUNREACH to IPv6 on some hosts (e.g., Render)
 try {
@@ -11,27 +12,20 @@ try {
 // ─────────────────────────────────────────────────────────────────────────────
 const fromName = process.env.SMTP_FROM_NAME || process.env.RESEND_FROM_NAME || 'R.A Quiz Portal';
 const fromEmail = process.env.GMAIL_USER!;
+const resendFrom = process.env.RESEND_FROM_EMAIL || 'onboarding@resend.dev';
+const getResend = () => new Resend(process.env.RESEND_API_KEY || '');
 
-const getTransporter = () =>
+const createTransporter = (port: number, secure: boolean) =>
   nodemailer.createTransport({
     host: 'smtp.gmail.com',
-    port: 465,
-    secure: true, // SSL/TLS
-    auth: {
-      user: process.env.GMAIL_USER,
-      pass: process.env.GMAIL_APP_PASSWORD,
-    },
-    // Force IPv4 because Render instances often have ENETUNREACH issues with IPv6
+    port,
+    secure,
+    auth: { user: process.env.GMAIL_USER, pass: process.env.GMAIL_APP_PASSWORD },
     family: 4,
-    // Additionally force IPv4 via custom lookup to bypass IPv6 resolution
     lookup: (hostname: string, _opts: any, cb: any) => {
       dns.lookup(hostname, { family: 4, verbatim: false }, cb);
     },
-    // Harden TLS for Gmail
-    tls: {
-      servername: 'smtp.gmail.com',
-      minVersion: 'TLSv1.2'
-    },
+    tls: { servername: 'smtp.gmail.com', minVersion: 'TLSv1.2' },
     connectionTimeout: 10000,
     greetingTimeout: 10000,
     socketTimeout: 15000,
@@ -66,7 +60,7 @@ const getTransporter = () =>
 // Dev logging helper
 // ─────────────────────────────────────────────────────────────────────────────
 const logEmailForDev = (to: string, subject: string, html: string, otp?: string) => {
-  if (process.env.NODE_ENV === 'development') {
+  if (process.env.NODE_ENV === 'development' || process.env.EMAIL_SIMULATE === 'true') {
     console.log('\n📧 === DEVELOPMENT EMAIL LOG ===');
     console.log(`To: ${to}`);
     console.log(`Subject: ${subject}`);
@@ -87,7 +81,7 @@ const sendMail = async (
   text?: string
 ): Promise<boolean> => {
   try {
-    const transporter = getTransporter();
+    const transporter = createTransporter(465, true);
     const info = await transporter.sendMail({
       from: `${fromName} <${fromEmail}>`,
       to,
@@ -99,7 +93,38 @@ const sendMail = async (
     return true;
   } catch (error: any) {
     console.error('[EMAIL] Send error:', error?.message || error);
-    return false;
+    try {
+      const alt = createTransporter(587, false);
+      const info = await alt.sendMail({
+        from: `${fromName} <${fromEmail}>`,
+        to,
+        subject,
+        html,
+        ...(text ? { text } : {}),
+      });
+      console.log(`[EMAIL] Sent via 587 to ${to}, messageId: ${info.messageId}`);
+      return true;
+    } catch (e: any) {
+      console.error('[EMAIL] 587 send error:', e?.message || e);
+      const domain = (resendFrom.split('@')[1] || '').toLowerCase();
+      const invalid = ['gmail.com', 'yahoo.com', 'outlook.com', 'hotmail.com', 'icloud.com'];
+      const safeFrom = invalid.some(d => domain.endsWith(d)) ? 'onboarding@resend.dev' : resendFrom;
+      try {
+        const data = await getResend().emails.send({
+          from: `${fromName} <${safeFrom}>`,
+          to,
+          subject,
+          html,
+          ...(text ? { text } : {}),
+        });
+        const id = (data as any)?.data?.id;
+        console.log(`[EMAIL] Resend fallback to ${to}, id: ${id || 'unknown'}`);
+        return true;
+      } catch (resendErr: any) {
+        console.error('[EMAIL] Resend fallback error:', resendErr?.message || resendErr);
+        return false;
+      }
+    }
   }
 };
 
