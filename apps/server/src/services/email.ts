@@ -1,4 +1,10 @@
 import nodemailer from 'nodemailer';
+import dns from 'dns';
+
+// Prefer IPv4 resolution to avoid ENETUNREACH to IPv6 on some hosts (e.g., Render)
+try {
+  dns.setDefaultResultOrder?.('ipv4first');
+} catch {}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // NODEMAILER (Gmail) Transport
@@ -17,6 +23,15 @@ const getTransporter = () =>
     },
     // Force IPv4 because Render instances often have ENETUNREACH issues with IPv6
     family: 4,
+    // Additionally force IPv4 via custom lookup to bypass IPv6 resolution
+    lookup: (hostname: string, _opts: any, cb: any) => {
+      dns.lookup(hostname, { family: 4, verbatim: false }, cb);
+    },
+    // Harden TLS for Gmail
+    tls: {
+      servername: 'smtp.gmail.com',
+      minVersion: 'TLSv1.2'
+    },
     connectionTimeout: 10000,
     greetingTimeout: 10000,
     socketTimeout: 15000,
