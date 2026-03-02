@@ -3,12 +3,15 @@ export const validateEnv = () => {
     const required = [
         'DATABASE_URL',
         'JWT_SECRET',
-        'RESEND_API_KEY'
+        'GMAIL_USER',
+        'GMAIL_APP_PASSWORD'
     ];
 
+    // Resend (commented out – kept for potential future use)
+    // const resendOptional = ['RESEND_API_KEY', 'RESEND_FROM_EMAIL', 'RESEND_FROM_NAME'];
+
     const optional = [
-        'RESEND_FROM_EMAIL',
-        'RESEND_FROM_NAME'
+        'SMTP_FROM_NAME'
     ];
 
     const missing = required.filter(key => !process.env[key]);
@@ -34,7 +37,7 @@ export const validateEnv = () => {
     }
 
     console.log('✅ Environment variables validated successfully');
-    const fromEmail = process.env.RESEND_FROM_EMAIL || 'onboarding@resend.dev';
-    const fromName = process.env.RESEND_FROM_NAME || 'Quiz System';
-    console.log(`📧 Email config: ${fromName} <${fromEmail}>`);
+    const fromEmail = process.env.GMAIL_USER;
+    const fromName = process.env.SMTP_FROM_NAME || 'R.A Quiz Portal';
+    console.log(`📧 Email config (Gmail SMTP): ${fromName} <${fromEmail}>`);
 };

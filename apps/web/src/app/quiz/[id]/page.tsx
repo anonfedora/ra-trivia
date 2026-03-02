@@ -258,8 +258,16 @@ export default function QuizPage() {
                     <h1 className="text-2xl font-bold text-slate-900">{quiz.title}</h1>
                     <p className="text-slate-500 font-medium">Question {currentIndex + 1} of {quiz.questions.length}</p>
                 </div>
-                <div className={`px-6 py-3 rounded-2xl font-mono text-xl font-bold shadow-sm ${timeLeft < 60 ? 'bg-red-50 text-red-600 border border-red-100 animate-pulse' : 'bg-white text-primary border border-slate-100'}`}>
-                    {formatTime(timeLeft)}
+                <div className="flex items-center gap-3">
+                    <button
+                        onClick={() => setShowReview(true)}
+                        className="px-4 py-2 rounded-xl font-semibold text-sm text-red-600 bg-red-50 border border-red-200 hover:bg-red-100 transition-all"
+                    >
+                        Review &amp; Submit
+                    </button>
+                    <div className={`px-6 py-3 rounded-2xl font-mono text-xl font-bold shadow-sm ${timeLeft < 60 ? 'bg-red-50 text-red-600 border border-red-100 animate-pulse' : 'bg-white text-primary border border-slate-100'}`}>
+                        {formatTime(timeLeft)}
+                    </div>
                 </div>
             </div>
 
@@ -296,40 +304,20 @@ export default function QuizPage() {
                     Previous
                 </button>
 
-                <button
-                    onClick={() => {
-                        saveAnswer(currentQuestion.id, answers[currentQuestion.id]);
-                        setShowReview(true);
-                    }}
-                    disabled={isSubmitting || !answers[currentQuestion.id]}
-                    className="flex-1 px-8 py-4 rounded-2xl font-bold text-white bg-red-600 hover:bg-red-700 shadow-xl shadow-red-100 transition-all transform hover:-translate-y-1 disabled:opacity-50"
-                >
-                    {isSubmitting ? 'Submitting...' : 'Review and Submit'}
-                </button>
-
                 {currentIndex < quiz.questions.length - 1 ? (
                     <button
                         onClick={() => setCurrentIndex(prev => Math.min(quiz.questions.length - 1, prev + 1))}
-                        className="px-8 py-4 rounded-2xl font-bold text-white bg-slate-900 hover:bg-slate-800 shadow-lg transition-all"
+                        className="flex-1 px-8 py-4 rounded-2xl font-bold text-white bg-slate-900 hover:bg-slate-800 shadow-lg transition-all"
                     >
                         Next
                     </button>
                 ) : (
-                    <>
-                        <button
-                            onClick={() => setShowReview(true)}
-                            className="flex-1 px-8 py-4 rounded-2xl font-bold text-white bg-blue-600 hover:bg-blue-700 shadow-xl shadow-blue-100 transition-all transform hover:-translate-y-1"
-                        >
-                            Review & Submit
-                        </button>
-                        <button
-                            onClick={handleSubmit}
-                            disabled={isSubmitting}
-                            className="flex-1 px-8 py-4 rounded-2xl font-bold text-white bg-green-600 hover:bg-green-700 shadow-xl shadow-green-100 transition-all transform hover:-translate-y-1 disabled:opacity-50"
-                        >
-                            {isSubmitting ? 'Submitting...' : 'Submit Now'}
-                        </button>
-                    </>
+                    <button
+                        onClick={() => setShowReview(true)}
+                        className="flex-1 px-8 py-4 rounded-2xl font-bold text-white bg-slate-900 hover:bg-slate-800 shadow-lg transition-all"
+                    >
+                        Review Answers
+                    </button>
                 )}
             </div>
         </main>
