@@ -38,6 +38,13 @@ export default function LoginPage() {
             localStorage.setItem('user', JSON.stringify(result.data.user));
             router.push(result.data.user.role === 'ADMIN' ? '/admin/dashboard' : '/dashboard');
         } else {
+            // Handle unverified user redirect
+            const resultData = (result as any).data;
+            if (resultData?.isUnverified) {
+                router.push(`/verify-otp?email=${encodeURIComponent(resultData.email)}`);
+                return;
+            }
+
             setError(('error' in result && result.error) ? result.error : 'Login failed');
             setIsLoading(false);
         }

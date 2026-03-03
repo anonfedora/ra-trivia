@@ -55,8 +55,29 @@ router.post('/register', registerValidation, handleValidationErrors, async (req:
 
         if (existingUser) {
             if (!existingUser.emailVerified) {
+                // Also trigger a new OTP here for consistency
+                const otp = generateOTP();
+                const otpHash = crypto.createHash('sha256').update(otp).digest('hex');
+                const otpExpiresAt = new Date(Date.now() + 1000 * 60 * 10);
+
+                await prisma.user.update({
+                    where: { id: existingUser.id },
+                    data: {
+                        emailOtpHash: otpHash,
+                        emailOtpExpiresAt: otpExpiresAt
+                    }
+                });
+
+                const protocol = (req.header('x-forwarded-proto') || req.protocol || 'http').toString();
+                const host = (req.header('x-forwarded-host') || req.get('host') || 'localhost:4000').toString();
+                const frontendUrl = WEB_URL || `${protocol}://${host.replace('4000', '3000')}`;
+                const verifyUrl = `${frontendUrl}/verify-otp?email=${encodeURIComponent(existingUser.email)}`;
+
+                sendVerificationEmail(existingUser.email, existingUser.name, verifyUrl, otp)
+                    .catch(err => console.error('[AUTH] Register-triggered verification email failed:', err));
+
                 return res.status(200).json({
-                    message: 'An unverified account already exists. Redirecting to verification page...',
+                    message: 'An unverified account already exists. A new verification code has been sent. Redirecting...',
                     isUnverified: true,
                     email: existingUser.email
                 });
@@ -224,7 +245,36 @@ router.post('/login', loginValidation, handleValidationErrors, async (req: Reque
         }
 
         if (!user.emailVerified) {
-            return res.status(403).json({ message: 'Please verify your email before logging in.' });
+            // Automatically trigger a new OTP if unverified user tries to log in
+            const otp = generateOTP();
+            const otpHash = crypto.createHash('sha256').update(otp).digest('hex');
+            const otpExpiresAt = new Date(Date.now() + 1000 * 60 * 10); // 10 minutes
+
+            console.log(`[AUTH] Login redirect: Generating new OTP for ${user.email}: ${otp} (Hash: ${otpHash.substring(0, 10)}...)`);
+
+            await prisma.user.update({
+                where: { id: user.id },
+                data: {
+                    emailOtpHash: otpHash,
+                    emailOtpExpiresAt: otpExpiresAt
+                }
+            });
+
+            const protocol = (req.header('x-forwarded-proto') || req.protocol || 'http').toString();
+            const host = (req.header('x-forwarded-host') || req.get('host') || 'localhost:4000').toString();
+            // Use WEB_URL if available for more reliable frontend links
+            const frontendUrl = WEB_URL || `${protocol}://${host.replace('4000', '3000')}`;
+            const verifyUrl = `${frontendUrl}/verify-otp?email=${encodeURIComponent(user.email)}`;
+
+            // Send verification email in the background
+            sendVerificationEmail(user.email, user.name, verifyUrl, otp)
+                .catch(err => console.error('[AUTH] Login-triggered verification email failed:', err));
+
+            return res.status(403).json({
+                message: 'Please verify your email before logging in. A new verification code has been sent to your email.',
+                isUnverified: true,
+                email: user.email
+            });
         }
 
         const token = jwt.sign({ userId: user.id, role: user.role }, JWT_SECRET, { expiresIn: '24h' });
@@ -260,10 +310,14 @@ router.post('/verify-otp', [
 
         // Check if OTP is valid and not expired
         const otpHash = crypto.createHash('sha256').update(otp).digest('hex');
-        const isOtpValid = user.emailOtpHash === otpHash && user.emailOtpExpiresAt && user.emailOtpExpiresAt > new Date();
+        const isHashMatch = user.emailOtpHash === otpHash;
+        const isExpired = !user.emailOtpExpiresAt || user.emailOtpExpiresAt <= new Date();
 
-        if (!isOtpValid) {
-            return res.status(400).json({ message: 'Invalid or expired OTP' });
+        console.log(`[AUTH] OTP Verify for ${email}: Input=${otp} (Hash: ${otpHash.substring(0, 10)}...), DB Hash: ${user.emailOtpHash?.substring(0, 10)}..., Match: ${isHashMatch}, Expired: ${isExpired}`);
+
+        if (!isHashMatch || isExpired) {
+            const errorMsg = !isHashMatch ? 'Invalid verification code' : 'Verification code has expired';
+            return res.status(400).json({ message: errorMsg });
         }
 
         // Mark email as verified and clear OTP

@@ -77,5 +77,5 @@ export const initScheduler = () => {
         } catch (error) {
             console.error('[SCHEDULER] Global error in results release task:', error);
         }
-    }, 10 * 60 * 1000); // 10 minutes
+    }, 3 * 60 * 60 * 1000); // 3 hours
 };

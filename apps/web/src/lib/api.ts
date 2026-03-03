@@ -1,5 +1,5 @@
 export type ApiOk<T> = { ok: true; data: T; status: number };
-export type ApiErr = { ok: false; error: string; status: number };
+export type ApiErr = { ok: false; error: string; status: number; data?: any };
 export type ApiResult<T> = ApiOk<T> | ApiErr;
 
 async function safeReadText(res: Response): Promise<string> {
@@ -26,7 +26,7 @@ export async function apiJson<T>(input: RequestInfo | URL, init?: RequestInit): 
             ? (parsed as any).message
             : (raw || `Request failed (${status})`);
 
-        return { ok: false, error: msg, status };
+        return { ok: false, error: msg, status, data: parsed };
     } catch {
         return { ok: false, error: 'Network error. Please check your connection and try again.', status: 0 };
     }
