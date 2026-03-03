@@ -1,35 +1,7 @@
-import nodemailer from 'nodemailer';
-import dns from 'dns';
 import { Resend } from 'resend';
-
-// Prefer IPv4 resolution to avoid ENETUNREACH to IPv6 on some hosts (e.g., Render)
-try {
-  dns.setDefaultResultOrder?.('ipv4first');
-} catch {}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// NODEMAILER (Gmail) Transport
-// ─────────────────────────────────────────────────────────────────────────────
 const fromName = process.env.SMTP_FROM_NAME || process.env.RESEND_FROM_NAME || 'R.A Quiz Portal';
-const fromEmail = process.env.GMAIL_USER!;
 const resendFrom = process.env.RESEND_FROM_EMAIL || 'onboarding@resend.dev';
 const getResend = () => new Resend(process.env.RESEND_API_KEY || '');
-
-const createTransporter = (port: number, secure: boolean) =>
-  nodemailer.createTransport({
-    host: 'smtp.gmail.com',
-    port,
-    secure,
-    auth: { user: process.env.GMAIL_USER, pass: process.env.GMAIL_APP_PASSWORD },
-    family: 4,
-    lookup: (hostname: string, _opts: any, cb: any) => {
-      dns.lookup(hostname, { family: 4, verbatim: false }, cb);
-    },
-    tls: { servername: 'smtp.gmail.com', minVersion: 'TLSv1.2' },
-    connectionTimeout: 10000,
-    greetingTimeout: 10000,
-    socketTimeout: 15000,
-  } as any);
 
 // ─────────────────────────────────────────────────────────────────────────────
 // RESEND (commented out – keep for potential future use)
@@ -80,66 +52,27 @@ const sendMail = async (
   html: string,
   text?: string
 ): Promise<boolean> => {
-  const preferResend = (process.env.EMAIL_TRANSPORT || '').toUpperCase() === 'RESEND';
   const domain = (resendFrom.split('@')[1] || '').toLowerCase();
   const invalid = ['gmail.com', 'yahoo.com', 'outlook.com', 'hotmail.com', 'icloud.com'];
   const safeFrom = invalid.some(d => domain.endsWith(d)) ? 'onboarding@resend.dev' : resendFrom;
 
-  const sendViaResend = async (): Promise<boolean> => {
-    try {
-      const resp = await getResend().emails.send({
-        from: `${fromName} <${safeFrom}>`,
-        to,
-        subject,
-        html,
-        ...(text ? { text } : {}),
-      });
-      console.log('[EMAIL] Resend response:', JSON.stringify(resp));
-      const id = (resp as any)?.data?.id;
-      console.log(`[EMAIL] Resend ${to}: id=${id || 'unknown'}`);
-      return !!id || true;
-    } catch (err: any) {
-      const msg = err?.message || String(err);
-      const body = err?.response?.data || err?.name || null;
-      console.error('[EMAIL] Resend error:', msg, body ? JSON.stringify(body) : '');
-      return false;
-    }
-  };
-
-  if (preferResend) {
-    const ok = await sendViaResend();
-    if (ok) return true;
-  }
-
   try {
-    const transporter = createTransporter(465, true);
-    const info = await transporter.sendMail({
-      from: `${fromName} <${fromEmail}>`,
+    const resp = await getResend().emails.send({
+      from: `${fromName} <${safeFrom}>`,
       to,
       subject,
       html,
       ...(text ? { text } : {}),
     });
-    console.log(`[EMAIL] Sent to ${to}, messageId: ${info.messageId}`);
-    return true;
-  } catch (error: any) {
-    console.error('[EMAIL] Send error:', error?.message || error);
-    try {
-      const alt = createTransporter(587, false);
-      const info = await alt.sendMail({
-        from: `${fromName} <${fromEmail}>`,
-        to,
-        subject,
-        html,
-        ...(text ? { text } : {}),
-      });
-      console.log(`[EMAIL] Sent via 587 to ${to}, messageId: ${info.messageId}`);
-      return true;
-    } catch (e: any) {
-      console.error('[EMAIL] 587 send error:', e?.message || e);
-      const ok = await sendViaResend();
-      return ok;
-    }
+    console.log('[EMAIL] Resend response:', JSON.stringify(resp));
+    const id = (resp as any)?.data?.id;
+    console.log(`[EMAIL] Resend ${to}: id=${id || 'unknown'}`);
+    return !!id || true;
+  } catch (err: any) {
+    const msg = err?.message || String(err);
+    const body = err?.response?.data || err?.name || null;
+    console.error('[EMAIL] Resend error:', msg, body ? JSON.stringify(body) : '');
+    return false;
   }
 };
 
