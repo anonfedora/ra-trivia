@@ -1,32 +1,7 @@
 import { Resend } from 'resend';
-const fromName = process.env.SMTP_FROM_NAME || process.env.RESEND_FROM_NAME || 'R.A Quiz Portal';
-const resendFrom = process.env.RESEND_FROM_EMAIL || 'onboarding@resend.dev';
-const getResend = () => new Resend(process.env.RESEND_API_KEY || '');
+import { config } from '../config';
 
-// ─────────────────────────────────────────────────────────────────────────────
-// RESEND (commented out – keep for potential future use)
-// ─────────────────────────────────────────────────────────────────────────────
-// import { Resend } from 'resend';
-// const getResend = () => new Resend(process.env.RESEND_API_KEY || '');
-// const resendFrom = process.env.RESEND_FROM_EMAIL || 'onboarding@resend.dev';
-//
-// const resolveFromEmail = (): string => {
-//   const invalidDomains = ['gmail.com', 'yahoo.com', 'outlook.com', 'hotmail.com', 'icloud.com'];
-//   const domain = (resendFrom.split('@')[1] || '').toLowerCase();
-//   if (invalidDomains.some(d => domain.endsWith(d))) {
-//     console.warn(`[EMAIL] RESEND_FROM_EMAIL uses a consumer domain. Falling back to onboarding@resend.dev`);
-//     return 'onboarding@resend.dev';
-//   }
-//   return resendFrom;
-// };
-//
-// const sendWithResend = async (to, subject, html, text?) => {
-//   const attempt = async (from) => { try { const d = await getResend().emails.send({ from, to, subject, html, ...(text ? { text } : {}) }); return { ok: true, id: d?.data?.id }; } catch (e) { console.error('[EMAIL] Resend error:', e?.message); return { ok: false }; } };
-//   const first = await attempt(`${fromName} <${resolveFromEmail()}>`);
-//   if (first.ok) return true;
-//   if (!resolveFromEmail().includes('onboarding@resend.dev')) { const second = await attempt(`${fromName} <onboarding@resend.dev>`); return second.ok; }
-//   return false;
-// };
+const resend = new Resend(config.resend.apiKey);
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Dev logging helper
@@ -39,6 +14,12 @@ const logEmailForDev = (to: string, subject: string, html: string, otp?: string)
     if (otp) console.log(`OTP: ${otp}`);
     console.log(`HTML: ${html.substring(0, 200)}...`);
     console.log('=== END EMAIL LOG ===\n');
+
+    // Troubleshooting log mentioned in the guide
+    console.log('Email service state:', {
+      hasKey: !!config.resend.apiKey,
+      keyPrefix: config.resend.apiKey?.slice(0, 7),
+    });
   }
   return process.env.EMAIL_SIMULATE === 'true';
 };
@@ -52,26 +33,28 @@ const sendMail = async (
   html: string,
   text?: string
 ): Promise<boolean> => {
-  const domain = (resendFrom.split('@')[1] || '').toLowerCase();
+  const domain = (config.resend.fromEmail.split('@')[1] || '').toLowerCase();
   const invalid = ['gmail.com', 'yahoo.com', 'outlook.com', 'hotmail.com', 'icloud.com'];
-  const safeFrom = invalid.some(d => domain.endsWith(d)) ? 'onboarding@resend.dev' : resendFrom;
+  const safeFrom = invalid.some(d => domain.endsWith(d)) ? 'onboarding@resend.dev' : config.resend.fromEmail;
 
   try {
-    const resp = await getResend().emails.send({
-      from: `${fromName} <${safeFrom}>`,
-      to,
+    const { data, error } = await resend.emails.send({
+      from: `${config.resend.fromName} <${safeFrom}>`,
+      to: [to], // Use array as per guide
       subject,
       html,
       ...(text ? { text } : {}),
     });
-    console.log('[EMAIL] Resend response:', JSON.stringify(resp));
-    const id = (resp as any)?.data?.id;
-    console.log(`[EMAIL] Resend ${to}: id=${id || 'unknown'}`);
-    return !!id || true;
+
+    if (error) {
+      console.error('[EMAIL] Resend error:', error.name, error.message);
+      return false;
+    }
+
+    console.log(`[EMAIL] Resend ${to}: id=${data?.id || 'unknown'}`);
+    return !!data?.id;
   } catch (err: any) {
-    const msg = err?.message || String(err);
-    const body = err?.response?.data || err?.name || null;
-    console.error('[EMAIL] Resend error:', msg, body ? JSON.stringify(body) : '');
+    console.error('[EMAIL] Resend exception:', err?.message || String(err));
     return false;
   }
 };
