@@ -1,8 +1,10 @@
 "use client";
 
-import { useState, useEffect, useCallback } from 'react';
-import { Search, FileDown, ArrowLeft, User, Mail, GraduationCap, Award, Calendar } from 'lucide-react';
+import { useState, useEffect, useCallback, Suspense } from 'react';
+import { Search, FileDown, ArrowLeft, User, Mail, GraduationCap, Award, Calendar, Activity } from 'lucide-react';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
+import { ThemeToggle } from '../../../components/ThemeToggle';
 
 interface Result {
     id: string;
@@ -26,14 +28,18 @@ interface PagedResponse<T> {
     pageSize: number;
 }
 
-export default function AdminResults() {
+function AdminResultsContent() {
+    const searchParams = useSearchParams();
+    const initialQuery = searchParams.get('q') || '';
+
     const [results, setResults] = useState<Result[]>([]);
     const [isLoading, setIsLoading] = useState(true);
-    const [searchTerm, setSearchTerm] = useState('');
+    const [searchTerm, setSearchTerm] = useState(initialQuery);
     const [status, setStatus] = useState<'all' | 'completed' | 'running'>('all');
     const [page, setPage] = useState(1);
     const [pageSize] = useState(25);
     const [total, setTotal] = useState(0);
+    const [summary, setSummary] = useState<any>(null);
 
     const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
 
@@ -51,9 +57,10 @@ export default function AdminResults() {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
             if (res.ok) {
-                const data: PagedResponse<Result> = await res.json();
+                const data: any = await res.json();
                 setResults(data.items);
                 setTotal(data.total);
+                setSummary(data.summary);
             }
         } catch (err) {
             console.error('Failed to fetch results', err);
@@ -99,15 +106,11 @@ export default function AdminResults() {
     const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
     if (isLoading) {
-        return (
-            <div className="min-h-screen flex items-center justify-center bg-slate-50">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
-            </div>
-        );
+        return null;
     }
 
     return (
-        <main className="min-h-screen bg-slate-50 p-6 md:p-12">
+        <main className="min-h-screen bg-slate-50 dark:bg-slate-900 p-6 md:p-12 transition-colors duration-200">
             <div className="max-w-7xl mx-auto">
                 <header className="flex flex-col md:flex-row justify-between items-start md:items-center mb-12 gap-6 animate-fade-in">
                     <div>
@@ -115,13 +118,14 @@ export default function AdminResults() {
                             <ArrowLeft size={18} />
                             Back to Dashboard
                         </Link>
-                        <h1 className="text-4xl font-extrabold text-slate-900 tracking-tight">Exam Results</h1>
-                        <p className="text-slate-500 mt-2 font-medium">Detailed breakdown of candidate performances across all exams.</p>
+                        <h1 className="text-4xl font-extrabold text-slate-900 dark:text-slate-50 tracking-tight">Exam Results</h1>
+                        <p className="text-slate-500 dark:text-slate-400 mt-2 font-medium">Detailed breakdown of candidate performances across all exams.</p>
                     </div>
-                    <div className="flex gap-4">
+                    <div className="flex gap-4 items-center">
+                        <ThemeToggle />
                         <button
                             onClick={handleExport}
-                            className="flex items-center gap-2 bg-white border border-slate-200 text-slate-600 px-6 py-3 rounded-2xl font-bold shadow-sm hover:shadow-md transition-all active:scale-95"
+                            className="flex items-center gap-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 px-6 py-3 rounded-2xl font-bold shadow-sm hover:shadow-md transition-all active:scale-95"
                         >
                             <FileDown size={18} />
                             Export Excel
@@ -130,22 +134,64 @@ export default function AdminResults() {
                 </header>
 
                 {/* Search and Filters */}
-                <div className="mb-8 relative animate-fade-in" style={{ animationDelay: '100ms' }}>
+                <div className="mb-12 relative animate-fade-in" style={{ animationDelay: '100ms' }}>
                     <Search className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
                     <input
                         type="text"
                         placeholder="Search by name, email, or exam title..."
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
-                        className="w-full pl-14 pr-6 py-4 rounded-[1.5rem] bg-white border border-slate-200 shadow-sm focus:ring-4 focus:ring-primary/10 focus:border-primary outline-none transition-all text-slate-600 font-medium"
+                        className="w-full pl-14 pr-6 py-4 rounded-[1.5rem] bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-xl focus:ring-4 focus:ring-primary/10 focus:border-primary outline-none transition-all text-slate-600 dark:text-slate-300 font-medium"
                     />
                 </div>
 
+                {/* Performance Summary Header (Only when filtering) */}
+                {summary && (
+                    <div className="mb-12 grid grid-cols-1 md:grid-cols-4 gap-6 animate-slide-up">
+                        <div className="bg-white dark:bg-slate-800 p-6 rounded-3xl shadow-lg border border-slate-100 dark:border-slate-700">
+                            <h4 className="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-4">Pass / Fail Ratio</h4>
+                            <div className="flex items-end gap-1.5 mb-2">
+                                <span className="text-3xl font-black text-emerald-500">{summary.passCount}</span>
+                                <span className="text-xs font-bold text-slate-300 mb-1">vs</span>
+                                <span className="text-3xl font-black text-rose-400">{summary.failCount}</span>
+                            </div>
+                            <div className="w-full h-2 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden flex">
+                                <div className="h-full bg-emerald-500" style={{ width: `${(summary.passCount / summary.totalCompleted) * 100}%` }} />
+                                <div className="h-full bg-rose-400" style={{ width: `${(summary.failCount / summary.totalCompleted) * 100}%` }} />
+                            </div>
+                        </div>
+
+                        <div className="bg-white dark:bg-slate-800 p-6 rounded-3xl shadow-lg border border-slate-100 dark:border-slate-700 flex flex-col justify-center">
+                            <h4 className="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-2">Average Score</h4>
+                            <div className="text-4xl font-black text-primary">{summary.averageScore}%</div>
+                            <div className="text-[10px] font-bold text-slate-400 mt-1 italic">Across {summary.totalCompleted} completions</div>
+                        </div>
+
+                        <div className="md:col-span-2 bg-slate-900 dark:bg-primary p-6 rounded-3xl shadow-lg border border-slate-800 text-white flex justify-between items-center bg-gradient-to-br from-slate-900 to-slate-800 dark:from-primary dark:to-primary/80">
+                            <div>
+                                <h4 className="text-xs font-bold text-white/40 uppercase tracking-widest mb-4">Score Range</h4>
+                                <div className="flex items-center gap-8">
+                                    <div>
+                                        <div className="text-[10px] font-bold text-white/40 uppercase">Highest</div>
+                                        <div className="text-3xl font-black">{summary.highestScore}%</div>
+                                    </div>
+                                    <div className="w-px h-10 bg-white/10" />
+                                    <div>
+                                        <div className="text-[10px] font-bold text-white/40 uppercase">Lowest</div>
+                                        <div className="text-3xl font-black text-white/60">{summary.lowestScore}%</div>
+                                    </div>
+                                </div>
+                            </div>
+                            <Activity className="text-white/10" size={64} />
+                        </div>
+                    </div>
+                )}
+
                 {/* Results Table */}
-                <section className="bg-white rounded-[2.5rem] shadow-xl border border-slate-100 overflow-hidden animate-slide-up" style={{ animationDelay: '200ms' }}>
-                    <div className="p-8 border-b border-slate-50 flex justify-between items-center bg-slate-50/50">
-                        <h3 className="text-xl font-bold text-slate-800">Candidate Attempts</h3>
-                        <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">{total} records found</span>
+                <section className="bg-white dark:bg-slate-800 rounded-[2.5rem] shadow-xl border border-slate-100 dark:border-slate-700 overflow-hidden animate-slide-up" style={{ animationDelay: '200ms' }}>
+                    <div className="p-8 border-b border-slate-50 dark:border-slate-700 flex justify-between items-center bg-slate-50/50 dark:bg-slate-900/50">
+                        <h3 className="text-xl font-bold text-slate-800 dark:text-slate-100">Candidate Attempts</h3>
+                        <span className="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">{total} records found</span>
                     </div>
 
                     <div className="px-8 pt-6 flex flex-col md:flex-row gap-4 md:items-center">
@@ -154,14 +200,14 @@ export default function AdminResults() {
                                 <button
                                     key={s}
                                     onClick={() => setStatus(s)}
-                                    className={`px-4 py-2 rounded-xl text-sm font-bold border transition-all ${status === s ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'}`}
+                                    className={`px-4 py-2 rounded-xl text-sm font-bold border transition-all ${status === s ? 'bg-slate-900 dark:bg-primary text-white border-slate-900 dark:border-primary' : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700'}`}
                                 >
                                     {s === 'all' ? 'All' : s === 'completed' ? 'Completed' : 'Running'}
                                 </button>
                             ))}
                         </div>
 
-                        <div className="ml-auto text-sm font-bold text-slate-400">
+                        <div className="ml-auto text-sm font-bold text-slate-400 dark:text-slate-500">
                             Page {page} of {totalPages}
                         </div>
                     </div>
@@ -169,7 +215,7 @@ export default function AdminResults() {
                     <div className="overflow-x-auto">
                         <table className="w-full text-left border-collapse">
                             <thead>
-                                <tr className="text-slate-400 text-xs font-bold uppercase tracking-widest border-b border-slate-50">
+                                <tr className="text-slate-400 dark:text-slate-500 text-xs font-bold uppercase tracking-widest border-b border-slate-50 dark:border-slate-700">
                                     <th className="px-8 py-6">Candidate</th>
                                     <th className="px-8 py-6">Exam</th>
                                     <th className="px-8 py-6">Score</th>
@@ -177,17 +223,17 @@ export default function AdminResults() {
                                     <th className="px-8 py-6">Status</th>
                                 </tr>
                             </thead>
-                            <tbody className="divide-y divide-slate-50">
+                            <tbody className="divide-y divide-slate-50 dark:divide-slate-700">
                                 {results.length > 0 ? results.map((result) => (
-                                    <tr key={result.id} className="hover:bg-slate-50 transition-colors">
+                                    <tr key={result.id} className="hover:bg-slate-50 dark:hover:bg-slate-900/50 transition-colors">
                                         <td className="px-8 py-6">
                                             <div className="flex items-center gap-3">
                                                 <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary">
                                                     <User size={18} />
                                                 </div>
                                                 <div>
-                                                    <div className="font-bold text-slate-900">{result.user.name}</div>
-                                                    <div className="flex items-center gap-1 text-xs text-slate-400 mt-0.5">
+                                                    <div className="font-bold text-slate-900 dark:text-slate-100">{result.user.name}</div>
+                                                    <div className="flex items-center gap-1 text-xs text-slate-400 dark:text-slate-500 mt-0.5">
                                                         <Mail size={12} />
                                                         {result.user.email}
                                                     </div>
@@ -195,8 +241,8 @@ export default function AdminResults() {
                                             </div>
                                         </td>
                                         <td className="px-8 py-6">
-                                            <div className="font-semibold text-slate-700">{result.quiz.title}</div>
-                                            <div className="flex items-center gap-1 text-xs text-slate-400 mt-1 uppercase font-bold tracking-tighter">
+                                            <div className="font-semibold text-slate-700 dark:text-slate-300">{result.quiz.title}</div>
+                                            <div className="flex items-center gap-1 text-xs text-slate-400 dark:text-slate-500 mt-1 uppercase font-bold tracking-tighter">
                                                 <GraduationCap size={12} />
                                                 {result.user.church || 'N/A'}
                                             </div>
@@ -208,7 +254,7 @@ export default function AdminResults() {
                                                         <span className={`text-lg font-black ${result.score >= 70 ? 'text-emerald-500' : result.score >= 40 ? 'text-amber-500' : 'text-rose-500'}`}>
                                                             {result.score.toFixed(1)}%
                                                         </span>
-                                                        <div className="w-16 h-1 bg-slate-100 rounded-full mt-1 overflow-hidden">
+                                                        <div className="w-16 h-1 bg-slate-100 dark:bg-slate-700 rounded-full mt-1 overflow-hidden">
                                                             <div
                                                                 className={`h-full rounded-full ${result.score >= 70 ? 'bg-emerald-500' : result.score >= 40 ? 'bg-amber-500' : 'bg-rose-500'}`}
                                                                 style={{ width: `${result.score}%` }}
@@ -218,21 +264,21 @@ export default function AdminResults() {
                                                     {result.score >= 80 && <Award className="text-amber-400" size={20} />}
                                                 </div>
                                             ) : (
-                                                <span className="text-slate-400 font-bold italic text-sm">In Progress</span>
+                                                <span className="text-slate-400 dark:text-slate-500 font-bold italic text-sm">In Progress</span>
                                             )}
                                         </td>
                                         <td className="px-8 py-6">
-                                            <div className="flex items-center gap-2 text-slate-600 text-sm font-medium">
-                                                <Calendar size={14} className="text-slate-400" />
+                                            <div className="flex items-center gap-2 text-slate-600 dark:text-slate-400 text-sm font-medium">
+                                                <Calendar size={14} className="text-slate-400 dark:text-slate-500" />
                                                 {new Date(result.startTime).toLocaleDateString()}
                                             </div>
-                                            <div className="text-[10px] text-slate-400 font-bold mt-1 uppercase tracking-tight">
+                                            <div className="text-[10px] text-slate-400 dark:text-slate-500 font-bold mt-1 uppercase tracking-tight">
                                                 Started: {new Date(result.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                             </div>
                                         </td>
                                         <td className="px-8 py-6">
-                                            <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${result.endTime ? 'bg-emerald-100 text-emerald-600' : 'bg-blue-100 text-blue-600'}`}>
-                                                <div className={`w-1.5 h-1.5 rounded-full ${result.endTime ? 'bg-emerald-500' : 'bg-blue-500'}`} />
+                                            <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${result.endTime ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400' : 'bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400'}`}>
+                                                <div className={`w-1.5 h-1.5 rounded-full ${result.endTime ? 'bg-emerald-500' : 'bg-blue-50'}`} />
                                                 {result.endTime ? 'Completed' : 'Running'}
                                             </span>
                                         </td>
@@ -241,10 +287,10 @@ export default function AdminResults() {
                                     <tr>
                                         <td colSpan={5} className="px-8 py-20 text-center">
                                             <div className="flex flex-col items-center gap-3">
-                                                <div className="w-16 h-16 rounded-full bg-slate-100 flex items-center justify-center text-slate-300">
+                                                <div className="w-16 h-16 rounded-full bg-slate-100 dark:bg-slate-900 flex items-center justify-center text-slate-300 dark:text-slate-700">
                                                     <Search size={32} />
                                                 </div>
-                                                <p className="text-slate-400 font-bold text-lg">No matching records found</p>
+                                                <p className="text-slate-400 dark:text-slate-500 font-bold text-lg">No matching records found</p>
                                                 <button onClick={() => setSearchTerm('')} className="text-primary font-bold hover:underline">Clear all filters</button>
                                             </div>
                                         </td>
@@ -254,22 +300,22 @@ export default function AdminResults() {
                         </table>
                     </div>
 
-                    <div className="p-8 border-t border-slate-50 flex flex-col md:flex-row gap-4 md:items-center justify-between bg-slate-50/30">
-                        <div className="text-sm text-slate-500 font-medium">
+                    <div className="p-8 border-t border-slate-50 dark:border-slate-700 flex flex-col md:flex-row gap-4 md:items-center justify-between bg-slate-50/30 dark:bg-slate-900/10">
+                        <div className="text-sm text-slate-500 dark:text-slate-400 font-medium">
                             Showing {(total === 0) ? 0 : (page - 1) * pageSize + 1} - {Math.min(page * pageSize, total)} of {total}
                         </div>
                         <div className="flex gap-3">
                             <button
                                 onClick={() => setPage(p => Math.max(1, p - 1))}
                                 disabled={page <= 1}
-                                className="px-5 py-2 rounded-xl font-bold bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                                className="px-5 py-2 rounded-xl font-bold bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed"
                             >
                                 Prev
                             </button>
                             <button
                                 onClick={() => setPage(p => Math.min(totalPages, p + 1))}
                                 disabled={page >= totalPages}
-                                className="px-5 py-2 rounded-xl font-bold bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                                className="px-5 py-2 rounded-xl font-bold bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed"
                             >
                                 Next
                             </button>
@@ -278,5 +324,17 @@ export default function AdminResults() {
                 </section>
             </div>
         </main>
+    );
+}
+
+export default function AdminResults() {
+    return (
+        <Suspense fallback={
+            <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-900 transition-colors duration-200">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+            </div>
+        }>
+            <AdminResultsContent />
+        </Suspense>
     );
 }

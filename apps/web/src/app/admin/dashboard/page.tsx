@@ -306,12 +306,12 @@ export default function AdminDashboard() {
     const selected = quizzes.find(q => q.id === selectedQuizId);
 
     return (
-        <main className="min-h-screen bg-slate-50 p-6 md:p-12">
+        <main className="min-h-screen bg-slate-50 dark:bg-slate-900 p-6 md:p-12 transition-colors duration-200">
             <div className="max-w-7xl mx-auto">
                 <header className="flex flex-col md:flex-row justify-between items-start md:items-center mb-12 gap-6 animate-fade-in">
                     <div>
-                        <h1 className="text-4xl font-extrabold text-slate-900 tracking-tight">Admin Dashboard</h1>
-                        <p className="text-slate-500 mt-2 font-medium">Manage your exam sessions and candidate records.</p>
+                        <h1 className="text-4xl font-extrabold text-slate-900 dark:text-slate-50 tracking-tight">Admin Dashboard</h1>
+                        <p className="text-slate-500 dark:text-slate-400 mt-2 font-medium">Manage your exam sessions and candidate records.</p>
                     </div>
                     <div className="flex gap-3 items-center">
                         <ThemeToggle />
@@ -330,16 +330,16 @@ export default function AdminDashboard() {
                     {/* Left Column: Quiz List & Recent Activity */}
                     <div className="xl:col-span-3 space-y-8">
                         {/* Exam Sessions List */}
-                        <section className="bg-white rounded-[2.5rem] shadow-xl border border-slate-100 overflow-hidden animate-slide-up">
-                            <div className="p-8 border-b border-slate-50 flex justify-between items-center bg-slate-50/50">
-                                <h3 className="text-xl font-bold text-slate-800">Exam Sessions</h3>
+                        <section className="bg-white dark:bg-slate-800 rounded-[2.5rem] shadow-xl border border-slate-100 dark:border-slate-700 overflow-hidden animate-slide-up">
+                            <div className="p-8 border-b border-slate-50 dark:border-slate-700 flex justify-between items-center bg-slate-50/50 dark:bg-slate-800/50">
+                                <h3 className="text-xl font-bold text-slate-800 dark:text-slate-100">Exam Sessions</h3>
                                 <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">{quizzes.length} Total</span>
                             </div>
 
                             <div className="overflow-x-auto">
                                 <table className="w-full text-left border-collapse">
                                     <thead>
-                                        <tr className="text-slate-400 text-xs font-bold uppercase tracking-widest border-b border-slate-50">
+                                        <tr className="text-slate-400 dark:text-slate-500 text-xs font-bold uppercase tracking-widest border-b border-slate-50 dark:border-slate-700">
                                             <th className="px-8 py-6">Exam Title</th>
                                             <th className="px-8 py-6">Questions</th>
                                             <th className="px-8 py-6">Duration</th>
@@ -352,16 +352,16 @@ export default function AdminDashboard() {
                                             <tr
                                                 key={quiz.id}
                                                 onClick={() => setSelectedQuizId(quiz.id)}
-                                                className={`hover:bg-slate-50 transition-colors cursor-pointer ${selectedQuizId === quiz.id ? 'bg-primary/5' : ''}`}
+                                                className={`hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors cursor-pointer ${selectedQuizId === quiz.id ? 'bg-primary/5 dark:bg-primary/10' : ''}`}
                                             >
                                                 <td className="px-8 py-6">
-                                                    <div className="font-bold text-slate-900">{quiz.title}</div>
+                                                    <div className="font-bold text-slate-900 dark:text-slate-100">{quiz.title}</div>
                                                     <div className="text-xs text-slate-400 mt-1 uppercase tracking-tighter font-bold">ID: {quiz.id.slice(0, 8)}</div>
                                                 </td>
-                                                <td className="px-8 py-6 font-semibold text-slate-600">{quiz._count.questions} Items</td>
-                                                <td className="px-8 py-6 font-semibold text-slate-600">{quiz.duration} min</td>
+                                                <td className="px-8 py-6 font-semibold text-slate-600 dark:text-slate-400">{quiz._count.questions} Items</td>
+                                                <td className="px-8 py-6 font-semibold text-slate-600 dark:text-slate-400">{quiz.duration} min</td>
                                                 <td className="px-8 py-6">
-                                                    <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold ${quiz.isActive ? 'bg-emerald-100 text-emerald-600' : 'bg-slate-200 text-slate-500'}`}>
+                                                    <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold ${quiz.isActive ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400' : 'bg-slate-200 dark:bg-slate-700 text-slate-500 dark:text-slate-400'}`}>
                                                         <div className={`w-1.5 h-1.5 rounded-full ${quiz.isActive ? 'bg-emerald-500' : 'bg-slate-400'}`} />
                                                         {quiz.isActive ? 'Active' : 'Inactive'}
                                                     </span>
@@ -394,41 +394,41 @@ export default function AdminDashboard() {
                         </section>
 
                         {/* Recent Activity Table */}
-                        <section className="bg-white rounded-[2.5rem] shadow-xl border border-slate-100 overflow-hidden animate-slide-up" style={{ animationDelay: '100ms' }}>
-                            <div className="p-8 border-b border-slate-50 flex justify-between items-center bg-slate-50/50">
-                                <h3 className="text-xl font-bold text-slate-800">Recent Candidate Activity</h3>
+                        <section className="bg-white dark:bg-slate-800 rounded-[2.5rem] shadow-xl border border-slate-100 dark:border-slate-700 overflow-hidden animate-slide-up" style={{ animationDelay: '100ms' }}>
+                            <div className="p-8 border-b border-slate-50 dark:border-slate-700 flex justify-between items-center bg-slate-50/50 dark:bg-slate-800/50">
+                                <h3 className="text-xl font-bold text-slate-800 dark:text-slate-100">Recent Candidate Activity</h3>
                                 <Link href="/admin/results" className="text-xs font-bold text-primary uppercase tracking-widest hover:underline">View All</Link>
                             </div>
 
                             <div className="overflow-x-auto">
                                 <table className="w-full text-left border-collapse">
                                     <thead>
-                                        <tr className="text-slate-400 text-xs font-bold uppercase tracking-widest border-b border-slate-50">
+                                        <tr className="text-slate-400 dark:text-slate-500 text-xs font-bold uppercase tracking-widest border-b border-slate-50 dark:border-slate-700">
                                             <th className="px-8 py-6">Candidate</th>
                                             <th className="px-8 py-6">Exam</th>
                                             <th className="px-8 py-6">Score</th>
                                             <th className="px-8 py-6">Status</th>
                                         </tr>
                                     </thead>
-                                    <tbody className="divide-y divide-slate-50">
+                                    <tbody className="divide-y divide-slate-50 dark:divide-slate-700">
                                         {recentAttempts.length > 0 ? recentAttempts.map((attempt) => (
-                                            <tr key={attempt.id} className="hover:bg-slate-50 transition-colors">
+                                            <tr key={attempt.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors">
                                                 <td className="px-8 py-6">
-                                                    <div className="font-bold text-slate-900">{attempt.user.name}</div>
+                                                    <div className="font-bold text-slate-900 dark:text-slate-100">{attempt.user.name}</div>
                                                     <div className="text-xs text-slate-400 mt-0.5">{attempt.user.email}</div>
                                                 </td>
-                                                <td className="px-8 py-6 font-semibold text-slate-600">{attempt.quiz.title}</td>
+                                                <td className="px-8 py-6 font-semibold text-slate-600 dark:text-slate-400">{attempt.quiz.title}</td>
                                                 <td className="px-8 py-6 font-bold">
                                                     {attempt.score !== null ? (
                                                         <span className={attempt.score >= 50 ? 'text-emerald-500' : 'text-rose-500'}>
                                                             {attempt.score.toFixed(1)}%
                                                         </span>
                                                     ) : (
-                                                        <span className="text-slate-300 font-medium italic text-sm">N/A</span>
+                                                        <span className="text-slate-300 dark:text-slate-600 font-medium italic text-sm">N/A</span>
                                                     )}
                                                 </td>
                                                 <td className="px-8 py-6">
-                                                    <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${attempt.endTime ? 'bg-emerald-100 text-emerald-600' : 'bg-blue-100 text-blue-600'
+                                                    <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${attempt.endTime ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400' : 'bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400'
                                                         }`}>
                                                         {attempt.endTime ? 'Completed' : 'Running'}
                                                     </span>
@@ -436,7 +436,7 @@ export default function AdminDashboard() {
                                             </tr>
                                         )) : (
                                             <tr>
-                                                <td colSpan={4} className="px-8 py-10 text-center text-slate-400 italic">No recent activity.</td>
+                                                <td colSpan={4} className="px-8 py-10 text-center text-slate-400 dark:text-slate-500 italic">No recent activity.</td>
                                             </tr>
                                         )}
                                     </tbody>
@@ -448,8 +448,8 @@ export default function AdminDashboard() {
                     {/* Right Column: Sidebar Actions */}
                     <div className="space-y-8">
                         {/* Edit Selected Quiz */}
-                        <section className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-xl animate-fade-in">
-                            <h3 className="text-xl font-bold text-slate-900 mb-6 flex items-center gap-2">
+                        <section className="bg-white dark:bg-slate-800 p-8 rounded-[2.5rem] border border-slate-100 dark:border-slate-700 shadow-xl animate-fade-in">
+                            <h3 className="text-xl font-bold text-slate-900 dark:text-slate-100 mb-6 flex items-center gap-2">
                                 <CheckCircle className="text-primary" size={20} />
                                 Edit Selected Exam
                             </h3>
@@ -477,7 +477,7 @@ export default function AdminDashboard() {
                                             value={editTitle}
                                             onChange={(e) => setEditTitle(e.target.value)}
                                             disabled={user?.role === 'ADMIN' && selected?.createdBy?.id !== user?.id}
-                                            className="w-full px-5 py-3 rounded-2xl bg-slate-50 border border-slate-200 focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all outline-none text-sm text-slate-900"
+                                            className="w-full px-5 py-3 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all outline-none text-sm text-slate-900 dark:text-slate-100"
                                         />
                                     </div>
 
@@ -490,7 +490,7 @@ export default function AdminDashboard() {
                                                 value={editDuration}
                                                 onChange={(e) => setEditDuration(e.target.value)}
                                                 disabled={user?.role === 'ADMIN' && selected?.createdBy?.id !== user?.id}
-                                                className="w-full px-5 py-3 rounded-2xl bg-slate-50 border border-slate-200 focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all outline-none text-sm text-slate-900"
+                                                className="w-full px-5 py-3 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all outline-none text-sm text-slate-900 dark:text-slate-100"
                                             />
                                         </div>
                                         <div className="space-y-2">
@@ -502,7 +502,7 @@ export default function AdminDashboard() {
                                                 value={editRetakeLimit}
                                                 onChange={(e) => setEditRetakeLimit(e.target.value)}
                                                 disabled={user?.role === 'ADMIN' && selected?.createdBy?.id !== user?.id}
-                                                className="w-full px-5 py-3 rounded-2xl bg-slate-50 border border-slate-200 focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all outline-none text-sm text-slate-900"
+                                                className="w-full px-5 py-3 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all outline-none text-sm text-slate-900 dark:text-slate-100"
                                             />
                                         </div>
                                     </div>
@@ -513,7 +513,7 @@ export default function AdminDashboard() {
                                             value={editStartDate}
                                             onChange={(e) => setEditStartDate(e.target.value)}
                                             disabled={user?.role === 'ADMIN' && selected?.createdBy?.id !== user?.id}
-                                            className="w-full px-5 py-3 rounded-2xl bg-slate-50 border border-slate-200 focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all outline-none text-sm text-slate-900"
+                                            className="w-full px-5 py-3 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all outline-none text-sm text-slate-900 dark:text-slate-100"
                                         />
                                     </div>
                                     <div className="space-y-2">
@@ -523,7 +523,7 @@ export default function AdminDashboard() {
                                             value={editEndDate}
                                             onChange={(e) => setEditEndDate(e.target.value)}
                                             disabled={user?.role === 'ADMIN' && selected?.createdBy?.id !== user?.id}
-                                            className="w-full px-5 py-3 rounded-2xl bg-slate-50 border border-slate-200 focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all outline-none text-sm text-slate-900"
+                                            className="w-full px-5 py-3 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all outline-none text-sm text-slate-900 dark:text-slate-100"
                                         />
                                     </div>
 
@@ -538,7 +538,7 @@ export default function AdminDashboard() {
                                         </button>
                                         <Link
                                             href={`/admin/quizzes/${selectedQuizId}/preview`}
-                                            className="px-6 py-3 rounded-2xl font-bold bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 transition-all"
+                                            className="px-6 py-3 rounded-2xl font-bold bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-all"
                                         >
                                             Preview
                                         </Link>
@@ -548,8 +548,8 @@ export default function AdminDashboard() {
                         </section>
 
                         {/* Create Quiz Form */}
-                        <section className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-xl animate-fade-in" style={{ animationDelay: '150ms' }}>
-                            <h3 className="text-xl font-bold text-slate-900 mb-6 flex items-center gap-2">
+                        <section className="bg-white dark:bg-slate-800 p-8 rounded-[2.5rem] border border-slate-100 dark:border-slate-700 shadow-xl animate-fade-in" style={{ animationDelay: '150ms' }}>
+                            <h3 className="text-xl font-bold text-slate-900 dark:text-slate-100 mb-6 flex items-center gap-2">
                                 <Plus className="text-primary" size={20} />
                                 New Exam Session
                             </h3>
@@ -561,7 +561,7 @@ export default function AdminDashboard() {
                                         value={newTitle}
                                         onChange={(e) => setNewTitle(e.target.value)}
                                         placeholder="e.g. Mathematics Q1"
-                                        className="w-full px-5 py-3 rounded-2xl bg-slate-50 border border-slate-200 focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all outline-none text-sm text-slate-900"
+                                        className="w-full px-5 py-3 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all outline-none text-sm text-slate-900 dark:text-slate-100"
                                         required
                                     />
                                 </div>
@@ -571,14 +571,14 @@ export default function AdminDashboard() {
                                         type="number"
                                         value={newDuration}
                                         onChange={(e) => setNewDuration(e.target.value)}
-                                        className="w-full px-5 py-3 rounded-2xl bg-slate-50 border border-slate-200 focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all outline-none text-sm text-slate-900"
+                                        className="w-full px-5 py-3 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all outline-none text-sm text-slate-900 dark:text-slate-100"
                                         required
                                     />
                                 </div>
                                 <button
                                     type="submit"
                                     disabled={isCreating}
-                                    className="w-full bg-slate-900 hover:bg-slate-800 text-white py-4 rounded-2xl font-bold transition-all active:scale-95 disabled:opacity-50 mt-2 shadow-lg shadow-slate-200"
+                                    className="w-full bg-slate-900 dark:bg-slate-700 hover:bg-slate-800 dark:hover:bg-slate-600 text-white py-4 rounded-2xl font-bold transition-all active:scale-95 disabled:opacity-50 mt-2 shadow-lg shadow-slate-200 dark:shadow-none"
                                 >
                                     {isCreating ? 'Creating...' : 'Create Exam'}
                                 </button>
@@ -586,7 +586,7 @@ export default function AdminDashboard() {
                         </section>
 
                         {/* Import Questions */}
-                        <section className="bg-primary p-10 rounded-[2.5rem] text-white shadow-xl shadow-primary/20 animate-fade-in" style={{ animationDelay: '200ms' }}>
+                        <section className="bg-primary p-10 rounded-[2.5rem] text-white shadow-xl shadow-primary/20 animate-fade-in dark:shadow-none" style={{ animationDelay: '200ms' }}>
                             <h3 className="text-xl font-bold mb-4 flex items-center gap-2">
                                 <Upload size={20} />
                                 Bulk Import

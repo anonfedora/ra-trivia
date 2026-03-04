@@ -4,6 +4,8 @@ import { useState, useEffect, Suspense, useRef, useCallback } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { apiJson } from '../../lib/api';
 
+import { ThemeToggle } from '../../components/ThemeToggle';
+
 function VerifyOTPContent() {
     const [otp, setOtp] = useState(['', '', '', '', '', '']);
     const [email, setEmail] = useState('');
@@ -171,16 +173,19 @@ function VerifyOTPContent() {
     };
 
     return (
-        <main className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 flex items-center justify-center p-6">
+        <main className="min-h-screen bg-slate-100 dark:bg-slate-900 flex items-center justify-center p-6 transition-colors duration-200">
+            <div className="absolute top-6 right-6">
+                <ThemeToggle />
+            </div>
             <div className="w-full max-w-md">
-                <div className="bg-white/80 backdrop-blur-sm rounded-3xl shadow-2xl shadow-slate-200/50 p-8 border border-white/20">
+                <div className="bg-white dark:bg-slate-800 rounded-[2.5rem] shadow-2xl p-8 border border-slate-100 dark:border-slate-700 animate-slide-up">
                     <div className="text-center mb-8">
-                        <div className="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-br from-blue-500 to-purple-600 rounded-3xl mb-6 shadow-lg">
+                        <div className="inline-flex items-center justify-center w-20 h-20 bg-primary rounded-3xl mb-6 shadow-lg">
                             <span className="text-white font-bold text-2xl">RA</span>
                         </div>
-                        <h1 className="text-4xl font-bold text-slate-800 mb-3">Verify Email</h1>
-                        <p className="text-slate-600 text-lg">Enter the 6-digit code sent to</p>
-                        <p className="text-slate-700 font-semibold">{email || 'your email'}</p>
+                        <h1 className="text-4xl font-bold text-slate-800 dark:text-slate-50 mb-3">Verify Email</h1>
+                        <p className="text-slate-600 dark:text-slate-400 text-lg">Enter the 6-digit code sent to</p>
+                        <p className="text-slate-700 dark:text-slate-300 font-semibold">{email || 'your email'}</p>
                     </div>
 
                     <form onSubmit={handleVerifyOTP} className="space-y-8">
@@ -195,7 +200,7 @@ function VerifyOTPContent() {
                                     onChange={(e) => handleInputChange(index, e.target.value)}
                                     onKeyDown={(e) => handleKeyDown(index, e)}
                                     onPaste={index === 0 ? handlePaste : undefined}
-                                    className="w-14 h-14 text-center text-2xl font-bold bg-slate-50 border-2 border-slate-200 rounded-2xl focus:border-blue-500 focus:ring-4 focus:ring-blue-500/20 transition-all outline-none text-slate-900"
+                                    className="w-14 h-14 text-center text-2xl font-bold bg-slate-50 dark:bg-slate-900 border-2 border-slate-200 dark:border-slate-700 rounded-2xl focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all outline-none text-slate-900 dark:text-slate-50"
                                     maxLength={1}
                                     required
                                     placeholder="•"
@@ -204,21 +209,21 @@ function VerifyOTPContent() {
                         </div>
 
                         {error && (
-                            <div className="p-4 rounded-2xl bg-red-50 border border-red-100">
-                                <p className="text-red-600 text-sm font-medium">{error}</p>
+                            <div className="p-4 rounded-2xl bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-900/50">
+                                <p className="text-red-600 dark:text-red-400 text-sm font-medium">{error}</p>
                             </div>
                         )}
 
                         {success && (
-                            <div className="p-4 rounded-2xl bg-green-50 border border-green-100">
-                                <p className="text-green-600 text-sm font-medium">{success}</p>
+                            <div className="p-4 rounded-2xl bg-green-50 dark:bg-emerald-900/20 border border-green-100 dark:border-emerald-900/50">
+                                <p className="text-green-600 dark:text-emerald-400 text-sm font-medium">{success}</p>
                             </div>
                         )}
 
                         <button
                             type="submit"
                             disabled={isLoading || otpString.length !== 6}
-                            className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white py-5 rounded-2xl font-bold text-lg shadow-lg shadow-blue-600/20 transform transition-all hover:-translate-y-1 active:scale-95 disabled:opacity-50"
+                            className="w-full bg-primary hover:bg-primary/90 text-white py-5 rounded-2xl font-bold text-lg shadow-lg shadow-primary/20 transform transition-all hover:-translate-y-1 active:scale-95 disabled:opacity-50"
                         >
                             {isLoading ? 'Verifying...' : 'Verify Email'}
                         </button>
@@ -228,19 +233,19 @@ function VerifyOTPContent() {
                                 type="button"
                                 onClick={handleResendOTP}
                                 disabled={isLoading || !email}
-                                className="text-blue-600 hover:text-blue-700 font-medium text-sm transition-colors disabled:opacity-50"
+                                className="text-primary hover:underline font-medium text-sm transition-colors disabled:opacity-50"
                             >
                                 Didn&apos;t receive the code? Resend
                             </button>
-                            <p className="text-slate-500 text-xs">
+                            <p className="text-slate-500 dark:text-slate-500 text-xs">
                                 The code will expire in 10 minutes
                             </p>
                         </div>
                     </form>
 
                     <div className="mt-8 text-center">
-                        <p className="text-slate-500 text-sm">
-                            Already verified? <a href="/login" className="text-blue-600 font-bold hover:underline">Sign In</a>
+                        <p className="text-slate-500 dark:text-slate-400 text-sm">
+                            Already verified? <a href="/login" className="text-primary font-bold hover:underline">Sign In</a>
                         </p>
                     </div>
                 </div>

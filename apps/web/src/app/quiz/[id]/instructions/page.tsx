@@ -17,6 +17,8 @@ interface Quiz {
     };
 }
 
+import { ThemeToggle } from '../../../../components/ThemeToggle';
+
 export default function InstructionsPage() {
     const [quiz, setQuiz] = useState<Quiz | null>(null);
     const [isLoading, setIsLoading] = useState(true);
@@ -90,7 +92,7 @@ export default function InstructionsPage() {
                     }
 
                     // Check retake limit
-                    const completedAttempts = sessionsData.filter((session: any) => 
+                    const completedAttempts = sessionsData.filter((session: any) =>
                         session.quizId === quizId && session.endTime !== null
                     ).length;
 
@@ -121,7 +123,7 @@ export default function InstructionsPage() {
 
     if (isLoading) {
         return (
-            <div className="min-h-screen flex items-center justify-center bg-slate-50">
+            <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-900 transition-colors duration-200">
                 <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
             </div>
         );
@@ -130,8 +132,11 @@ export default function InstructionsPage() {
     if (!quiz) return null;
 
     return (
-        <main className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
-            <div className="max-w-2xl w-full bg-white rounded-[2.5rem] shadow-2xl border border-slate-100 overflow-hidden animate-slide-up">
+        <main className="min-h-screen bg-slate-100 dark:bg-slate-900 flex items-center justify-center p-6 transition-colors duration-200">
+            <div className="absolute top-6 right-6">
+                <ThemeToggle />
+            </div>
+            <div className="max-w-2xl w-full bg-white dark:bg-slate-800 rounded-[2.5rem] shadow-2xl border border-slate-100 dark:border-slate-700 overflow-hidden animate-slide-up">
                 <div className="bg-primary p-8 text-white relative">
                     <button
                         onClick={() => router.push('/dashboard')}
@@ -149,47 +154,47 @@ export default function InstructionsPage() {
                 </div>
 
                 <div className="p-10 space-y-8">
-                    <div className="grid grid-cols-2 gap-6">
-                        <div className="bg-slate-50 p-6 rounded-3xl border border-slate-100 items-center flex gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="bg-slate-50 dark:bg-slate-900 p-6 rounded-3xl border border-slate-100 dark:border-slate-700 items-center flex gap-4">
                             <div className="bg-primary/10 p-3 rounded-2xl text-primary">
                                 <Clock size={24} />
                             </div>
                             <div>
-                                <p className="text-sm text-slate-500 font-medium">Duration</p>
-                                <p className="text-xl font-bold text-slate-900">{quiz.duration} Minutes</p>
+                                <p className="text-sm text-slate-500 dark:text-slate-400 font-medium">Duration</p>
+                                <p className="text-xl font-bold text-slate-900 dark:text-slate-50">{quiz.duration} Minutes</p>
                             </div>
                         </div>
-                        <div className="bg-slate-50 p-6 rounded-3xl border border-slate-100 items-center flex gap-4">
+                        <div className="bg-slate-50 dark:bg-slate-900 p-6 rounded-3xl border border-slate-100 dark:border-slate-700 items-center flex gap-4">
                             <div className="bg-primary/10 p-3 rounded-2xl text-primary">
                                 <AlertCircle size={24} />
                             </div>
                             <div>
-                                <p className="text-sm text-slate-500 font-medium">Questions</p>
-                                <p className="text-xl font-bold text-slate-900">{quiz._count.questions} Total</p>
+                                <p className="text-sm text-slate-500 dark:text-slate-400 font-medium">Questions</p>
+                                <p className="text-xl font-bold text-slate-900 dark:text-slate-50">{quiz._count.questions} Total</p>
                             </div>
                         </div>
-                        <div className="bg-slate-50 p-6 rounded-3xl border border-slate-100 items-center flex gap-4">
+                        <div className="bg-slate-50 dark:bg-slate-900 p-6 rounded-3xl border border-slate-100 dark:border-slate-700 items-center flex gap-4">
                             <div className="bg-primary/10 p-3 rounded-2xl text-primary">
                                 <Calendar size={24} />
                             </div>
                             <div>
-                                <p className="text-sm text-slate-500 font-medium">Schedule</p>
-                                <p className="text-sm font-bold text-slate-900">{getScheduleLabel()}</p>
+                                <p className="text-sm text-slate-500 dark:text-slate-400 font-medium">Schedule</p>
+                                <p className="text-sm font-bold text-slate-900 dark:text-slate-50">{getScheduleLabel()}</p>
                             </div>
                         </div>
-                        <div className="bg-slate-50 p-6 rounded-3xl border border-slate-100 items-center flex gap-4">
+                        <div className="bg-slate-50 dark:bg-slate-900 p-6 rounded-3xl border border-slate-100 dark:border-slate-700 items-center flex gap-4">
                             <div className="bg-primary/10 p-3 rounded-2xl text-primary">
                                 <Repeat size={24} />
                             </div>
                             <div>
-                                <p className="text-sm text-slate-500 font-medium">Attempts</p>
-                                <p className="text-sm font-bold text-slate-900">{getTriesLabel()}</p>
+                                <p className="text-sm text-slate-500 dark:text-slate-400 font-medium">Attempts</p>
+                                <p className="text-sm font-bold text-slate-900 dark:text-slate-50">{getTriesLabel()}</p>
                             </div>
                         </div>
                     </div>
 
                     <div className="space-y-4">
-                        <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+                        <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
                             System Rules & Guidelines
                         </h3>
                         <ul className="space-y-3">
@@ -201,7 +206,7 @@ export default function InstructionsPage() {
                                 "Do not refresh the page or close the tab as the timer continues running.",
                                 "The exam will auto-submit when the timer expires."
                             ].map((rule, i) => (
-                                <li key={i} className="flex gap-3 text-slate-600">
+                                <li key={i} className="flex gap-3 text-slate-600 dark:text-slate-400">
                                     <CheckCircle size={18} className="text-emerald-500 mt-1 flex-shrink-0" />
                                     <span className="font-medium text-sm leading-relaxed">{rule}</span>
                                 </li>
@@ -217,7 +222,7 @@ export default function InstructionsPage() {
                         Start My Exam
                     </button>
 
-                    <p className="text-center text-xs text-slate-400 font-medium pb-2">
+                    <p className="text-center text-xs text-slate-400 dark:text-slate-500 font-medium pb-2">
                         By starting the exam, you agree to follow all the rules mentioned above.
                     </p>
                 </div>

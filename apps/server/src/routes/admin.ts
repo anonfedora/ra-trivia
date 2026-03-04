@@ -9,7 +9,7 @@ const router = Router();
 router.get('/analytics', authenticate, authorizeAdmin, async (req: AuthRequest, res) => {
     try {
         const userRole = req.user?.role;
-        
+
         // For SUPER_ADMIN, get all quizzes. For regular ADMIN, get only their created quizzes
         const whereClause: any = userRole === 'SUPER_ADMIN' ? {} : {
             createdById: req.user?.userId
@@ -37,11 +37,19 @@ router.get('/analytics', authenticate, authorizeAdmin, async (req: AuthRequest, 
             const sessions = quiz.sessions || [];
             const completedSessions = sessions.filter((s: any) => s.endTime !== null);
             const totalAttempts = sessions.length;
-            const averageScore = completedSessions.length > 0 
-                ? completedSessions.reduce((sum: number, s: any) => sum + (s.score || 0), 0) / completedSessions.length 
+            const completedScores = completedSessions.map((s: any) => s.score || 0);
+
+            const averageScore = completedSessions.length > 0
+                ? completedScores.reduce((sum: number, score: number) => sum + score, 0) / completedSessions.length
                 : 0;
+
+            const passCount = completedScores.filter((s: number) => s >= 50).length;
+            const failCount = completedScores.length - passCount;
+            const highestScore = completedScores.length > 0 ? Math.max(...completedScores) : 0;
+            const lowestScore = completedScores.length > 0 ? Math.min(...completedScores) : 0;
+
             const completionRate = totalAttempts > 0 ? (completedSessions.length / totalAttempts) * 100 : 0;
-            const averageTime = completedSessions.length > 0 
+            const averageTime = completedSessions.length > 0
                 ? completedSessions.reduce((sum: number, s: any) => {
                     const duration = new Date(s.endTime!).getTime() - new Date(s.startTime).getTime();
                     return sum + duration;
@@ -52,6 +60,10 @@ router.get('/analytics', authenticate, authorizeAdmin, async (req: AuthRequest, 
                 id: quiz.id,
                 title: quiz.title,
                 totalAttempts,
+                passCount,
+                failCount,
+                highestScore: Math.round(highestScore * 100) / 100,
+                lowestScore: Math.round(lowestScore * 100) / 100,
                 averageScore: Math.round(averageScore * 100) / 100,
                 completionRate: Math.round(completionRate * 100) / 100,
                 averageTime: Math.round(averageTime * 100) / 100
@@ -83,8 +95,8 @@ router.get('/global-stats', authenticate, authorizeAdmin, async (req: AuthReques
             select: { score: true }
         });
 
-        const averageScore = allScores.length > 0 
-            ? allScores.reduce((sum, s) => sum + s.score!, 0) / allScores.length 
+        const averageScore = allScores.length > 0
+            ? allScores.reduce((sum, s) => sum + s.score!, 0) / allScores.length
             : 0;
 
         const globalStats = {
@@ -105,9 +117,9 @@ router.get('/global-stats', authenticate, authorizeAdmin, async (req: AuthReques
 router.get('/export/:quizId', authenticate, authorizeAdmin, async (req: AuthRequest, res) => {
     try {
         const { quizId } = req.params;
-        
+
         const sessions = await prisma.quizSession.findMany({
-            where: { 
+            where: {
                 quizId,
                 endTime: { not: null }
             } as any,
@@ -190,7 +202,29 @@ router.get('/results', authenticate, authorizeAdmin, async (req: AuthRequest, re
             })
         ]);
 
-        res.json({ items, total, page, pageSize });
+        let summary = null;
+        if (q) {
+            const summaryData = await prisma.quizSession.findMany({
+                where: { ...where, endTime: { not: null } },
+                select: { score: true }
+            });
+
+            if (summaryData.length > 0) {
+                const scores = summaryData.map((s: { score: number | null }) => s.score || 0);
+                const passCount = scores.filter((s: number) => s >= 50).length;
+                const averageScore = scores.reduce((a: number, b: number) => a + b, 0) / scores.length;
+                summary = {
+                    totalCompleted: summaryData.length,
+                    passCount,
+                    failCount: summaryData.length - passCount,
+                    averageScore: Math.round(averageScore * 100) / 100,
+                    highestScore: Math.max(...scores),
+                    lowestScore: Math.min(...scores)
+                };
+            }
+        }
+
+        res.json({ items, total, page, pageSize, summary });
     } catch (error) {
         console.error(error);
         res.status(500).json({ message: 'Internal server error' });

@@ -56,7 +56,7 @@ function ResultsContent() {
 
     if (isLoading) {
         return (
-            <div className="min-h-screen flex items-center justify-center bg-slate-50">
+            <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-900 transition-colors duration-200">
                 <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary" />
             </div>
         );
@@ -65,17 +65,17 @@ function ResultsContent() {
     if (lockedAt) {
         const releaseDate = new Date(lockedAt);
         return (
-            <main className="min-h-screen flex flex-col items-center justify-center bg-slate-50 p-6">
-                <div className="max-w-md w-full bg-white rounded-[2.5rem] shadow-xl p-10 text-center space-y-6 border border-slate-100 animate-scale-in">
-                    <div className="w-20 h-20 bg-amber-50 text-amber-500 rounded-full flex items-center justify-center mx-auto mb-2">
+            <main className="min-h-screen flex flex-col items-center justify-center bg-slate-50 dark:bg-slate-900 p-6 transition-colors duration-200">
+                <div className="max-w-md w-full bg-white dark:bg-slate-800 rounded-[2.5rem] shadow-xl p-10 text-center space-y-6 border border-slate-100 dark:border-slate-700 animate-scale-in">
+                    <div className="w-20 h-20 bg-amber-50 dark:bg-amber-900/20 text-amber-500 rounded-full flex items-center justify-center mx-auto mb-2">
                         <BookOpen size={40} />
                     </div>
-                    <h1 className="text-2xl font-bold text-slate-900">Results Locked</h1>
-                    <p className="text-slate-500 leading-relaxed font-medium">
-                        Your exam has been submitted successfully! However, results are only released daily at <span className="text-slate-900 font-bold">10:00 PM</span>.
+                    <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-50">Results Locked</h1>
+                    <p className="text-slate-500 dark:text-slate-400 leading-relaxed font-medium">
+                        Your exam has been submitted successfully! However, results are only released daily at <span className="text-slate-900 dark:text-slate-50 font-bold">10:00 PM</span>.
                     </p>
 
-                    <div className="bg-slate-50 rounded-2xl p-6 border border-slate-100">
+                    <div className="bg-slate-50 dark:bg-slate-900 rounded-2xl p-6 border border-slate-100 dark:border-slate-700">
                         <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-2">Available on</p>
                         <p className="text-xl font-black text-primary">
                             {releaseDate.toLocaleDateString(undefined, {
@@ -89,142 +89,132 @@ function ResultsContent() {
 
                     <Link
                         href="/dashboard"
-                        className="flex items-center justify-center gap-2 w-full bg-slate-900 text-white py-4 rounded-xl font-bold hover:bg-slate-800 transition-all shadow-lg active:scale-95"
+                        className="flex items-center justify-center gap-2 w-full bg-slate-900 dark:bg-primary text-white py-4 rounded-xl font-bold hover:bg-slate-800 dark:hover:bg-primary/90 transition-all shadow-lg active:scale-95"
                     >
                         <Home size={18} />
                         Back to Dashboard
                     </Link>
-                    <p className="text-[10px] text-slate-300 font-bold uppercase tracking-widest">You will receive an email once results are released</p>
+                    <p className="text-[10px] text-slate-300 dark:text-slate-600 font-bold uppercase tracking-widest">You will receive an email once results are released</p>
                 </div>
             </main>
         );
     }
 
-    if (!result) {
+    if (!sessionId || !result) {
         return (
-            <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 gap-4">
-                <p className="text-slate-500 text-lg font-medium">Could not load results.</p>
-                <Link href="/dashboard" className="text-primary font-bold hover:underline">Back to Dashboard</Link>
-            </div>
+            <main className="min-h-screen flex flex-col items-center justify-center bg-slate-50 dark:bg-slate-900 p-6 transition-colors duration-200">
+                <div className="text-center">
+                    <XCircle size={64} className="text-rose-500 mx-auto mb-4" />
+                    <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-50">Session Not Found</h1>
+                    <Link href="/dashboard" className="text-primary hover:underline mt-4 block font-bold">Return to Dashboard</Link>
+                </div>
+            </main>
         );
     }
 
-    const score = result.score !== null ? Math.round(result.score) : 0;
-    const passed = score >= 50;
-    const scoreColor = score >= 70 ? 'text-emerald-500' : score >= 50 ? 'text-amber-500' : 'text-rose-500';
-    const scoreBg = score >= 70 ? 'bg-emerald-50 border-emerald-100' : score >= 50 ? 'bg-amber-50 border-amber-100' : 'bg-rose-50 border-rose-100';
+    const percentage = result.score ?? 0;
+    const isPassed = percentage >= 50;
 
     return (
-        <main className="min-h-screen bg-slate-50 p-6 md:p-12">
-            <div className="max-w-3xl mx-auto space-y-8">
+        <main className="min-h-screen bg-slate-50 dark:bg-slate-900 p-6 md:p-12 transition-colors duration-200">
+            <div className="max-w-4xl mx-auto space-y-8 animate-fade-in">
+                <div className="bg-white dark:bg-slate-800 rounded-[2.5rem] shadow-xl border border-slate-100 dark:border-slate-700 p-8 md:p-12 text-center relative overflow-hidden">
+                    <div className={`absolute top-0 left-0 w-full h-2 ${isPassed ? 'bg-emerald-500' : 'bg-rose-500'}`} />
 
-                {/* Header Card */}
-                <div className={`bg-white rounded-[2.5rem] shadow-xl border p-10 text-center animate-scale-in ${scoreBg}`}>
-                    <div className={`w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6 ${passed ? 'bg-emerald-100 text-emerald-600' : 'bg-rose-100 text-rose-500'}`}>
-                        {passed ? <Award size={40} /> : <BookOpen size={40} />}
-                    </div>
-                    <h1 className="text-3xl font-extrabold text-slate-900 mb-1">{result.quiz.title}</h1>
-                    <p className={`text-lg font-bold mb-6 ${passed ? 'text-emerald-600' : 'text-rose-500'}`}>
-                        {passed ? '🎉 Passed!' : 'Not Passed'}
-                    </p>
-
-                    {/* Score */}
-                    <div className={`text-8xl font-black mb-2 ${scoreColor}`}>{score}%</div>
-                    <p className="text-slate-400 font-medium text-sm uppercase tracking-widest">Final Score</p>
-
-                    {/* Stats Row */}
-                    <div className="grid grid-cols-3 gap-4 mt-8">
-                        <div className="bg-white/70 rounded-2xl p-4 border border-slate-100">
-                            <div className="text-2xl font-black text-slate-800">{result.totalQuestions}</div>
-                            <div className="text-xs font-bold text-slate-400 uppercase tracking-wider mt-1">Total</div>
-                        </div>
-                        <div className="bg-emerald-50 rounded-2xl p-4 border border-emerald-100">
-                            <div className="text-2xl font-black text-emerald-600">{result.correctCount}</div>
-                            <div className="text-xs font-bold text-emerald-400 uppercase tracking-wider mt-1">Correct</div>
-                        </div>
-                        <div className="bg-rose-50 rounded-2xl p-4 border border-rose-100">
-                            <div className="text-2xl font-black text-rose-500">{result.incorrectCount}</div>
-                            <div className="text-xs font-bold text-rose-400 uppercase tracking-wider mt-1">Incorrect</div>
+                    <div className="flex justify-between items-start mb-8">
+                        <Link href="/dashboard" className="p-3 bg-slate-50 dark:bg-slate-900 rounded-2xl text-slate-400 hover:text-primary transition-all">
+                            <Home size={20} />
+                        </Link>
+                        <div className={`px-4 py-1.5 rounded-full text-xs font-black uppercase tracking-widest ${isPassed ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600' : 'bg-rose-100 dark:bg-rose-900/30 text-rose-600'
+                            }`}>
+                            {isPassed ? 'Passed' : 'Not Passed'}
                         </div>
                     </div>
-                </div>
 
-                {/* Progress Bar */}
-                <div className="bg-white rounded-[2rem] shadow-lg border border-slate-100 p-6 animate-fade-in">
-                    <div className="flex items-center gap-2 mb-3">
-                        <TrendingUp size={18} className="text-primary" />
-                        <span className="font-bold text-slate-700">Performance Breakdown</span>
-                        <span className="ml-auto text-sm font-bold text-slate-400">{result.correctCount}/{result.totalQuestions} correct</span>
+                    <div className="space-y-4">
+                        <div className={`w-24 h-24 ${isPassed ? 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-500' : 'bg-rose-50 dark:bg-rose-900/20 text-rose-500'} rounded-full flex items-center justify-center mx-auto mb-6`}>
+                            {isPassed ? <Award size={48} /> : <XCircle size={48} />}
+                        </div>
+                        <h1 className="text-4xl font-black text-slate-900 dark:text-slate-50">{result.quiz.title}</h1>
+                        <p className="text-slate-500 dark:text-slate-400 font-medium">Detailed results and performance review</p>
                     </div>
-                    <div className="w-full h-3 bg-slate-100 rounded-full overflow-hidden">
-                        <div
-                            className={`h-full rounded-full transition-all duration-1000 ${score >= 70 ? 'bg-emerald-500' : score >= 50 ? 'bg-amber-500' : 'bg-rose-500'}`}
-                            style={{ width: `${score}%` }}
-                        />
-                    </div>
-                    <div className="flex justify-between text-xs font-bold text-slate-400 mt-2">
-                        <span>0%</span>
-                        <span className="text-amber-500">50% (Pass)</span>
-                        <span>100%</span>
-                    </div>
-                </div>
 
-                {/* Per-Question Breakdown */}
-                <div className="bg-white rounded-[2.5rem] shadow-xl border border-slate-100 overflow-hidden animate-slide-up">
-                    <div className="p-8 border-b border-slate-50 bg-slate-50/50">
-                        <h2 className="text-xl font-bold text-slate-800">Question Review</h2>
-                        <p className="text-slate-400 text-sm mt-1">See how you answered each question</p>
-                    </div>
-                    <div className="divide-y divide-slate-50">
-                        {result.breakdown.map((q, index) => (
-                            <div key={q.questionId} className={`p-6 md:p-8 ${q.isCorrect ? 'bg-white' : 'bg-rose-50/30'}`}>
-                                <div className="flex items-start gap-4">
-                                    <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center mt-0.5 ${q.isCorrect ? 'bg-emerald-100 text-emerald-600' : 'bg-rose-100 text-rose-500'}`}>
-                                        {q.isCorrect
-                                            ? <CheckCircle2 size={18} />
-                                            : <XCircle size={18} />
-                                        }
-                                    </div>
-                                    <div className="flex-1 min-w-0">
-                                        <div className="flex items-center gap-2 mb-2">
-                                            <span className="text-xs font-black text-slate-400 uppercase tracking-widest">Q{index + 1}</span>
-                                            <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${q.isCorrect ? 'bg-emerald-100 text-emerald-600' : 'bg-rose-100 text-rose-500'}`}>
-                                                {q.isCorrect ? 'Correct' : 'Incorrect'}
-                                            </span>
-                                        </div>
-                                        <p className="font-semibold text-slate-800 mb-4 leading-relaxed">{q.text}</p>
-
-                                        <div className="space-y-2">
-                                            {q.options.map((opt) => {
-                                                const isSelected = opt.key === q.selectedOption;
-                                                const isCorrect = opt.key === q.correctOption;
-                                                let style = 'bg-slate-50 border-slate-100 text-slate-600';
-                                                if (isCorrect) style = 'bg-emerald-50 border-emerald-200 text-emerald-700 font-bold';
-                                                if (isSelected && !isCorrect) style = 'bg-rose-50 border-rose-200 text-rose-600 font-bold line-through';
-                                                return (
-                                                    <div key={opt.key} className={`flex items-center gap-3 px-4 py-3 rounded-xl border text-sm ${style}`}>
-                                                        {isCorrect && <CheckCircle2 size={14} className="text-emerald-500 flex-shrink-0" />}
-                                                        {isSelected && !isCorrect && <XCircle size={14} className="text-rose-400 flex-shrink-0" />}
-                                                        {!isCorrect && !isSelected && <div className="w-3.5 h-3.5 flex-shrink-0" />}
-                                                        <span>
-                                                            <span className="font-black mr-2">{opt.key}.</span>
-                                                            {opt.text}
-                                                        </span>
-                                                    </div>
-                                                );
-                                            })}
-                                            {!q.selectedOption && (
-                                                <p className="text-xs text-slate-400 italic mt-1 pl-1">No answer selected</p>
-                                            )}
-                                        </div>
-                                    </div>
-                                </div>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-12">
+                        {[
+                            { label: 'Total Score', value: `${percentage.toFixed(1)}%`, icon: TrendingUp, color: 'text-primary' },
+                            { label: 'Correct Answers', value: result.correctCount, icon: CheckCircle2, color: 'text-emerald-500' },
+                            { label: 'Incorrect', value: result.incorrectCount, icon: XCircle, color: 'text-rose-500' }
+                        ].map((stat, i) => (
+                            <div key={i} className="bg-slate-50 dark:bg-slate-900/50 p-6 rounded-3xl border border-slate-100 dark:border-slate-700">
+                                <stat.icon className={`w-6 h-6 ${stat.color} mx-auto mb-3`} />
+                                <p className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-1">{stat.label}</p>
+                                <p className="text-2xl font-black text-slate-900 dark:text-slate-50">{stat.value}</p>
                             </div>
                         ))}
                     </div>
                 </div>
 
-                {/* Back to Dashboard — no retake button */}
+                <div className="space-y-6">
+                    <h2 className="text-2xl font-bold text-slate-800 dark:text-slate-100 px-2 flex items-center gap-2">
+                        <BookOpen className="text-primary" size={24} />
+                        Question Breakdown
+                    </h2>
+
+                    {result.breakdown.map((item, idx) => (
+                        <div key={item.questionId} className="bg-white dark:bg-slate-800 rounded-3xl p-8 shadow-lg border border-slate-100 dark:border-slate-700 animate-slide-up" style={{ animationDelay: `${idx * 50}ms` }}>
+                            <div className="flex justify-between items-start gap-4 mb-6">
+                                <div className="flex items-start gap-4">
+                                    <span className="w-8 h-8 rounded-xl bg-slate-100 dark:bg-slate-900 flex items-center justify-center text-xs font-black text-slate-400 shrink-0">
+                                        {idx + 1}
+                                    </span>
+                                    <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100 leading-tight">{item.text}</h3>
+                                </div>
+                                <div className={item.isCorrect ? 'text-emerald-500' : 'text-rose-500'}>
+                                    {item.isCorrect ? <CheckCircle2 size={24} /> : <XCircle size={24} />}
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                {item.options.map(opt => {
+                                    const isSelected = item.selectedOption === opt.key;
+                                    const isCorrect = item.correctOption === opt.key;
+
+                                    let borderColor = 'border-slate-100 dark:border-slate-700';
+                                    let bgColor = 'bg-white dark:bg-slate-800';
+                                    let textColor = 'text-slate-600 dark:text-slate-400';
+
+                                    if (isCorrect) {
+                                        borderColor = 'border-emerald-200 dark:border-emerald-900/50';
+                                        bgColor = 'bg-emerald-50 dark:bg-emerald-900/20';
+                                        textColor = 'text-emerald-700 dark:text-emerald-400 font-bold';
+                                    } else if (isSelected && !isCorrect) {
+                                        borderColor = 'border-rose-200 dark:border-rose-900/50';
+                                        bgColor = 'bg-rose-50 dark:bg-rose-900/20';
+                                        textColor = 'text-rose-700 dark:text-rose-400 font-bold';
+                                    }
+
+                                    return (
+                                        <div key={opt.key} className={`p-4 rounded-2xl border transition-all ${borderColor} ${bgColor} ${textColor} text-sm flex items-center gap-3`}>
+                                            <span className={`w-6 h-6 rounded-lg flex items-center justify-center text-[10px] font-black shrink-0 ${isCorrect ? 'bg-emerald-500 text-white' : isSelected ? 'bg-rose-500 text-white' : 'bg-slate-100 dark:bg-slate-700 text-slate-400'
+                                                }`}>
+                                                {opt.key}
+                                            </span>
+                                            {opt.text}
+                                        </div>
+                                    );
+                                })}
+                            </div>
+
+                            {!item.isCorrect && (
+                                <div className="mt-6 pt-6 border-t border-slate-50 dark:border-slate-700 flex items-center gap-2 text-xs font-bold text-slate-400">
+                                    <TrendingUp size={14} className="text-primary" />
+                                    Correct Answer: <span className="text-emerald-500 uppercase">{item.correctOption}</span>
+                                </div>
+                            )}
+                        </div>
+                    ))}
+                </div>
+
                 <div className="pb-8">
                     <Link
                         href="/dashboard"

@@ -129,32 +129,32 @@ export default function DashboardPage() {
 
     if (isLoading) {
         return (
-            <div className="min-h-screen flex items-center justify-center bg-slate-50">
+            <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-900 transition-colors duration-200">
                 <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
             </div>
         );
     }
 
     return (
-        <main className="min-h-screen bg-slate-50 p-6 md:p-12">
+        <main className="min-h-screen bg-slate-50 dark:bg-slate-900 p-6 md:p-12 transition-colors duration-200">
             <div className="max-w-6xl mx-auto">
                 <header className="flex justify-between items-center mb-12 animate-fade-in text-center md:text-left">
-                    <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-4 text-left">
                         <img
                             src="/favicon.png"
                             alt="RA Logo"
                             className="w-12 h-12 rounded-lg"
                         />
                         <div>
-                            <h1 className="text-4xl font-bold text-slate-900">Candidate Dashboard</h1>
-                            <p className="text-slate-500 mt-2">Welcome back, <span className="font-bold text-primary">{user?.name}</span>. Ready for your next challenge?</p>
+                            <h1 className="text-4xl font-bold text-slate-900 dark:text-slate-50">Candidate Dashboard</h1>
+                            <p className="text-slate-500 dark:text-slate-400 mt-2">Welcome back, <span className="font-bold text-primary">{user?.name}</span>. Ready for your next challenge?</p>
                         </div>
                     </div>
                     <div className="flex items-center gap-3">
                         <ThemeToggle />
                         <button
                             onClick={handleLogout}
-                            className="hidden md:flex items-center gap-2 px-6 py-3 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-2xl font-semibold border border-slate-200 dark:border-slate-600 hover:bg-slate-100 dark:hover:bg-slate-700 transition-all shadow-sm"
+                            className="hidden md:flex items-center gap-2 px-6 py-3 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-2xl font-semibold border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700 transition-all shadow-sm"
                         >
                             <LogOut size={18} />
                             Logout
@@ -165,45 +165,45 @@ export default function DashboardPage() {
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
                     <div className="lg:col-span-2 space-y-12">
                         <section>
-                            <h2 className="text-2xl font-bold text-slate-800 mb-6 flex items-center gap-2">
+                            <h2 className="text-2xl font-bold text-slate-800 dark:text-slate-100 mb-6 flex items-center gap-2">
                                 <PlayCircle className="text-primary" size={24} />
                                 Available Exams
                             </h2>
                             {quizzes.length === 0 ? (
-                                <div className="bg-white rounded-[2.5rem] p-12 text-center shadow-xl border border-slate-100 animate-slide-up">
-                                    <div className="bg-slate-50 w-20 h-20 rounded-3xl flex items-center justify-center mx-auto mb-6 text-slate-400">
+                                <div className="bg-white dark:bg-slate-800 rounded-[2.5rem] p-12 text-center shadow-xl border border-slate-100 dark:border-slate-700 animate-slide-up">
+                                    <div className="bg-slate-50 dark:bg-slate-900 w-20 h-20 rounded-3xl flex items-center justify-center mx-auto mb-6 text-slate-400">
                                         <BookOpen size={40} />
                                     </div>
-                                    <h3 className="text-2xl font-bold text-slate-900 mb-2">No active exams</h3>
-                                    <p className="text-slate-500">There are currently no exams available for you to take.</p>
+                                    <h3 className="text-2xl font-bold text-slate-900 dark:text-slate-50 mb-2">No active exams</h3>
+                                    <p className="text-slate-500 dark:text-slate-400">There are currently no exams available for you to take.</p>
                                 </div>
                             ) : (
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                                     {quizzes.map((quiz, index) => (
                                         <div
                                             key={quiz.id}
-                                            className="bg-white rounded-[2.5rem] p-8 shadow-xl border border-slate-100 hover:shadow-2xl hover:-translate-y-2 transition-all group animate-scale-in"
+                                            className="bg-white dark:bg-slate-800 rounded-[2.5rem] p-8 shadow-xl border border-slate-100 dark:border-slate-700 hover:shadow-2xl hover:-translate-y-2 transition-all group animate-scale-in"
                                             style={{ animationDelay: `${index * 100}ms` }}
                                         >
                                             <div className="bg-primary/10 w-14 h-14 rounded-2xl flex items-center justify-center text-primary mb-6 transition-transform group-hover:scale-110">
                                                 <BookOpen size={28} />
                                             </div>
-                                            <h3 className="text-2xl font-bold text-slate-900 mb-4">{quiz.title}</h3>
+                                            <h3 className="text-2xl font-bold text-slate-900 dark:text-slate-50 mb-4">{quiz.title}</h3>
 
                                             <div className="space-y-3 mb-8">
-                                                <div className="flex items-center gap-3 text-slate-500">
+                                                <div className="flex items-center gap-3 text-slate-500 dark:text-slate-400">
                                                     <Clock size={18} />
                                                     <span className="font-medium">{quiz.duration} Minutes</span>
                                                 </div>
-                                                <div className="flex items-center gap-3 text-slate-500">
+                                                <div className="flex items-center gap-3 text-slate-500 dark:text-slate-400">
                                                     <Calendar size={18} />
                                                     <span className="font-medium">{getScheduleLabel(quiz)}</span>
                                                 </div>
-                                                <div className="flex items-center gap-3 text-slate-500">
+                                                <div className="flex items-center gap-3 text-slate-500 dark:text-slate-400">
                                                     <Repeat size={18} />
                                                     <span className="font-medium">{getTriesLabel(quiz)}</span>
                                                 </div>
-                                                <div className="flex items-center gap-3 text-slate-500">
+                                                <div className="flex items-center gap-3 text-slate-500 dark:text-slate-400">
                                                     <PlayCircle size={18} />
                                                     <span className="font-medium">{quiz._count.questions} Questions</span>
                                                 </div>
@@ -219,7 +219,7 @@ export default function DashboardPage() {
                                                         href={remainingTries > 0 ? `/quiz/${quiz.id}/instructions` : '#'}
                                                         className={`block w-full text-center py-4 rounded-2xl font-bold shadow-lg transition-all active:scale-95 ${remainingTries > 0
                                                             ? 'bg-primary hover:bg-primary/90 text-white shadow-primary/20'
-                                                            : 'bg-slate-300 text-slate-500 cursor-not-allowed'
+                                                            : 'bg-slate-300 dark:bg-slate-700 text-slate-500 dark:text-slate-400 cursor-not-allowed'
                                                             }`}
                                                         onClick={(e) => {
                                                             if (remainingTries === 0) {
@@ -240,14 +240,14 @@ export default function DashboardPage() {
                     </div>
 
                     <div className="space-y-8">
-                        <section className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-xl animate-fade-in" style={{ animationDelay: '200ms' }}>
-                            <h2 className="text-2xl font-bold text-slate-800 mb-6 flex items-center gap-2">
+                        <section className="bg-white dark:bg-slate-800 p-8 rounded-[2.5rem] border border-slate-100 dark:border-slate-700 shadow-xl animate-fade-in" style={{ animationDelay: '200ms' }}>
+                            <h2 className="text-2xl font-bold text-slate-800 dark:text-slate-100 mb-6 flex items-center gap-2">
                                 <Clock className="text-primary" size={24} />
                                 My Results
                             </h2>
                             <div className="space-y-4">
                                 {pastSessions.length === 0 ? (
-                                    <p className="text-slate-400 text-center py-8 italic font-medium">No previous attempts recorded.</p>
+                                    <p className="text-slate-400 dark:text-slate-500 text-center py-8 italic font-medium">No previous attempts recorded.</p>
                                 ) : (
                                     pastSessions.map((session) => {
                                         const now = new Date();
@@ -257,7 +257,7 @@ export default function DashboardPage() {
                                         return (
                                             <div
                                                 key={session.id}
-                                                className={`p-5 rounded-2xl bg-slate-50 border border-slate-100 transition-all ${!isRunning ? 'cursor-pointer hover:border-primary/20 hover:bg-white active:scale-95' : ''}`}
+                                                className={`p-5 rounded-2xl bg-slate-50 dark:bg-slate-900/50 border border-slate-100 dark:border-slate-700 transition-all ${!isRunning ? 'cursor-pointer hover:border-primary/20 hover:bg-white dark:hover:bg-slate-800 active:scale-95' : ''}`}
                                                 onClick={() => {
                                                     if (!isRunning) {
                                                         router.push(`/results?quizId=${session.quiz.id}&sessionId=${session.id}`);
@@ -265,20 +265,20 @@ export default function DashboardPage() {
                                                 }}
                                             >
                                                 <div className="flex justify-between items-start mb-1">
-                                                    <div className="font-bold text-slate-900">{session.quiz.title}</div>
+                                                    <div className="font-bold text-slate-900 dark:text-slate-50">{session.quiz.title}</div>
                                                     {!isRunning && (
                                                         <span className="text-[10px] font-bold text-primary bg-primary/5 px-2 py-1 rounded-lg">View Details</span>
                                                     )}
                                                 </div>
                                                 <div className="flex justify-between items-center mt-2">
-                                                    <span className="text-xs text-slate-400 font-bold uppercase tracking-wider">
+                                                    <span className="text-xs text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wider">
                                                         {new Date(session.startTime).toLocaleDateString()}
                                                     </span>
                                                     <span className={`px-3 py-1 rounded-full text-xs font-black ${isRunning
-                                                        ? 'bg-blue-100 text-blue-600'
+                                                        ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400'
                                                         : isReleased
-                                                            ? 'bg-emerald-100 text-emerald-600'
-                                                            : 'bg-orange-100 text-orange-600'
+                                                            ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400'
+                                                            : 'bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400'
                                                         }`}>
                                                         {isRunning
                                                             ? 'Running'
@@ -296,7 +296,7 @@ export default function DashboardPage() {
 
                         <button
                             onClick={handleLogout}
-                            className="md:hidden w-full flex items-center justify-center gap-2 px-6 py-4 bg-slate-50 text-slate-600 rounded-2xl font-bold border border-slate-200 hover:bg-slate-100 transition-all"
+                            className="md:hidden w-full flex items-center justify-center gap-2 px-6 py-4 bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-2xl font-bold border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700 transition-all shadow-sm"
                         >
                             <LogOut size={18} />
                             Logout

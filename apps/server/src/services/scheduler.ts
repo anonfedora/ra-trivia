@@ -4,10 +4,18 @@ import { sendQuizResultEmail } from './email';
 export const initScheduler = () => {
     console.log('⏰ Initializing results release scheduler...');
 
-    // Run every 10 minutes to check for pending releases
+    // Run every hour to check for pending releases
     setInterval(async () => {
         try {
             const now = new Date();
+            const currentHour = now.getHours();
+
+            // Only process at 10 PM (22:00)
+            if (currentHour !== 22) {
+                console.log(`[SCHEDULER] Skipping check at ${now.toISOString()} (Hour: ${currentHour}, not 22/10PM)`);
+                return;
+            }
+
             console.log(`[SCHEDULER] Checking for results to release at ${now.toISOString()}...`);
 
             // Find sessions that have reached release time and haven't sent email
@@ -77,5 +85,5 @@ export const initScheduler = () => {
         } catch (error) {
             console.error('[SCHEDULER] Global error in results release task:', error);
         }
-    }, 3 * 60 * 60 * 1000); // 3 hours
+    }, 60 * 60 * 1000); // 1 hour
 };
