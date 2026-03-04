@@ -4,9 +4,13 @@ import { useState, useEffect, useCallback } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { ThemeToggle } from '../../../components/ThemeToggle';
 
+export const dynamic = 'force-dynamic';
+
 export default function QuizPage() {
     const params = useParams();
-    const quizId = params.id as string;
+    const router = useRouter();
+    const quizId = params?.id as string;
+    
     const [quiz, setQuiz] = useState<any>(null);
     const [session, setSession] = useState<any>(null);
     const [currentIndex, setCurrentIndex] = useState(0);
@@ -15,7 +19,41 @@ export default function QuizPage() {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [showWarning, setShowWarning] = useState<string | null>(null);
     const [showReview, setShowReview] = useState(false);
-    const router = useRouter();
+    const [leaveCount, setLeaveCount] = useState(0);
+
+    const handleSubmit = useCallback(async () => {
+        if (isSubmitting) return;
+        setIsSubmitting(true);
+
+        try {
+            const token = localStorage.getItem('token');
+            const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
+            const res = await fetch(`${apiUrl}/quiz/submit`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({ sessionId: session.id }),
+            });
+
+            if (res.ok) {
+                // Clean up localStorage backup
+                if (session?.id) {
+                    localStorage.removeItem(`quiz_backup_${session.id}`);
+                }
+                router.push(`/results?quizId=${quizId}&sessionId=${session.id}`);
+            } else {
+                const data = await res.json();
+                alert(data.message || 'Submission failed');
+                setIsSubmitting(false);
+            }
+        } catch (err) {
+            console.error('Submission error:', err);
+            alert('An error occurred during submission');
+            setIsSubmitting(false);
+        }
+    }, [isSubmitting, session?.id, router, quizId]);
 
     const fetchQuiz = useCallback(async () => {
         const token = localStorage.getItem('token');
@@ -58,39 +96,82 @@ export default function QuizPage() {
         }
     }, [quizId, router]);
 
-    const handleSubmit = useCallback(async () => {
-        if (isSubmitting) return;
-        setIsSubmitting(true);
-
-        try {
-            const token = localStorage.getItem('token');
-            const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
-            const res = await fetch(`${apiUrl}/quiz/submit`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
-                },
-                body: JSON.stringify({ sessionId: session.id }),
-            });
-
-            if (res.ok) {
-                // Clean up localStorage backup
-                if (session?.id) {
-                    localStorage.removeItem(`quiz_backup_${session.id}`);
-                }
-                router.push(`/results?quizId=${quizId}&sessionId=${session.id}`);
-            } else {
-                const data = await res.json();
-                alert(data.message || 'Submission failed');
-                setIsSubmitting(false);
+    // Check for tab reload and show warning
+    useEffect(() => {
+        if (typeof window === 'undefined') return;
+        
+        const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+            if (session && timeLeft > 0) {
+                e.preventDefault();
+                e.returnValue = 'If you reload, your quiz progress will be lost. Are you sure?';
             }
-        } catch (err) {
-            console.error('Submission error:', err);
-            alert('An error occurred during submission');
-            setIsSubmitting(false);
-        }
-    }, [isSubmitting, session?.id, router, quizId]);
+        };
+
+        window.addEventListener('beforeunload', handleBeforeUnload);
+        return () => {
+            window.removeEventListener('beforeunload', handleBeforeUnload);
+        };
+    }, [session, timeLeft]);
+
+    // Handle window visibility change (tab switching)
+    useEffect(() => {
+        if (typeof window === 'undefined' || typeof document === 'undefined') return;
+        
+        const handleVisibilityChange = () => {
+            if (document.hidden && session && timeLeft > 0 && !isSubmitting) {
+                const newLeaveCount = leaveCount + 1;
+                setLeaveCount(newLeaveCount);
+
+                if (newLeaveCount === 1) {
+                    setShowWarning('⚠️ First Warning: Do not leave the quiz window! This is your first violation.');
+                    setTimeout(() => setShowWarning(null), 5000);
+                } else if (newLeaveCount === 2) {
+                    setShowWarning('⚠️ Final Warning: Do not leave the quiz window! Next violation will auto-submit your exam.');
+                    setTimeout(() => setShowWarning(null), 5000);
+                } else if (newLeaveCount >= 3) {
+                    setShowWarning('🚨 Auto-submitting exam due to multiple violations!');
+                    setTimeout(() => {
+                        handleSubmit();
+                    }, 2000);
+                }
+            }
+        };
+
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+        return () => {
+            document.removeEventListener('visibilitychange', handleVisibilityChange);
+        };
+    }, [leaveCount, session, timeLeft, isSubmitting, handleSubmit]);
+
+    // Handle window blur (clicking outside browser)
+    useEffect(() => {
+        if (typeof window === 'undefined') return;
+        
+        const handleBlur = () => {
+            if (session && timeLeft > 0 && !isSubmitting) {
+                const newLeaveCount = leaveCount + 1;
+                setLeaveCount(newLeaveCount);
+
+                if (newLeaveCount === 1) {
+                    setShowWarning('⚠️ First Warning: Do not leave the quiz window! This is your first violation.');
+                    setTimeout(() => setShowWarning(null), 5000);
+                } else if (newLeaveCount === 2) {
+                    setShowWarning('⚠️ Final Warning: Do not leave the quiz window! Next violation will auto-submit your exam.');
+                    setTimeout(() => setShowWarning(null), 5000);
+                } else if (newLeaveCount >= 3) {
+                    setShowWarning('🚨 Auto-submitting exam due to multiple violations!');
+                    setTimeout(() => {
+                        handleSubmit();
+                    }, 2000);
+                }
+            }
+        };
+
+        window.addEventListener('blur', handleBlur);
+        return () => {
+            window.removeEventListener('blur', handleBlur);
+        };
+    }, [leaveCount, session, timeLeft, isSubmitting, handleSubmit]);
 
     useEffect(() => {
         fetchQuiz();
@@ -129,6 +210,10 @@ export default function QuizPage() {
         return () => clearInterval(timer);
     }, [timeLeft, handleSubmit, quiz, session]);
 
+    if (!quizId) {
+        return <div>Loading...</div>;
+    }
+
     const saveAnswer = async (questionId: string, option: string) => {
         const newAnswers = { ...answers, [questionId]: option };
         setAnswers(newAnswers);
@@ -159,6 +244,15 @@ export default function QuizPage() {
         }
     };
 
+
+    const jumpToQuestion = (index: number) => {
+        setCurrentIndex(index);
+        setShowReview(false);
+    };
+
+    const isQuestionAnswered = (questionId: string) => {
+        return answers[questionId] !== undefined;
+    };
 
     const formatTime = (seconds: number) => {
         const mins = Math.floor(seconds / 60);
@@ -265,6 +359,18 @@ export default function QuizPage() {
                     <p className="text-slate-500 dark:text-slate-400 font-medium">Question {currentIndex + 1} of {quiz.questions.length}</p>
                 </div>
                 <div className="flex items-center gap-3">
+                    {/* Violation Counter */}
+                    {leaveCount > 0 && (
+                        <div className={`px-3 py-2 rounded-lg text-sm font-bold ${
+                            leaveCount === 1 
+                                ? 'bg-orange-100 dark:bg-orange-900/20 text-orange-700 dark:text-orange-400 border border-orange-200 dark:border-orange-900/30'
+                                : leaveCount === 2
+                                ? 'bg-red-100 dark:bg-rose-900/20 text-red-700 dark:text-rose-400 border border-red-200 dark:border-rose-900/30'
+                                : 'bg-red-600 text-white border border-red-700'
+                        }`}>
+                            {leaveCount === 1 ? '⚠️ 1st Warning' : leaveCount === 2 ? '⚠️ Final Warning' : '🚨 Auto-submitting...'}
+                        </div>
+                    )}
                     <ThemeToggle />
                     <button
                         onClick={() => setShowReview(true)}
@@ -326,6 +432,54 @@ export default function QuizPage() {
                         Review Answers
                     </button>
                 )}
+            </div>
+
+            {/* Question Navigation Boxes */}
+            <div className="max-w-4xl w-full bg-white dark:bg-slate-800 rounded-[2.5rem] shadow-xl shadow-slate-200/50 dark:shadow-none p-4 border border-slate-100 dark:border-slate-700 mb-6">
+                <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100 mb-3">Question Navigation</h3>
+                <div className="grid grid-cols-8 md:grid-cols-16 gap-1.5 mb-3">
+                    {quiz.questions.map((question: any, index: number) => {
+                        const isAnswered = isQuestionAnswered(question.id);
+                        const isCurrent = index === currentIndex;
+                        
+                        return (
+                            <button
+                                key={question.id}
+                                onClick={() => jumpToQuestion(index)}
+                                className={`p-2 rounded-lg border transition-all text-xs font-medium ${
+                                    isCurrent
+                                        ? 'bg-primary text-white border-primary shadow-md scale-105'
+                                        : isAnswered
+                                        ? 'bg-green-100 dark:bg-emerald-900/20 text-green-700 dark:text-emerald-400 border-green-200 dark:border-emerald-900/30 hover:bg-green-200 dark:hover:bg-emerald-900/30'
+                                        : 'bg-slate-50 dark:bg-slate-900/50 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700'
+                                }`}
+                                title={isCurrent ? 'Current Question' : isAnswered ? 'Answered - Click to Review' : 'Not Answered - Click to Skip'}
+                            >
+                                <div className="text-center">
+                                    <div className="font-bold text-sm mb-1">Q{index + 1}</div>
+                                    <div className={`w-2 h-2 rounded-full mx-auto mb-1 ${
+                                        isCurrent
+                                            ? 'bg-white text-primary'
+                                            : isAnswered
+                                            ? 'bg-green-500 text-white'
+                                            : 'bg-slate-300 text-slate-600'
+                                    }`}>
+                                        {isCurrent ? '•' : isAnswered ? '✓' : index + 1}
+                                    </div>
+                                    <div className={`text-xs ${
+                                        isCurrent
+                                            ? 'text-primary'
+                                            : isAnswered
+                                            ? 'text-green-600 dark:text-emerald-400'
+                                            : 'text-slate-500'
+                                    }`}>
+                                        {isCurrent ? 'Current' : isAnswered ? 'Answered' : 'Not Answered'}
+                                    </div>
+                                </div>
+                            </button>
+                        );
+                    })}
+                </div>
             </div>
         </main>
     );

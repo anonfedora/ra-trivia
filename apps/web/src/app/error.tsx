@@ -2,6 +2,8 @@
 
 import Link from 'next/link';
 
+export const dynamic = 'force-dynamic';
+
 export default function Error({ reset }: { reset: () => void }) {
     return (
         <main className="min-h-screen bg-slate-50 p-6 md:p-12 flex items-center justify-center">

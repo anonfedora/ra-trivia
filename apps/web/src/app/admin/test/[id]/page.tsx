@@ -24,7 +24,7 @@ interface Quiz {
 export default function AdminTestQuizPage() {
     const params = useParams();
     const router = useRouter();
-    const quizId = params.id as string;
+    const quizId = params?.id as string;
     
     const [quiz, setQuiz] = useState<Quiz | null>(null);
     const [session, setSession] = useState<any>(null);
@@ -32,6 +32,31 @@ export default function AdminTestQuizPage() {
     const [timeLeft, setTimeLeft] = useState(0);
     const [answers, setAnswers] = useState<any>({});
     const [isLoading, setIsLoading] = useState(true);
+
+    const handleSubmit = useCallback(async () => {
+        if (!session) return;
+
+        const token = localStorage.getItem('token');
+        try {
+            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api'}/quiz/submit`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({
+                    sessionId: session.id,
+                    answers
+                })
+            });
+
+            if (res.ok) {
+                router.push('/admin/dashboard');
+            }
+        } catch (err) {
+            console.error('Failed to submit quiz:', err);
+        }
+    }, [session, answers, router]);
 
     useEffect(() => {
         const token = localStorage.getItem('token');
@@ -62,10 +87,12 @@ export default function AdminTestQuizPage() {
                     setCurrentIndex(0);
                     setAnswers(data.session.answers || {});
 
-                    // Initialize timer
-                    const durationSeconds = data.quiz.duration * 60;
-                    const elapsedSeconds = Math.floor((new Date().getTime() - new Date(data.session.startTime).getTime()) / 1000);
-                    setTimeLeft(Math.max(0, durationSeconds - elapsedSeconds));
+                    // Initialize timer - set to end at 8pm today
+                    const now = new Date();
+                    const endTime = new Date();
+                    endTime.setHours(20, 0, 0, 0); // 8:00 PM today
+                    const timeLeftSeconds = Math.max(0, Math.floor((endTime.getTime() - now.getTime()) / 1000));
+                    setTimeLeft(timeLeftSeconds);
                 } else {
                     console.error('Failed to start quiz');
                 }
@@ -78,6 +105,10 @@ export default function AdminTestQuizPage() {
 
         fetchQuiz();
     }, [quizId, router]);
+    
+    if (!quizId) {
+        return <div>Loading...</div>;
+    }
 
     const formatTime = (seconds: number) => {
         const mins = Math.floor(seconds / 60);
@@ -106,31 +137,6 @@ export default function AdminTestQuizPage() {
             }).catch(err => console.error('Failed to sync answer:', err));
         }
     };
-
-    const handleSubmit = useCallback(async () => {
-        if (!session) return;
-
-        const token = localStorage.getItem('token');
-        try {
-            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api'}/quiz/submit`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
-                },
-                body: JSON.stringify({
-                    sessionId: session.id,
-                    answers
-                })
-            });
-
-            if (res.ok) {
-                router.push('/admin/dashboard');
-            }
-        } catch (err) {
-            console.error('Failed to submit quiz:', err);
-        }
-    }, [session, answers, router]);
 
     if (isLoading) {
         return (

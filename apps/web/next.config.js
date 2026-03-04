@@ -5,6 +5,19 @@ const nextConfig = {
     // your project has type errors.
     ignoreBuildErrors: false,
   },
+  trailingSlash: true,
+  output: 'standalone',
+  experimental: {
+    forceSwcTransforms: true,
+  },
+  // Completely disable static generation
+  generateEtags: false,
+  poweredByHeader: false,
+  compress: true,
+  // Disable static page generation
+  images: {
+    domains: [],
+  },
 };
 
 module.exports = nextConfig;

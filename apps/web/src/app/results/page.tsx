@@ -26,7 +26,7 @@ interface SessionResult {
 
 function ResultsContent() {
     const searchParams = useSearchParams();
-    const sessionId = searchParams.get('sessionId');
+    const sessionId = searchParams?.get('sessionId');
     const [result, setResult] = useState<SessionResult | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [lockedAt, setLockedAt] = useState<string | null>(null);

@@ -29,7 +29,7 @@ interface PreviewQuiz {
 export default function AdminQuizPreviewPage() {
     const params = useParams();
     const router = useRouter();
-    const quizId = params.id as string;
+    const quizId = params?.id as string;
 
     const [quiz, setQuiz] = useState<PreviewQuiz | null>(null);
     const [isLoading, setIsLoading] = useState(true);
@@ -68,6 +68,10 @@ export default function AdminQuizPreviewPage() {
 
         fetchPreview();
     }, [quizId, router]);
+
+    if (!quizId) {
+        return <div>Loading...</div>;
+    }
 
     if (isLoading) {
         return (

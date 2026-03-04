@@ -6,6 +6,8 @@ import { apiJson } from '../../lib/api';
 
 import { ThemeToggle } from '../../components/ThemeToggle';
 
+export const dynamic = 'force-dynamic';
+
 function VerifyOTPContent() {
     const [otp, setOtp] = useState(['', '', '', '', '', '']);
     const [email, setEmail] = useState('');
@@ -17,13 +19,14 @@ function VerifyOTPContent() {
     const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
     const isSubmitting = useRef(false);
 
-    // Get email from URL params if provided
+    // Get email from URL params
+    const emailFromUrl = searchParams?.get('email') || '';
+
     useEffect(() => {
-        const emailParam = searchParams.get('email');
-        if (emailParam) {
-            setEmail(emailParam);
+        if (emailFromUrl) {
+            setEmail(emailFromUrl);
         }
-    }, [searchParams]);
+    }, [emailFromUrl]);
 
     const handleInputChange = (index: number, value: string) => {
         // Reset submitting flag when user changes OTP

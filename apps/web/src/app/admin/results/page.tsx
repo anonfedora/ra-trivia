@@ -30,7 +30,7 @@ interface PagedResponse<T> {
 
 function AdminResultsContent() {
     const searchParams = useSearchParams();
-    const initialQuery = searchParams.get('q') || '';
+    const initialQuery = searchParams?.get('q') || '';
 
     const [results, setResults] = useState<Result[]>([]);
     const [isLoading, setIsLoading] = useState(true);
