@@ -89,7 +89,22 @@ export default function QuizPage() {
                 // Initialize timer
                 const durationSeconds = data.quiz.duration * 60;
                 const elapsedSeconds = Math.floor((new Date().getTime() - new Date(data.session.startTime).getTime()) / 1000);
-                setTimeLeft(Math.max(0, durationSeconds - elapsedSeconds));
+                const calculatedTimeLeft = durationSeconds - elapsedSeconds;
+                
+                console.log('Timer initialization:', {
+                    durationSeconds,
+                    elapsedSeconds,
+                    calculatedTimeLeft
+                });
+                
+                // Only set timeLeft if there's actually time remaining, otherwise set to full duration
+                // Add a 5-second buffer to prevent edge cases
+                if (calculatedTimeLeft > 5) {
+                    setTimeLeft(calculatedTimeLeft);
+                } else {
+                    console.log('Setting to full duration due to insufficient time');
+                    setTimeLeft(durationSeconds);
+                }
             }
         } catch (err) {
             console.error('Failed to load quiz');
@@ -118,6 +133,14 @@ export default function QuizPage() {
         if (typeof window === 'undefined' || typeof document === 'undefined') return;
         
         const handleVisibilityChange = () => {
+            console.log('Visibility change detected:', {
+                documentHidden: document.hidden,
+                session: !!session,
+                timeLeft,
+                isSubmitting,
+                leaveCount
+            });
+            
             if (document.hidden && session && timeLeft > 0 && !isSubmitting) {
                 const newLeaveCount = leaveCount + 1;
                 setLeaveCount(newLeaveCount);
@@ -148,6 +171,13 @@ export default function QuizPage() {
         if (typeof window === 'undefined') return;
         
         const handleBlur = () => {
+            console.log('Window blur detected:', {
+                session: !!session,
+                timeLeft,
+                isSubmitting,
+                leaveCount
+            });
+            
             if (session && timeLeft > 0 && !isSubmitting) {
                 const newLeaveCount = leaveCount + 1;
                 setLeaveCount(newLeaveCount);
@@ -178,10 +208,19 @@ export default function QuizPage() {
     }, [fetchQuiz]);
 
     useEffect(() => {
+        // Don't run timer logic if quiz or session aren't loaded yet
+        if (!quiz || !session) return;
+        
+        console.log('Timer useEffect triggered:', {
+            timeLeft,
+            quizLoaded: !!quiz,
+            sessionLoaded: !!session,
+            isSubmitting
+        });
+        
         if (timeLeft <= 0) {
-            if (quiz && session) {
-                handleSubmit();
-            }
+            console.log('Auto-submitting due to timeLeft <= 0');
+            handleSubmit();
             return;
         }
         const timer = setInterval(() => {
@@ -346,19 +385,19 @@ export default function QuizPage() {
         <main className="min-h-screen bg-slate-50 dark:bg-slate-900 p-6 md:p-12 flex flex-col items-center transition-colors duration-200">
             {/* Timer Warning */}
             {showWarning && (
-                <div className="fixed top-4 left-1/2 transform -translate-x-1/2 z-50 animate-bounce">
-                    <div className="bg-red-500 text-white px-6 py-3 rounded-2xl font-bold text-lg shadow-xl border-2 border-red-600">
+                <div className="fixed top-4 left-1/2 transform -translate-x-1/2 z-50 animate-bounce px-4 w-full max-w-sm">
+                    <div className="bg-red-500 text-white px-4 py-3 sm:px-6 sm:py-3 rounded-2xl font-bold text-sm sm:text-lg shadow-xl border-2 border-red-600 text-center">
                         ⚠️ {showWarning}
                     </div>
                 </div>
             )}
 
-            <div className="max-w-4xl w-full flex justify-between items-center mb-10">
-                <div>
+            <div className="max-w-4xl w-full flex flex-col md:flex-row md:justify-between md:items-center mb-10 text-center md:text-left">
+                <div className="mb-4 md:mb-0">
                     <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-50">{quiz.title}</h1>
                     <p className="text-slate-500 dark:text-slate-400 font-medium">Question {currentIndex + 1} of {quiz.questions.length}</p>
                 </div>
-                <div className="flex items-center gap-3">
+                <div className="flex flex-col sm:flex-row items-center gap-3 justify-center md:justify-end">
                     {/* Violation Counter */}
                     {leaveCount > 0 && (
                         <div className={`px-3 py-2 rounded-lg text-sm font-bold ${
@@ -408,11 +447,11 @@ export default function QuizPage() {
                 </div>
             </div>
 
-            <div className="max-w-4xl w-full flex justify-between gap-4">
+            <div className="max-w-4xl w-full flex flex-col sm:flex-row justify-between gap-3 sm:gap-4">
                 <button
                     onClick={() => setCurrentIndex(prev => Math.max(0, prev - 1))}
                     disabled={currentIndex === 0}
-                    className="px-8 py-4 rounded-2xl font-bold text-slate-500 dark:text-slate-400 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+                    className="w-full sm:w-auto px-6 sm:px-8 py-3 sm:py-4 rounded-2xl font-bold text-slate-500 dark:text-slate-400 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
                 >
                     Previous
                 </button>
@@ -420,14 +459,14 @@ export default function QuizPage() {
                 {currentIndex < quiz.questions.length - 1 ? (
                     <button
                         onClick={() => setCurrentIndex(prev => Math.min(quiz.questions.length - 1, prev + 1))}
-                        className="flex-1 px-8 py-4 rounded-2xl font-bold text-white bg-slate-900 dark:bg-primary hover:bg-slate-800 dark:hover:bg-primary/90 shadow-lg transition-all"
+                        className="w-full sm:w-auto flex-1 px-6 sm:px-8 py-3 sm:py-4 rounded-2xl font-bold text-white bg-slate-900 dark:bg-primary hover:bg-slate-800 dark:hover:bg-primary/90 shadow-lg transition-all"
                     >
                         Next
                     </button>
                 ) : (
                     <button
                         onClick={() => setShowReview(true)}
-                        className="flex-1 px-8 py-4 rounded-2xl font-bold text-white bg-slate-900 dark:bg-emerald-600 hover:bg-slate-800 dark:hover:bg-emerald-500 shadow-lg transition-all"
+                        className="w-full sm:w-auto flex-1 px-6 sm:px-8 py-3 sm:py-4 rounded-2xl font-bold text-white bg-slate-900 dark:bg-emerald-600 hover:bg-slate-800 dark:hover:bg-emerald-500 shadow-lg transition-all"
                     >
                         Review Answers
                     </button>
@@ -435,9 +474,9 @@ export default function QuizPage() {
             </div>
 
             {/* Question Navigation Boxes */}
-            <div className="max-w-4xl w-full bg-white dark:bg-slate-800 rounded-[2.5rem] shadow-xl shadow-slate-200/50 dark:shadow-none p-4 border border-slate-100 dark:border-slate-700 mb-6">
+            <div className="max-w-4xl w-full bg-white dark:bg-slate-800 rounded-[2.5rem] shadow-xl shadow-slate-200/50 dark:shadow-none p-4 sm:p-6 border border-slate-100 dark:border-slate-700 mb-6">
                 <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100 mb-3">Question Navigation</h3>
-                <div className="grid grid-cols-8 md:grid-cols-16 gap-1.5 mb-3">
+                <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-16 gap-1.5 sm:gap-2 mb-3">
                     {quiz.questions.map((question: any, index: number) => {
                         const isAnswered = isQuestionAnswered(question.id);
                         const isCurrent = index === currentIndex;
@@ -446,7 +485,7 @@ export default function QuizPage() {
                             <button
                                 key={question.id}
                                 onClick={() => jumpToQuestion(index)}
-                                className={`p-2 rounded-lg border transition-all text-xs font-medium ${
+                                className={`p-1.5 sm:p-2 rounded-lg border transition-all text-xs font-medium ${
                                     isCurrent
                                         ? 'bg-primary text-white border-primary shadow-md scale-105'
                                         : isAnswered
@@ -456,7 +495,7 @@ export default function QuizPage() {
                                 title={isCurrent ? 'Current Question' : isAnswered ? 'Answered - Click to Review' : 'Not Answered - Click to Skip'}
                             >
                                 <div className="text-center">
-                                    <div className="font-bold text-sm mb-1">Q{index + 1}</div>
+                                    <div className="font-bold text-xs sm:text-sm mb-1">Q{index + 1}</div>
                                     <div className={`w-2 h-2 rounded-full mx-auto mb-1 ${
                                         isCurrent
                                             ? 'bg-white text-primary'
@@ -464,16 +503,16 @@ export default function QuizPage() {
                                             ? 'bg-green-500 text-white'
                                             : 'bg-slate-300 text-slate-600'
                                     }`}>
-                                        {isCurrent ? '•' : isAnswered ? '✓' : index + 1}
+                                        {isCurrent ? '•' : isAnswered ? '✓' : ''}
                                     </div>
-                                    <div className={`text-xs ${
+                                    <div className={`text-xs hidden sm:block ${
                                         isCurrent
                                             ? 'text-primary'
                                             : isAnswered
                                             ? 'text-green-600 dark:text-emerald-400'
                                             : 'text-slate-500'
                                     }`}>
-                                        {isCurrent ? 'Current' : isAnswered ? 'Answered' : 'Not Answered'}
+                                        {isCurrent ? 'Current' : isAnswered ? 'Answered' : 'Not'}
                                     </div>
                                 </div>
                             </button>
