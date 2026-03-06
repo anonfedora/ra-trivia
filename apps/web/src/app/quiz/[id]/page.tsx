@@ -385,8 +385,8 @@ export default function QuizPage() {
         <main className="min-h-screen bg-slate-50 dark:bg-slate-900 p-6 md:p-12 flex flex-col items-center transition-colors duration-200">
             {/* Timer Warning */}
             {showWarning && (
-                <div className="fixed top-4 left-1/2 transform -translate-x-1/2 z-50 animate-bounce px-4 w-full max-w-sm">
-                    <div className="bg-red-500 text-white px-4 py-3 sm:px-6 sm:py-3 rounded-2xl font-bold text-sm sm:text-lg shadow-xl border-2 border-red-600 text-center">
+                <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 animate-bounce pointer-events-none px-3 max-w-[92vw] sm:max-w-md">
+                    <div className="inline-flex items-center justify-center bg-red-500 text-white px-4 py-3 sm:px-6 sm:py-3 rounded-2xl font-bold text-sm sm:text-lg shadow-xl border-2 border-red-600 text-center whitespace-normal break-words">
                         ⚠️ {showWarning}
                     </div>
                 </div>
