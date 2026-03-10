@@ -284,7 +284,7 @@ export default function DashboardPage() {
                                                             ? 'Running'
                                                             : isReleased
                                                                 ? `${session.score?.toFixed(1)}%`
-                                                                : 'Locked until 10 PM'}
+                                                                : 'Locked until 8 PM'}
                                                     </span>
                                                 </div>
                                             </div>
