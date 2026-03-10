@@ -232,18 +232,20 @@ router.post('/submit', authenticate, async (req: AuthRequest, res) => {
 
         const score = questions.length > 0 ? Math.round((correctCount / questions.length) * 100 * 100) / 100 : 0;
 
-        // Calculate Results Release Time (10 PM Daily)
+        // Calculate Results Release Time (8 PM Daily)
         const now = new Date();
         const minReleaseTime = new Date(now.getTime() + 90 * 60 * 1000); // Now + 90 minutes
 
         let releaseDate = new Date(now);
-        releaseDate.setHours(22, 0, 0, 0); // 10 PM today
+        releaseDate.setHours(20, 0, 0, 0); // 8 PM today
 
-        // If 10 PM today is earlier than minReleaseTime, move to 10 PM tomorrow
+        // If 8 PM today is earlier than minReleaseTime, move to 8 PM tomorrow
         if (releaseDate < minReleaseTime) {
             releaseDate.setDate(releaseDate.getDate() + 1);
-            releaseDate.setHours(22, 0, 0, 0);
+            releaseDate.setHours(20, 0, 0, 0);
         }
+
+        console.log(`[QUIZ SUBMIT] Release date calculated: ${releaseDate.toISOString()} (Local: ${releaseDate.toLocaleString()})`);
 
         const updatedSession = await prisma.quizSession.update({
             where: { id: sessionId },

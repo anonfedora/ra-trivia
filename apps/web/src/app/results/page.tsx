@@ -72,7 +72,7 @@ function ResultsContent() {
                     </div>
                     <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-50">Results Locked</h1>
                     <p className="text-slate-500 dark:text-slate-400 leading-relaxed font-medium">
-                        Your exam has been submitted successfully! However, results are only released daily at <span className="text-slate-900 dark:text-slate-50 font-bold">10:00 PM</span>.
+                        Your exam has been submitted successfully! However, results are only released daily at <span className="text-slate-900 dark:text-slate-50 font-bold">8:00 PM</span>.
                     </p>
 
                     <div className="bg-slate-50 dark:bg-slate-900 rounded-2xl p-6 border border-slate-100 dark:border-slate-700">
@@ -82,7 +82,8 @@ function ResultsContent() {
                                 month: 'long',
                                 day: 'numeric',
                                 hour: '2-digit',
-                                minute: '2-digit'
+                                minute: '2-digit',
+                                hour12: true
                             })}
                         </p>
                     </div>

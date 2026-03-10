@@ -111,11 +111,22 @@ export default function LoginPage() {
                     </button>
                 </form>
 
-                <p className="mt-8 text-center text-slate-500 dark:text-slate-400 text-sm">
-                    Don&apos;t have an account? <Link href="/register" className="text-primary font-bold hover:underline">Register here</Link>
-                </p>
-                <p className="mt-2 text-center text-slate-500 dark:text-slate-400 text-sm">
-                    Are you an admin? <span className="text-primary font-bold">Log in with your credentials</span>
+                {/* Prominent Registration Section */}
+                <div className="mt-8 p-6 bg-slate-50 dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700">
+                    <div className="text-center">
+                        <h3 className="text-lg font-bold text-slate-900 dark:text-slate-50 mb-2">New Candidate?</h3>
+                        <p className="text-slate-600 dark:text-slate-400 text-sm mb-4">Create your account to take Exam</p>
+                        <Link 
+                            href="/register"
+                            className="inline-block w-full bg-emerald-600 hover:bg-emerald-700 text-white py-4 px-6 rounded-2xl font-bold shadow-lg shadow-emerald-600/20 transform transition-all hover:-translate-y-1 active:scale-95 text-center"
+                        >
+                            Create New Account
+                        </Link>
+                    </div>
+                </div>
+
+                <p className="mt-6 text-center text-slate-500 dark:text-slate-400 text-sm">
+                    Are you an admin? <span className="text-primary font-bold">Log in with your credentials above</span>
                 </p>
             </div>
         </main>

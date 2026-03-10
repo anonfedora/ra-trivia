@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { ThemeToggle } from '../../../components/ThemeToggle';
 
@@ -20,6 +20,7 @@ export default function QuizPage() {
     const [showWarning, setShowWarning] = useState<string | null>(null);
     const [showReview, setShowReview] = useState(false);
     const [leaveCount, setLeaveCount] = useState(0);
+    const leaveCountRef = useRef(0);
 
     const handleSubmit = useCallback(async () => {
         if (isSubmitting) return;
@@ -128,28 +129,41 @@ export default function QuizPage() {
         };
     }, [session, timeLeft]);
 
-    // Handle window visibility change (tab switching)
+    // Handle window visibility change (tab switching) and blur events
     useEffect(() => {
         if (typeof window === 'undefined' || typeof document === 'undefined') return;
         
-        const handleVisibilityChange = () => {
-            console.log('Visibility change detected:', {
-                documentHidden: document.hidden,
+        let violationTimeout: NodeJS.Timeout | null = null;
+        
+        const handleViolation = () => {
+            // Prevent double-counting if both events fire simultaneously
+            if (violationTimeout) return;
+            
+            console.log('Violation detected:', {
                 session: !!session,
                 timeLeft,
                 isSubmitting,
-                leaveCount
+                currentLeaveCount: leaveCountRef.current
             });
             
-            if (document.hidden && session && timeLeft > 0 && !isSubmitting) {
-                const newLeaveCount = leaveCount + 1;
+            if (session && timeLeft > 0 && !isSubmitting) {
+                // Set a small timeout to prevent duplicate violations
+                violationTimeout = setTimeout(() => {
+                    violationTimeout = null;
+                }, 500);
+                
+                // Increment using ref for immediate access
+                leaveCountRef.current += 1;
+                const newLeaveCount = leaveCountRef.current;
                 setLeaveCount(newLeaveCount);
 
+                console.log('New leave count:', newLeaveCount);
+
                 if (newLeaveCount === 1) {
-                    setShowWarning('⚠️ First Warning: Do not leave the quiz window! This is your first violation.');
+                    setShowWarning('⚠️ Warning 1/2: Do not leave the quiz window! This is your first warning.');
                     setTimeout(() => setShowWarning(null), 5000);
                 } else if (newLeaveCount === 2) {
-                    setShowWarning('⚠️ Final Warning: Do not leave the quiz window! Next violation will auto-submit your exam.');
+                    setShowWarning('⚠️ Warning 2/2: Final warning! Next violation will auto-submit your exam.');
                     setTimeout(() => setShowWarning(null), 5000);
                 } else if (newLeaveCount >= 3) {
                     setShowWarning('🚨 Auto-submitting exam due to multiple violations!');
@@ -157,51 +171,24 @@ export default function QuizPage() {
                         handleSubmit();
                     }, 2000);
                 }
+            }
+        };
+        
+        const handleVisibilityChange = () => {
+            if (document.hidden) {
+                handleViolation();
             }
         };
 
         document.addEventListener('visibilitychange', handleVisibilityChange);
+        window.addEventListener('blur', handleViolation);
+        
         return () => {
             document.removeEventListener('visibilitychange', handleVisibilityChange);
+            window.removeEventListener('blur', handleViolation);
+            if (violationTimeout) clearTimeout(violationTimeout);
         };
-    }, [leaveCount, session, timeLeft, isSubmitting, handleSubmit]);
-
-    // Handle window blur (clicking outside browser)
-    useEffect(() => {
-        if (typeof window === 'undefined') return;
-        
-        const handleBlur = () => {
-            console.log('Window blur detected:', {
-                session: !!session,
-                timeLeft,
-                isSubmitting,
-                leaveCount
-            });
-            
-            if (session && timeLeft > 0 && !isSubmitting) {
-                const newLeaveCount = leaveCount + 1;
-                setLeaveCount(newLeaveCount);
-
-                if (newLeaveCount === 1) {
-                    setShowWarning('⚠️ First Warning: Do not leave the quiz window! This is your first violation.');
-                    setTimeout(() => setShowWarning(null), 5000);
-                } else if (newLeaveCount === 2) {
-                    setShowWarning('⚠️ Final Warning: Do not leave the quiz window! Next violation will auto-submit your exam.');
-                    setTimeout(() => setShowWarning(null), 5000);
-                } else if (newLeaveCount >= 3) {
-                    setShowWarning('🚨 Auto-submitting exam due to multiple violations!');
-                    setTimeout(() => {
-                        handleSubmit();
-                    }, 2000);
-                }
-            }
-        };
-
-        window.addEventListener('blur', handleBlur);
-        return () => {
-            window.removeEventListener('blur', handleBlur);
-        };
-    }, [leaveCount, session, timeLeft, isSubmitting, handleSubmit]);
+    }, [session, timeLeft, isSubmitting, handleSubmit]);
 
     useEffect(() => {
         fetchQuiz();
@@ -407,7 +394,7 @@ export default function QuizPage() {
                                 ? 'bg-red-100 dark:bg-rose-900/20 text-red-700 dark:text-rose-400 border border-red-200 dark:border-rose-900/30'
                                 : 'bg-red-600 text-white border border-red-700'
                         }`}>
-                            {leaveCount === 1 ? '⚠️ 1st Warning' : leaveCount === 2 ? '⚠️ Final Warning' : '🚨 Auto-submitting...'}
+                            {leaveCount === 1 ? '⚠️ Warning 1/2' : leaveCount === 2 ? '⚠️ Warning 2/2' : '🚨 Auto-submitting...'}
                         </div>
                     )}
                     <ThemeToggle />
