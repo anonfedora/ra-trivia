@@ -30,6 +30,7 @@ export class ReportGenerator {
                     select: {
                         name: true,
                         email: true,
+                        church: true,
                         association: true
                     }
                 },
@@ -276,7 +277,7 @@ export class ReportGenerator {
                         <tr>
                             <td>${index + 1}</td>
                             <td>${result.user.name}</td>
-                            <td>N/A</td>
+                            <td>${result.user.church || 'N/A'}</td>
                             <td>${result.user.association || 'N/A'}</td>
                             <td>${score}</td>
                             <td>${remark}</td>
