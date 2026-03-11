@@ -453,3 +453,69 @@ router.post('/trigger-emails', authenticate, authorizeAdmin, async (req: AuthReq
         res.status(500).json({ message: 'Failed to trigger emails' });
     }
 });
+
+// Admin: Update manual status for a quiz session
+router.patch('/sessions/:sessionId/status', authenticate, authorizeAdmin, async (req: AuthRequest, res) => {
+    try {
+        const sessionId = req.params.sessionId as string;
+        const { manualStatus } = req.body;
+
+        // Validate manualStatus
+        if (manualStatus !== null && manualStatus !== 'Cleared' && manualStatus !== 'Not Cleared - No Certificates') {
+            return res.status(400).json({ message: 'Invalid status. Must be "Cleared", "Not Cleared - No Certificates", or null' });
+        }
+
+        const updatedSession = await prisma.quizSession.update({
+            where: { id: sessionId },
+            data: { manualStatus } as any // Type assertion until schema is pushed
+        });
+
+        res.json({ message: 'Status updated successfully', session: updatedSession });
+    } catch (error) {
+        console.error('Status update error:', error);
+        res.status(500).json({ message: 'Failed to update status' });
+    }
+});
+
+// Admin: Manually release results for specific sessions
+router.post('/sessions/release', authenticate, authorizeAdmin, async (req: AuthRequest, res) => {
+    try {
+        const { sessionIds } = req.body;
+
+        if (!Array.isArray(sessionIds) || sessionIds.length === 0) {
+            return res.status(400).json({ message: 'sessionIds must be a non-empty array' });
+        }
+
+        // Set resultReleasesAt to now for all specified sessions
+        const updated = await prisma.quizSession.updateMany({
+            where: { id: { in: sessionIds } },
+            data: { resultReleasesAt: new Date() }
+        });
+
+        res.json({ message: `Released ${updated.count} result(s) successfully`, count: updated.count });
+    } catch (error) {
+        console.error('Result release error:', error);
+        res.status(500).json({ message: 'Failed to release results' });
+    }
+});
+
+// Admin: Manually release all results for a specific quiz
+router.post('/quizzes/:quizId/release-all', authenticate, authorizeAdmin, async (req: AuthRequest, res) => {
+    try {
+        const quizId = req.params.quizId as string;
+
+        // Set resultReleasesAt to now for all sessions of this quiz
+        const updated = await prisma.quizSession.updateMany({
+            where: { 
+                quizId,
+                endTime: { not: null } // Only release completed sessions
+            },
+            data: { resultReleasesAt: new Date() }
+        });
+
+        res.json({ message: `Released ${updated.count} result(s) for this quiz`, count: updated.count });
+    } catch (error) {
+        console.error('Quiz result release error:', error);
+        res.status(500).json({ message: 'Failed to release quiz results' });
+    }
+});

@@ -270,8 +270,9 @@ export class ReportGenerator {
                 <tbody>
                     ${results.map((result: any, index: number) => {
                         const score = result.score || 0;
-                        const remark = score >= 50 ? 'Pass' : 'Fail';
-                        const status = score >= 50 ? 'Cleared' : 'Not Cleared - No Certificates';
+                        // Use manual status if set, otherwise calculate based on score
+                        const status = result.manualStatus || (score >= 50 ? 'Cleared' : 'Not Cleared - No Certificates');
+                        const remark = status === 'Cleared' ? 'Pass' : 'Fail';
                         
                         return `
                         <tr>
@@ -316,7 +317,7 @@ export class ReportGenerator {
             </table>
             
             <div class="footer-stats">
-                <p><strong>Report Generated:</strong> ${new Date().toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', year: 'numeric' })}, ${new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}</p>
+                <p><strong>Report Generated:</strong> ${new Date().toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' })}, ${new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}</p>
                 <p><strong>Average Score:</strong> ${summary.averageScore}%</p>
                 <p><strong>Highest Score:</strong> ${summary.highestScore}%</p>
                 <p><strong>Lowest Score:</strong> ${summary.lowestScore}%</p>

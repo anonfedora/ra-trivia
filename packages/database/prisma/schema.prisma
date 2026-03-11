@@ -69,6 +69,7 @@ model QuizSession {
   quizId           String
   resultReleasesAt DateTime?
   emailSent        Boolean   @default(false)
+  manualStatus     String?   // Admin override: "Cleared", "Not Cleared", or null for auto
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
   quiz             Quiz      @relation(fields: [quizId], references: [id])

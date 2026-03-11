@@ -11,12 +11,15 @@ interface Result {
     startTime: string;
     endTime: string | null;
     score: number | null;
+    manualStatus: string | null;
+    resultReleasesAt: string | null;
     user: {
         name: string;
         email: string;
         church: string | null;
     };
     quiz: {
+        id: string;
         title: string;
     };
 }
@@ -82,6 +85,55 @@ function AdminResultsContent() {
         return () => clearTimeout(t);
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [searchTerm, status]);
+
+    const handleStatusChange = async (sessionId: string, newStatus: string | null) => {
+        const token = localStorage.getItem('token');
+        try {
+            const res = await fetch(`${apiUrl}/admin/sessions/${sessionId}/status`, {
+                method: 'PATCH',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ manualStatus: newStatus })
+            });
+
+            if (res.ok) {
+                // Refresh results to show updated status
+                fetchResults();
+            } else {
+                alert('Failed to update status');
+            }
+        } catch (err) {
+            console.error('Status update error:', err);
+            alert('Failed to update status');
+        }
+    };
+
+    const handleReleaseResults = async (sessionIds: string[]) => {
+        const token = localStorage.getItem('token');
+        try {
+            const res = await fetch(`${apiUrl}/admin/sessions/release`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ sessionIds })
+            });
+
+            if (res.ok) {
+                const data = await res.json();
+                alert(data.message);
+                fetchResults();
+            } else {
+                alert('Failed to release results');
+            }
+        } catch (err) {
+            console.error('Release error:', err);
+            alert('Failed to release results');
+        }
+    };
 
     const handleExport = async (format: 'excel' | 'formatted-excel' | 'pdf') => {
         const token = localStorage.getItem('token');
@@ -299,7 +351,9 @@ function AdminResultsContent() {
                                     <th className="px-8 py-6">Candidate</th>
                                     <th className="px-8 py-6">Exam</th>
                                     <th className="px-8 py-6">Score</th>
+                                    <th className="px-8 py-6">Status</th>
                                     <th className="px-8 py-6">Timeline</th>
+                                    <th className="px-8 py-6">Actions</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-50 dark:divide-slate-700">
@@ -345,9 +399,19 @@ function AdminResultsContent() {
                                             )}
                                         </td>
                                         <td className="px-8 py-6">
+                                            <select
+                                                value={result.manualStatus || (result.score && result.score >= 50 ? 'Cleared' : 'Not Cleared - No Certificates')}
+                                                onChange={(e) => handleStatusChange(result.id, e.target.value)}
+                                                className="px-3 py-2 rounded-xl text-xs font-bold border bg-white dark:bg-slate-700 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-600 hover:border-primary focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-all"
+                                            >
+                                                <option value="Cleared">✅ Cleared</option>
+                                                <option value="Not Cleared - No Certificates">❌ Not Cleared</option>
+                                            </select>
+                                        </td>
+                                        <td className="px-8 py-6">
                                             <div className="flex items-center gap-2 text-slate-600 dark:text-slate-400 text-sm font-medium">
                                                 <Calendar size={14} className="text-slate-400 dark:text-slate-500" />
-                                                {new Date(result.startTime).toLocaleDateString()}
+                                                {new Date(result.startTime).toLocaleDateString('en-GB')}
                                             </div>
                                             <div className="text-[10px] text-slate-400 dark:text-slate-500 font-bold mt-1 uppercase tracking-tight">
                                                 Started: {new Date(result.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
@@ -359,10 +423,19 @@ function AdminResultsContent() {
                                                 )}
                                             </div>
                                         </td>
+                                        <td className="px-8 py-6">
+                                            <button
+                                                onClick={() => handleReleaseResults([result.id])}
+                                                disabled={!!result.resultReleasesAt && new Date(result.resultReleasesAt) <= new Date()}
+                                                className="px-4 py-2 rounded-xl text-xs font-bold bg-primary text-white hover:bg-primary/90 disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-sm hover:shadow-md active:scale-95"
+                                            >
+                                                {result.resultReleasesAt && new Date(result.resultReleasesAt) <= new Date() ? '✓ Released' : 'Release Now'}
+                                            </button>
+                                        </td>
                                     </tr>
                                 )) : (
                                     <tr>
-                                        <td colSpan={4} className="px-8 py-20 text-center">
+                                        <td colSpan={6} className="px-8 py-20 text-center">
                                             <div className="flex flex-col items-center gap-3">
                                                 <div className="w-16 h-16 rounded-full bg-slate-100 dark:bg-slate-900 flex items-center justify-center text-slate-300 dark:text-slate-700">
                                                     <Search size={32} />
