@@ -399,39 +399,50 @@ export class ReportGenerator {
             </table>
 
             <div style="margin-top: 30px; font-size: 11px;">
-                <p><strong>Report Generated:</strong> ${new Date().toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' })}</p>
-                <p><strong>Average Score:</strong> ${summary.averageScore}%</p>
-                <p><strong>Highest Score:</strong> ${summary.highestScore}%</p>
-                <p><strong>Lowest Score:</strong> ${summary.lowestScore}%</p>
-            </div>
-        </body>
-        </html>
-        `;
-
-        const browser = await puppeteer.launch({
-            headless: true,
+            
+            // Check if we're in a production environment that might not support Puppeteer
+            const isProduction = process.env.NODE_ENV === 'production';
+            const isRender = process.env.RENDER === 'true' || process.env.RENDER_SERVICE_ID;
+            
+            if (isProduction && isRender) {
+                console.log('[PDF_GENERATION] Detected Render environment, using optimized Puppeteer config');
+            }
+            
             // Use downloaded Puppeteer Chrome on Render, default on other environments
-            executablePath: isProduction && isRender 
-                ? '/opt/render/.cache/puppeteer/chrome/linux-146.0.7680.66/chrome-linux64/chrome'
-                : undefined,
-            args: [
-                '--no-sandbox',
-                '--disable-setuid-sandbox',
-                '--disable-dev-shm-usage',
-                '--disable-accelerated-2d-canvas',
-                '--no-first-run',
-                '--no-zygote',
-                '--single-process',
-                '--disable-gpu',
-                // Add Chrome-specific flags for cloud environments
-                ...(isProduction && isRender ? [
-                    '--disable-extensions',
-                    '--disable-background-timer-throttling',
-                    '--disable-backgrounding-occluded-windows',
-                    '--disable-renderer-backgrounding'
-                ] : [])
-            ]
-        });
+            let chromePath = undefined;
+            if (isProduction && isRender) {
+                chromePath = '/opt/render/.cache/puppeteer/chrome/linux-146.0.7680.66/chrome-linux64/chrome';
+                // Make Chrome executable
+                try {
+                    const fs = await import('fs');
+                    await fs.promises.chmod(chromePath, 0o755);
+                    console.log('[PDF_GENERATION] Made Chrome executable');
+                } catch (chmodError) {
+                    console.error('[PDF_GENERATION] Failed to make Chrome executable:', chmodError);
+                }
+            }
+            
+            const browser = await puppeteer.launch({
+                headless: true,
+                executablePath: chromePath,
+                args: [
+                    '--no-sandbox',
+                    '--disable-setuid-sandbox',
+                    '--disable-dev-shm-usage',
+                    '--disable-accelerated-2d-canvas',
+                    '--no-first-run',
+                    '--no-zygote',
+                    '--single-process',
+                    '--disable-gpu',
+                    // Add Chrome-specific flags for cloud environments
+                    ...(isProduction && isRender ? [
+                        '--disable-extensions',
+                        '--disable-background-timer-throttling',
+                        '--disable-backgrounding-occluded-windows',
+                        '--disable-renderer-backgrounding'
+                    ] : [])
+                ]
+            });
 
         try {
             console.log('[PDF_GENERATION] Starting PDF generation...');
