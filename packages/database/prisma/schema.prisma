@@ -13,7 +13,9 @@ model User {
   name      String
   password  String
   role      Role          @default(CANDIDATE)
+  userType  UserType      @default(AMBASSADOR_RANK_EXAMS)
   church    String?
+  association String?
   emailVerified Boolean   @default(false)
   emailVerificationTokenHash String?
   emailVerificationTokenExpiresAt DateTime?
@@ -23,6 +25,7 @@ model User {
   updatedAt DateTime      @updatedAt
   sessions  QuizSession[]
   quizzes   Quiz[]        @relation("QuizCreator")
+  auditLogs UserTypeAuditLog[]
 }
 
 model Question {
@@ -33,6 +36,7 @@ model Question {
   optionC       String
   optionD       String
   correctOption String
+  questionType  UserType @default(AMBASSADOR_RANK_EXAMS)
   quizId        String
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
@@ -71,8 +75,26 @@ model QuizSession {
   user             User      @relation(fields: [userId], references: [id])
 }
 
+model UserTypeAuditLog {
+  id           String   @id @default(uuid())
+  userId       String
+  previousType UserType?
+  newType      UserType
+  changedAt    DateTime @default(now())
+  ipAddress    String?
+  userAgent    String?
+  user         User     @relation(fields: [userId], references: [id])
+}
+
 enum Role {
   SUPER_ADMIN
   ADMIN
   CANDIDATE
+}
+
+enum UserType {
+  AMBASSADOR_RANK_EXAMS
+  EXTRAORDINARY_RANK_EXAMS
+  PRE_PLENIPOTENTIARY_EXAMS
+  PLENIPOTENTIARY_RANK_EXAMS
 }

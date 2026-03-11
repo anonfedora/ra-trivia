@@ -22,30 +22,93 @@ export default function SetupAdminPage() {
         setSuccess('');
         setIsLoading(true);
 
-        const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
-        const result = await apiJson<{ user: any; message?: string }>(`${apiUrl}/auth/register`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ 
-                email, 
-                name, 
-                password, 
-                church,
-                role
-            })
-        });
+        try {
+            const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
+            
+            // Fix TypeScript type to match actual server response
+            const result = await apiJson<{ 
+                message: string; 
+                user?: {
+                    id: string;
+                    name: string;
+                    email: string;
+                    role: 'ADMIN' | 'SUPER_ADMIN' | 'CANDIDATE';
+                    userType: string;
+                    emailVerified: boolean;
+                };
+                isUnverified?: boolean;
+                email?: string;
+            }>(`${apiUrl}/auth/register`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                    email, 
+                    name, 
+                    password, 
+                    church,
+                    role
+                })
+            });
 
-        if (result.ok && result.data?.user) {
-            const createdRole = result.data.user.role === 'SUPER_ADMIN' ? 'Super Admin' : 'Admin';
-            setSuccess(`${createdRole} account created successfully! Redirecting to login...`);
-            setTimeout(() => {
-                router.push('/login');
-            }, 2000);
-        } else {
-            setError('error' in result ? result.error : 'Failed to create admin account');
+            // Debug logging for development
+            if (process.env.NODE_ENV === 'development') {
+                console.log('Admin setup result:', {
+                    ok: result.ok,
+                    status: result.status,
+                    hasUser: !!result.data?.user,
+                    data: result.data
+                });
+            }
+
+            // Check for success with proper type safety
+            if (result.ok && result.data) {
+                if (result.data.user) {
+                    // New account created successfully
+                    const createdRole = result.data.user.role === 'SUPER_ADMIN' ? 'Super Admin' : 'Admin';
+                    setSuccess(`${createdRole} account created successfully! Please check your email for verification. Redirecting to login...`);
+                    
+                    // Redirect after showing success message
+                    setTimeout(() => {
+                        router.push('/login');
+                    }, 3000);
+                } else if (result.data.isUnverified) {
+                    // Existing unverified account
+                    setSuccess(`Account already exists but needs verification. A new verification code has been sent to ${result.data.email}. Redirecting to login...`);
+                    
+                    // Redirect after showing success message
+                    setTimeout(() => {
+                        router.push('/login');
+                    }, 3000);
+                } else {
+                    // Unexpected success response structure
+                    setSuccess('Admin account processed successfully! Please check your email if verification is required. Redirecting to login...');
+                    
+                    setTimeout(() => {
+                        router.push('/login');
+                    }, 2000);
+                }
+            } else {
+                // Handle error cases properly
+                const errorMessage = !result.ok && 'error' in result 
+                    ? result.error 
+                    : 'Failed to create admin account. Please try again.';
+                setError(errorMessage);
+                
+                // Debug logging for development
+                if (process.env.NODE_ENV === 'development') {
+                    console.error('Admin setup failed:', {
+                        ok: result.ok,
+                        error: 'error' in result ? result.error : 'Unknown error',
+                        data: result.data
+                    });
+                }
+            }
+        } catch (error) {
+            console.error('Admin setup error:', error);
+            setError('An unexpected error occurred. Please try again.');
+        } finally {
+            setIsLoading(false);
         }
-
-        setIsLoading(false);
     };
 
     return (
@@ -103,12 +166,21 @@ export default function SetupAdminPage() {
                         <select
                             value={role}
                             onChange={(e) => setRole(e.target.value as 'ADMIN' | 'SUPER_ADMIN')}
-                            className="w-full px-6 py-4 rounded-2xl bg-slate-50 border border-slate-200 focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all outline-none text-slate-900 font-medium"
+                            className="w-full px-6 py-4 rounded-2xl bg-slate-50 border border-slate-200 focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all outline-none text-slate-900 font-medium appearance-none cursor-pointer bg-no-repeat bg-right pr-12"
+                            style={{
+                                backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3e%3c/svg%3e")`,
+                                backgroundPosition: 'right 1rem center',
+                                backgroundSize: '1.5em 1.5em'
+                            }}
                             required
                         >
-                            <option value="ADMIN">Admin - Spec.</option>
-                            <option value="SUPER_ADMIN">Super Admin - *</option>
+                            <option value="ADMIN">Administrator</option>
+                            <option value="SUPER_ADMIN">Super Administrator</option>
                         </select>
+                        <p className="text-xs text-slate-500 ml-1">
+                            Administrator: Can manage quizzes and view results<br/>
+                            Super Administrator: Full system access
+                        </p>
                     </div>
 
                     <div className="space-y-2">
@@ -123,7 +195,7 @@ export default function SetupAdminPage() {
                     </div>
 
                     <div className="space-y-2">
-                        <label className="text-sm font-semibold text-slate-700 ml-1">Church / Organization</label>
+                        <label className="text-sm font-semibold text-slate-700 ml-1">Church</label>
                         <input
                             type="text"
                             value={church}

@@ -31,7 +31,20 @@ const registerValidation = [
     body('role')
         .optional()
         .isIn(['SUPER_ADMIN', 'ADMIN', 'CANDIDATE'])
-        .withMessage('Role must be either SUPER_ADMIN, ADMIN, or CANDIDATE')
+        .withMessage('Role must be either SUPER_ADMIN, ADMIN, or CANDIDATE'),
+    body('userType')
+        .custom((value, { req }) => {
+            // Only require userType for candidates
+            if (req.body.role === 'CANDIDATE' || !req.body.role) {
+                if (!value) {
+                    throw new Error('User type is required for candidates');
+                }
+                if (!['AMBASSADOR_RANK_EXAMS', 'EXTRAORDINARY_RANK_EXAMS', 'PRE_PLENIPOTENTIARY_EXAMS', 'PLENIPOTENTIARY_RANK_EXAMS'].includes(value)) {
+                    throw new Error('User type must be one of: Ambassador Rank Exams, Extraordinary Rank Exams, Pre-Plenipotentiary Exams, or Plenipotentiary Rank Exams');
+                }
+            }
+            return true;
+        })
 ];
 
 // Login validation rules
@@ -47,7 +60,7 @@ const loginValidation = [
 
 router.post('/register', registerValidation, handleValidationErrors, async (req: Request, res: Response) => {
     try {
-        const { email, name, password, church, role } = req.body;
+        const { email, name, password, church, association, role, userType } = req.body;
 
         const existingUser = await prisma.user.findUnique({
             where: { email }
@@ -103,7 +116,9 @@ router.post('/register', registerValidation, handleValidationErrors, async (req:
                 name,
                 password: hashedPassword,
                 church: church || null,
+                association: association || null,
                 role: role || 'CANDIDATE',
+                userType: userType || 'AMBASSADOR_RANK_EXAMS', // Default for admins or if not provided
                 emailVerified: false, // Require OTP verification
                 emailVerificationTokenHash: verifyTokenHash,
                 emailVerificationTokenExpiresAt: verifyTokenExpiresAt,
@@ -127,6 +142,7 @@ router.post('/register', registerValidation, handleValidationErrors, async (req:
                 name: user.name,
                 email: user.email,
                 role: user.role,
+                userType: user.userType,
                 emailVerified: user.emailVerified
             }
         });
@@ -277,7 +293,7 @@ router.post('/login', loginValidation, handleValidationErrors, async (req: Reque
             });
         }
 
-        const token = jwt.sign({ userId: user.id, role: user.role }, JWT_SECRET, { expiresIn: '24h' });
+        const token = jwt.sign({ userId: user.id, role: user.role, userType: user.userType }, JWT_SECRET, { expiresIn: '24h' });
         res.json({
             token,
             user: {
@@ -285,6 +301,7 @@ router.post('/login', loginValidation, handleValidationErrors, async (req: Reque
                 name: user.name,
                 email: user.email,
                 role: user.role,
+                userType: user.userType,
                 emailVerified: user.emailVerified
             }
         });
@@ -330,7 +347,7 @@ router.post('/verify-otp', [
             }
         });
 
-        const token = jwt.sign({ userId: user.id, role: user.role }, JWT_SECRET, { expiresIn: '24h' });
+        const token = jwt.sign({ userId: user.id, role: user.role, userType: user.userType }, JWT_SECRET, { expiresIn: '24h' });
 
         res.json({
             message: 'Email verified successfully!',
@@ -340,6 +357,7 @@ router.post('/verify-otp', [
                 name: user.name,
                 email: user.email,
                 role: user.role,
+                userType: user.userType,
                 emailVerified: true
             }
         });
@@ -401,6 +419,130 @@ router.post('/resend-verification', [
         });
     } catch (error) {
         console.error('[AUTH] Resend OTP error:', error);
+        res.status(500).json({ message: 'Internal server error' });
+    }
+});
+
+// Get user profile endpoint
+router.get('/profile', authenticate, async (req: AuthRequest, res: Response) => {
+    try {
+        const user = await prisma.user.findUnique({
+            where: { id: req.user!.userId },
+            select: {
+                id: true,
+                email: true,
+                name: true,
+                role: true,
+                userType: true,
+                church: true,
+                emailVerified: true,
+                createdAt: true,
+                updatedAt: true
+            }
+        });
+
+        if (!user) {
+            return res.status(404).json({ message: 'User not found' });
+        }
+
+        res.json({ user });
+    } catch (error) {
+        console.error('[AUTH] Get profile error:', error);
+        res.status(500).json({ message: 'Internal server error' });
+    }
+});
+
+// Update user profile endpoint
+router.put('/profile', authenticate, [
+    body('name')
+        .optional()
+        .trim()
+        .isLength({ min: 1, max: 100 })
+        .withMessage('Name must be between 1 and 100 characters'),
+    body('church')
+        .optional()
+        .trim()
+        .isLength({ max: 200 })
+        .withMessage('Church name must not exceed 200 characters'),
+    body('association')
+        .optional()
+        .trim()
+        .isLength({ max: 200 })
+        .withMessage('Association name must not exceed 200 characters'),
+    body('userType')
+        .optional()
+        .isIn(['AMBASSADOR_RANK_EXAMS', 'EXTRAORDINARY_RANK_EXAMS', 'PRE_PLENIPOTENTIARY_EXAMS', 'PLENIPOTENTIARY_RANK_EXAMS'])
+        .withMessage('User type must be one of: Ambassador Rank Exams, Extraordinary Rank Exams, Pre-Plenipotentiary Exams, or Plenipotentiary Rank Exams')
+], handleValidationErrors, async (req: AuthRequest, res: Response) => {
+    try {
+        const { name, church, association, userType } = req.body;
+        const userId = req.user!.userId;
+
+        // Get current user data for audit logging
+        const currentUser = await prisma.user.findUnique({
+            where: { id: userId },
+            select: { userType: true }
+        });
+
+        if (!currentUser) {
+            return res.status(404).json({ message: 'User not found' });
+        }
+
+        // Build update data object with only provided fields
+        const updateData: any = {};
+        if (name !== undefined) updateData.name = name;
+        if (church !== undefined) updateData.church = church || null;
+        if (association !== undefined) updateData.association = association || null;
+        if (userType !== undefined) updateData.userType = userType;
+
+        const updatedUser = await prisma.user.update({
+            where: { id: userId },
+            data: updateData,
+            select: {
+                id: true,
+                email: true,
+                name: true,
+                role: true,
+                userType: true,
+                church: true,
+                association: true,
+                emailVerified: true,
+                createdAt: true,
+                updatedAt: true
+            }
+        });
+
+        // Create audit log entry if userType was changed
+        // TODO: Temporarily commented out due to Prisma client generation issue with UserTypeAuditLog model
+        // if (userType !== undefined && userType !== currentUser.userType) {
+        //     await prisma.userTypeAuditLog.create({
+        //         data: {
+        //             userId: userId,
+        //             previousType: currentUser.userType,
+        //             newType: userType,
+        //             ipAddress: req.ip || (req as any).connection?.remoteAddress || null,
+        //             userAgent: req.get('User-Agent') || null
+        //         }
+        //     });
+        // }
+
+        // If userType was updated, generate a new JWT token with the updated userType
+        let newToken = null;
+        if (userType !== undefined) {
+            newToken = jwt.sign({ 
+                userId: updatedUser.id, 
+                role: updatedUser.role, 
+                userType: updatedUser.userType 
+            }, JWT_SECRET, { expiresIn: '24h' });
+        }
+
+        res.json({
+            message: 'Profile updated successfully',
+            user: updatedUser,
+            ...(newToken && { token: newToken })
+        });
+    } catch (error) {
+        console.error('[AUTH] Update profile error:', error);
         res.status(500).json({ message: 'Internal server error' });
     }
 });

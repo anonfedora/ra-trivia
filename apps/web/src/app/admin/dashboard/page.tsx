@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { BookOpen, Clock, PlayCircle, Plus, Upload, Trash2, Power, PowerOff, FileDown, MoreVertical, CheckCircle, BarChart3 } from 'lucide-react';
 import Link from 'next/link';
 import { ThemeToggle } from '../../../components/ThemeToggle';
+import UserTypeSelector, { UserType } from '../../../components/UserTypeSelector';
 
 interface Quiz {
     id: string;
@@ -52,6 +53,8 @@ export default function AdminDashboard() {
     const [file, setFile] = useState<File | null>(null);
     const [selectedQuizId, setSelectedQuizId] = useState<string>('');
     const [user, setUser] = useState<any>(null);
+    const [questionType, setQuestionType] = useState<UserType | null>(null);
+    const [questionTypeError, setQuestionTypeError] = useState<string>('');
 
     // Edit Selected Quiz
     const [editTitle, setEditTitle] = useState('');
@@ -251,6 +254,15 @@ export default function AdminDashboard() {
     const [importDuration, setImportDuration] = useState('30');
 
     const handleUpload = async () => {
+        // Clear previous errors
+        setQuestionTypeError('');
+
+        // Validate question type is selected
+        if (!questionType) {
+            setQuestionTypeError('Please select a question type');
+            return;
+        }
+
         if (!file || (importToExisting && !selectedQuizId)) {
             alert('Please select a file and a quiz');
             return;
@@ -263,6 +275,7 @@ export default function AdminDashboard() {
 
         const formData = new FormData();
         formData.append('file', file);
+        formData.append('questionType', questionType); // Add question type to form data
         if (importToExisting) {
             formData.append('quizId', selectedQuizId);
         } else {
@@ -282,6 +295,7 @@ export default function AdminDashboard() {
                 alert('Import successful!');
                 setImportTitle('');
                 setFile(null);
+                setQuestionType(null); // Reset question type selection
                 fetchQuizzes();
             } else {
                 const errorData = await res.json();
@@ -635,6 +649,20 @@ export default function AdminDashboard() {
                                     </div>
                                 )}
 
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-bold text-white/60 uppercase tracking-widest ml-1">Question Type *</label>
+                                    <UserTypeSelector
+                                        value={questionType}
+                                        onChange={(type) => {
+                                            setQuestionType(type);
+                                            setQuestionTypeError('');
+                                        }}
+                                        required={true}
+                                        className="[&>div]:bg-white/10 [&>div]:border-white/20 [&>div]:text-white [&>div]:placeholder:text-white/40 [&>div:focus]:border-white [&>div:focus]:ring-white/10"
+                                        error={questionTypeError}
+                                    />
+                                </div>
+
                                 <input
                                     key={file ? 'file-present' : 'file-empty'}
                                     type="file"
@@ -643,7 +671,7 @@ export default function AdminDashboard() {
                                 />
                                 <button
                                     onClick={handleUpload}
-                                    disabled={isUploading || (importToExisting && !selectedQuizId)}
+                                    disabled={isUploading || (importToExisting && !selectedQuizId) || !questionType}
                                     className="w-full bg-white text-primary py-4 rounded-2xl font-bold shadow-lg transform transition-all hover:scale-[1.02] active:scale-95 disabled:opacity-50"
                                 >
                                     {isUploading ? 'Importing...' : 'Upload Excel'}

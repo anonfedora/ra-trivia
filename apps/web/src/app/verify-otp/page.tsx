@@ -14,19 +14,26 @@ function VerifyOTPContent() {
     const [error, setError] = useState('');
     const [success, setSuccess] = useState('');
     const [isLoading, setIsLoading] = useState(false);
+    const [isClient, setIsClient] = useState(false);
     const router = useRouter();
     const searchParams = useSearchParams();
     const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
     const isSubmitting = useRef(false);
 
-    // Get email from URL params
-    const emailFromUrl = searchParams?.get('email') || '';
-
+    // Ensure client-side rendering for search params
     useEffect(() => {
-        if (emailFromUrl) {
-            setEmail(emailFromUrl);
+        setIsClient(true);
+    }, []);
+
+    // Get email from URL params only on client side
+    useEffect(() => {
+        if (isClient && searchParams) {
+            const emailFromUrl = searchParams.get('email') || '';
+            if (emailFromUrl) {
+                setEmail(emailFromUrl);
+            }
         }
-    }, [emailFromUrl]);
+    }, [isClient, searchParams]);
 
     const handleInputChange = (index: number, value: string) => {
         // Reset submitting flag when user changes OTP
@@ -177,7 +184,7 @@ function VerifyOTPContent() {
 
     return (
         <main className="min-h-screen bg-slate-100 dark:bg-slate-900 flex items-center justify-center p-6 transition-colors duration-200">
-            <div className="absolute top-6 right-6">
+            <div className="absolute top-6 right-6 z-50">
                 <ThemeToggle />
             </div>
             <div className="w-full max-w-md">
@@ -188,7 +195,9 @@ function VerifyOTPContent() {
                         </div>
                         <h1 className="text-4xl font-bold text-slate-800 dark:text-slate-50 mb-3">Verify Email</h1>
                         <p className="text-slate-600 dark:text-slate-400 text-lg">Enter the 6-digit code sent to</p>
-                        <p className="text-slate-700 dark:text-slate-300 font-semibold">{email || 'your email'}</p>
+                        <p className="text-slate-700 dark:text-slate-300 font-semibold">
+                            {isClient ? (email || 'your email') : 'your email'}
+                        </p>
                     </div>
 
                     <form onSubmit={handleVerifyOTP} className="space-y-8">
@@ -235,7 +244,7 @@ function VerifyOTPContent() {
                             <button
                                 type="button"
                                 onClick={handleResendOTP}
-                                disabled={isLoading || !email}
+                                disabled={isLoading || !email || !isClient}
                                 className="text-primary hover:underline font-medium text-sm transition-colors disabled:opacity-50"
                             >
                                 Didn&apos;t receive the code? Resend
@@ -260,14 +269,18 @@ function VerifyOTPContent() {
 export default function VerifyOTPPage() {
     return (
         <Suspense fallback={
-            <main className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 flex items-center justify-center p-6">
+            <main className="min-h-screen bg-slate-100 dark:bg-slate-900 flex items-center justify-center p-6 transition-colors duration-200">
+                <div className="absolute top-6 right-6 z-50">
+                    <ThemeToggle />
+                </div>
                 <div className="w-full max-w-md">
-                    <div className="bg-white/80 backdrop-blur-sm rounded-3xl shadow-2xl shadow-slate-200/50 p-8 border border-white/20">
-                        <div className="text-center">
-                            <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-blue-500 to-purple-600 rounded-2xl mb-4">
-                                <span className="text-white font-bold text-xl">RA</span>
+                    <div className="bg-white dark:bg-slate-800 rounded-[2.5rem] shadow-2xl p-8 border border-slate-100 dark:border-slate-700 animate-slide-up">
+                        <div className="text-center mb-8">
+                            <div className="inline-flex items-center justify-center w-20 h-20 bg-primary rounded-3xl mb-6 shadow-lg">
+                                <span className="text-white font-bold text-2xl">RA</span>
                             </div>
-                            <h1 className="text-3xl font-bold text-slate-800 mb-2">Loading...</h1>
+                            <h1 className="text-4xl font-bold text-slate-800 dark:text-slate-50 mb-3">Verify Email</h1>
+                            <p className="text-slate-600 dark:text-slate-400 text-lg">Loading...</p>
                         </div>
                     </div>
                 </div>

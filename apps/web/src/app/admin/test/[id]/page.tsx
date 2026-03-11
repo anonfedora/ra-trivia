@@ -69,8 +69,22 @@ export default function AdminTestQuizPage() {
         }
 
         const fetchQuiz = async () => {
+            // Add confirmation to prevent accidental session creation
+            const confirmed = window.confirm(
+                '⚠️ WARNING: This will create a REAL quiz session that will appear in the candidate dashboard.\n\n' +
+                'This should only be used for testing purposes.\n\n' +
+                'Do you want to continue?'
+            );
+            
+            if (!confirmed) {
+                router.push('/admin/dashboard');
+                return;
+            }
+
             try {
                 const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
+                console.log('[ADMIN_TEST] Creating test session for quiz:', quizId);
+                
                 const res = await fetch(`${apiUrl}/quiz/start`, {
                     method: 'POST',
                     headers: {

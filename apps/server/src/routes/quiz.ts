@@ -1,15 +1,30 @@
 import { Router } from 'express';
 import { prisma } from 'database';
 import { authenticate, AuthRequest } from '../middlewares/auth';
+import { validateUserTypeAccess, filterQuestionsByUserType } from '../middlewares/userTypeAccess';
 import { sendQuizResultEmail } from '../services/email';
 
 const router = Router();
 
-// Start a quiz session
-router.post('/start', authenticate, async (req: AuthRequest, res) => {
+// Start a quiz session - with user type access control
+router.post('/start', authenticate, validateUserTypeAccess, async (req: AuthRequest, res) => {
     try {
         const { quizId } = req.body;
         const userId = req.user!.userId;
+        const userRole = req.user!.role;
+        const userType = req.user!.userType;
+        const userAgent = req.get('User-Agent') || 'Unknown';
+        const referer = req.get('Referer') || 'Unknown';
+
+        console.log(`[QUIZ_START] Session start request:`, {
+            quizId,
+            userId,
+            userRole,
+            userType,
+            userAgent: userAgent.substring(0, 100),
+            referer: referer.substring(0, 100),
+            timestamp: new Date().toISOString()
+        });
 
         // Check retake limit
         const quiz = await prisma.quiz.findUnique({
@@ -49,28 +64,78 @@ router.post('/start', authenticate, async (req: AuthRequest, res) => {
             });
         }
 
-        // Check if user already has an active session
+        // Check if user already has an active session (not completed)
         let session = await prisma.quizSession.findFirst({
             where: {
                 userId,
                 quizId,
-                endTime: null
+                endTime: null // Only get truly active sessions
             }
         });
 
+        // Clean up stale sessions (older than quiz duration + 1 hour buffer)
+        if (session) {
+            const sessionAge = Date.now() - new Date(session.startTime).getTime();
+            const maxSessionTime = (quiz.duration + 60) * 60 * 1000; // duration in minutes + 1 hour buffer
+            
+            if (sessionAge > maxSessionTime) {
+                console.log(`[QUIZ_START] Cleaning up stale session ${session.id} (age: ${Math.round(sessionAge / 60000)} minutes)`);
+                
+                // Mark stale session as completed with 0 score
+                await prisma.quizSession.update({
+                    where: { id: session.id },
+                    data: {
+                        endTime: new Date(),
+                        score: 0
+                    }
+                });
+                
+                session = null; // Will create a new session below
+            }
+        }
+
+        // CRITICAL: Check if user just completed this quiz (within last 5 minutes)
+        // This prevents phantom sessions from being created immediately after submission
         if (!session) {
+            const recentCompletion = await prisma.quizSession.findFirst({
+                where: {
+                    userId,
+                    quizId,
+                    endTime: { 
+                        not: null,
+                        gte: new Date(Date.now() - 5 * 60 * 1000) // Last 5 minutes
+                    }
+                },
+                orderBy: { endTime: 'desc' }
+            });
+
+            if (recentCompletion) {
+                console.log(`[QUIZ_START] User ${userId} just completed quiz ${quizId} at ${recentCompletion.endTime}. Blocking new session to prevent phantom.`);
+                return res.status(400).json({
+                    message: 'You just completed this quiz. Please wait a few minutes before retaking it.',
+                    recentCompletion: true
+                });
+            }
+        }
+
+        // If there's an active session, return it
+        if (session) {
+            console.log(`[QUIZ_START] Found existing active session ${session.id} for user ${userId}, quiz ${quizId}`);
+        } else {
+            // Create new session only if user hasn't exceeded retake limit
+            console.log(`[QUIZ_START] Creating new session for user ${userId}, quiz ${quizId}. Completed attempts: ${completedSessions}/${retakeLimit}`);
+            
             session = await prisma.quizSession.create({
                 data: {
                     userId,
                     quizId,
                     startTime: new Date(),
-                    // __remap__ will be added after randomizing questions (see below)
                     answers: {}
                 }
             });
         }
 
-        // Get quiz with questions and randomize them
+        // Get quiz with questions and filter by user type for candidates
         const quizWithQuestions = await prisma.quiz.findUnique({
             where: { id: quizId },
             include: { questions: true }
@@ -80,16 +145,29 @@ router.post('/start', authenticate, async (req: AuthRequest, res) => {
             return res.status(404).json({ message: 'Quiz not found' });
         }
 
-        // Randomize question order and shuffle answers
-        const questions = [...quizWithQuestions.questions];
+        // Filter questions by user type for candidates
+        let questions = [...quizWithQuestions.questions];
+        if (userRole === 'CANDIDATE' && userType) {
+            questions = filterQuestionsByUserType(questions, userType);
+            
+            if (questions.length === 0) {
+                return res.status(403).json({
+                    message: 'No questions available for your examination type in this quiz.',
+                    userType
+                });
+            }
 
+            console.log(`[QUIZ_START_FILTER] Quiz ${quizId}: Total questions: ${quizWithQuestions.questions.length}, Filtered for ${userType}: ${questions.length}`);
+        }
+
+        // Randomize question order and shuffle answers
         // Fisher-Yates shuffle for questions
         for (let i = questions.length - 1; i > 0; i--) {
             const j = Math.floor(Math.random() * (i + 1));
             [questions[i], questions[j]] = [questions[j], questions[i]];
         }
 
-        console.log('[QUIZ_RANDOMIZATION] Shuffled questions:', questions.map(q => ({ id: q.id, originalOrder: quizWithQuestions.questions.findIndex(orig => orig.id === q.id) })));
+        console.log('[QUIZ_RANDOMIZATION] Shuffled questions:', questions.map(q => ({ id: q.id, questionType: q.questionType, originalOrder: quizWithQuestions.questions.findIndex(orig => orig.id === q.id) })));
 
         const randomizedQuestions = questions.map(question => {
             // Create array of options and shuffle them using Fisher-Yates
@@ -265,27 +343,52 @@ router.post('/submit', authenticate, async (req: AuthRequest, res) => {
     }
 });
 
-// Get candidate's own sessions
+// Get candidate's own sessions - filtered by user type access
 router.get('/my-sessions', authenticate, async (req: AuthRequest, res) => {
     try {
         const userId = req.user!.userId;
+        const userRole = req.user!.role;
+        const userType = req.user!.userType;
+
         const sessions = await prisma.quizSession.findMany({
             where: { userId },
             include: {
                 quiz: {
-                    select: { id: true, title: true, duration: true }
+                    select: { 
+                        id: true, 
+                        title: true, 
+                        duration: true,
+                        // Include questions for filtering (candidates only)
+                        questions: userRole === 'CANDIDATE' ? {
+                            select: { questionType: true }
+                        } : false
+                    }
                 }
             },
             orderBy: { startTime: 'desc' }
         });
 
-        // Mask scores if results are not yet released
+        // Filter sessions for candidates based on user type matching
+        let filteredSessions = sessions;
+        if (userRole === 'CANDIDATE' && userType) {
+            filteredSessions = sessions.filter(session => {
+                // Only show sessions for quizzes that have questions matching the user's type
+                const hasMatchingQuestions = session.quiz.questions?.some(q => q.questionType === userType);
+                return hasMatchingQuestions;
+            });
+
+            console.log(`[MY_SESSIONS_FILTER] User ${userId}, UserType: ${userType}, Original count: ${sessions.length}, Filtered count: ${filteredSessions.length}`);
+        }
+
+        // Mask scores if results are not yet released and remove questions from response
         const now = new Date();
-        const processedSessions = sessions.map(session => {
+        const processedSessions = filteredSessions.map(session => {
             const isReleased = !session.resultReleasesAt || now >= session.resultReleasesAt;
+            const { questions, ...quizWithoutQuestions } = session.quiz;
             return {
                 ...session,
-                score: isReleased ? session.score : null
+                score: isReleased ? session.score : null,
+                quiz: quizWithoutQuestions
             };
         });
 

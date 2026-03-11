@@ -53,7 +53,7 @@ export default function LoginPage() {
 
     return (
         <main className="min-h-screen bg-slate-100 dark:bg-slate-900 flex items-center justify-center p-6 transition-colors duration-200">
-            <div className="absolute top-6 right-6">
+            <div className="absolute top-6 right-6 z-50">
                 <ThemeToggle />
             </div>
             <div className="bg-white dark:bg-slate-800 p-10 rounded-[2.5rem] shadow-2xl max-w-md w-full border border-slate-100 dark:border-slate-700 animate-slide-up">
@@ -64,7 +64,7 @@ export default function LoginPage() {
                         className="w-16 h-16 mx-auto mb-4 rounded-lg"
                     />
                     <h2 className="text-3xl font-bold text-slate-900 dark:text-slate-50 mb-2">Welcome Back</h2>
-                    <p className="text-slate-500 dark:text-slate-400">Please enter your credentials to access the quiz portal.</p>
+                    <p className="text-slate-500 dark:text-slate-400">Please enter your credentials to access the exams portal.</p>
                 </div>
 
                 {error && (

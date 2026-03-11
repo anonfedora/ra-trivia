@@ -1,15 +1,17 @@
 import { Router } from 'express';
 import { prisma } from 'database';
 import { authenticate, AuthRequest, authorize } from '../middlewares/auth';
+import { validateQuizListAccess, validateUserTypeAccess } from '../middlewares/userTypeAccess';
 
 const router = Router();
 
 // Get all quizzes
-// Super Admin gets all, Admin gets only their created quizzes, Candidates get only active ones
-router.get('/', authenticate, async (req: AuthRequest, res) => {
+// Super Admin gets all, Admin gets only their created quizzes, Candidates get only active ones with matching question types
+router.get('/', authenticate, validateQuizListAccess, async (req: AuthRequest, res) => {
     try {
         const userRole = req.user?.role;
         const userId = req.user?.userId;
+        const userType = req.userTypeFilter;
         const activeOnly = req.query.activeOnly === 'true';
 
         let where: any = {};
@@ -31,7 +33,7 @@ router.get('/', authenticate, async (req: AuthRequest, res) => {
             where.isActive = true;
         }
 
-        console.log(`[QUIZ_GET] User: ${userId}, Role: ${userRole}, activeOnly: ${activeOnly}, Filter: ${JSON.stringify(where)}`);
+        console.log(`[QUIZ_GET] User: ${userId}, Role: ${userRole}, UserType: ${userType}, activeOnly: ${activeOnly}, Filter: ${JSON.stringify(where)}`);
 
         const quizzes = await prisma.quiz.findMany({
             where,
@@ -39,28 +41,57 @@ router.get('/', authenticate, async (req: AuthRequest, res) => {
                 _count: {
                     select: { questions: true }
                 },
-                createdBy: true
+                createdBy: true,
+                // Include questions for user type filtering (candidates only)
+                questions: userRole === 'CANDIDATE' ? {
+                    select: { questionType: true }
+                } : false
             },
             orderBy: { createdAt: 'desc' }
         });
 
-        res.json(quizzes);
+        // Filter quizzes for candidates based on user type matching
+        let filteredQuizzes = quizzes;
+        if (userRole === 'CANDIDATE' && userType) {
+            filteredQuizzes = quizzes.filter(quiz => {
+                // Only show quizzes that have at least one question matching the user's type
+                const hasMatchingQuestions = quiz.questions?.some(q => q.questionType === userType);
+                return hasMatchingQuestions;
+            });
+
+            console.log(`[QUIZ_FILTER] Original count: ${quizzes.length}, Filtered count: ${filteredQuizzes.length}, UserType: ${userType}`);
+        }
+
+        // Remove questions from response (they were only needed for filtering)
+        const responseQuizzes = filteredQuizzes.map(quiz => {
+            const { questions, ...quizWithoutQuestions } = quiz;
+            return quizWithoutQuestions;
+        });
+
+        res.json(responseQuizzes);
     } catch (error) {
         console.error(error);
         res.status(500).json({ message: 'Internal server error' });
     }
 });
 
-// Get quiz details (for instructions)
-router.get('/:id', authenticate, async (req: AuthRequest, res) => {
+// Get quiz details (for instructions) - with user type access control
+router.get('/:id', authenticate, validateUserTypeAccess, async (req: AuthRequest, res) => {
     try {
         const id = req.params.id as string;
+        const userRole = req.user?.role;
+        const userType = req.user?.userType;
+
         const quiz = await prisma.quiz.findUnique({
             where: { id },
             include: {
                 _count: {
                     select: { questions: true }
-                }
+                },
+                // Include questions for candidates to show filtered count
+                questions: userRole === 'CANDIDATE' ? {
+                    select: { questionType: true }
+                } : false
             }
         });
 
@@ -68,7 +99,25 @@ router.get('/:id', authenticate, async (req: AuthRequest, res) => {
             return res.status(404).json({ message: 'Quiz not found' });
         }
 
-        res.json(quiz);
+        // For candidates, show count of questions matching their type
+        if (userRole === 'CANDIDATE' && userType && quiz.questions) {
+            const matchingQuestionsCount = quiz.questions.filter(q => q.questionType === userType).length;
+            
+            console.log(`[QUIZ_DETAILS] Quiz ${id}: Total questions: ${quiz.questions.length}, Matching user type ${userType}: ${matchingQuestionsCount}`);
+
+            // Return quiz without questions but with updated count
+            const { questions, ...quizWithoutQuestions } = quiz;
+            res.json({
+                ...quizWithoutQuestions,
+                _count: {
+                    questions: matchingQuestionsCount
+                }
+            });
+        } else {
+            // For admins, return quiz without questions
+            const { questions, ...quizWithoutQuestions } = quiz;
+            res.json(quizWithoutQuestions);
+        }
     } catch (error) {
         console.error(error);
         res.status(500).json({ message: 'Internal server error' });
@@ -89,7 +138,8 @@ router.get('/:id/preview', authenticate, authorize(['ADMIN']), async (req: AuthR
                         optionA: true,
                         optionB: true,
                         optionC: true,
-                        optionD: true
+                        optionD: true,
+                        questionType: true // Include questionType in preview
                     },
                     orderBy: { createdAt: 'asc' }
                 },

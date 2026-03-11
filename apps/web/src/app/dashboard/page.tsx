@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { BookOpen, Clock, PlayCircle, LogOut, Calendar, Repeat } from 'lucide-react';
+import { BookOpen, Clock, PlayCircle, LogOut, Calendar, Repeat, User } from 'lucide-react';
 import { ThemeToggle } from '../../components/ThemeToggle';
 
 interface Quiz {
@@ -151,6 +151,13 @@ export default function DashboardPage() {
                         </div>
                     </div>
                     <div className="flex items-center gap-3">
+                        <Link
+                            href="/profile"
+                            className="hidden md:flex items-center gap-2 px-6 py-3 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-2xl font-semibold border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700 transition-all shadow-sm"
+                        >
+                            <User size={18} />
+                            Profile
+                        </Link>
                         <ThemeToggle />
                         <button
                             onClick={handleLogout}
@@ -253,6 +260,11 @@ export default function DashboardPage() {
                                         const now = new Date();
                                         const isReleased = !session.resultReleasesAt || now >= new Date(session.resultReleasesAt);
                                         const isRunning = !session.endTime;
+                                        
+                                        // Check if session might be abandoned (older than 2 hours without endTime)
+                                        const sessionAge = now.getTime() - new Date(session.startTime).getTime();
+                                        const twoHours = 2 * 60 * 60 * 1000;
+                                        const likelyAbandoned = isRunning && sessionAge > twoHours;
 
                                         return (
                                             <div
@@ -269,22 +281,29 @@ export default function DashboardPage() {
                                                     {!isRunning && (
                                                         <span className="text-[10px] font-bold text-primary bg-primary/5 px-2 py-1 rounded-lg">View Details</span>
                                                     )}
+                                                    {likelyAbandoned && (
+                                                        <span className="text-[10px] font-bold text-orange-600 bg-orange-100 dark:bg-orange-900/30 px-2 py-1 rounded-lg">Likely Abandoned</span>
+                                                    )}
                                                 </div>
                                                 <div className="flex justify-between items-center mt-2">
                                                     <span className="text-xs text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wider">
                                                         {new Date(session.startTime).toLocaleDateString()}
                                                     </span>
-                                                    <span className={`px-3 py-1 rounded-full text-xs font-black ${isRunning
-                                                        ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400'
-                                                        : isReleased
-                                                            ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400'
-                                                            : 'bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400'
-                                                        }`}>
-                                                        {isRunning
-                                                            ? 'Running'
+                                                    <span className={`px-3 py-1 rounded-full text-xs font-black ${likelyAbandoned
+                                                        ? 'bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400'
+                                                        : isRunning
+                                                            ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400'
                                                             : isReleased
-                                                                ? `${session.score?.toFixed(1)}%`
-                                                                : 'Locked until 8 PM'}
+                                                                ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400'
+                                                                : 'bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400'
+                                                        }`}>
+                                                        {likelyAbandoned
+                                                            ? 'Abandoned'
+                                                            : isRunning
+                                                                ? 'Running'
+                                                                : isReleased
+                                                                    ? `${session.score?.toFixed(1)}%`
+                                                                    : 'Locked until 8 PM'}
                                                     </span>
                                                 </div>
                                             </div>
@@ -293,6 +312,14 @@ export default function DashboardPage() {
                                 )}
                             </div>
                         </section>
+
+                        <Link
+                            href="/profile"
+                            className="md:hidden w-full flex items-center justify-center gap-2 px-6 py-4 bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-2xl font-bold border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700 transition-all shadow-sm mb-4"
+                        >
+                            <User size={18} />
+                            Profile
+                        </Link>
 
                         <button
                             onClick={handleLogout}

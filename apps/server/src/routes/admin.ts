@@ -1,7 +1,8 @@
 import { Router } from 'express';
-import { prisma } from 'database';
+import { prisma, UserType } from 'database';
 import { authenticate, authorizeAdmin, AuthRequest } from '../middlewares/auth';
 import * as xlsx from 'xlsx';
+import { ReportGenerator } from '../services/reportGenerator';
 
 const router = Router();
 
@@ -113,7 +114,41 @@ router.get('/global-stats', authenticate, authorizeAdmin, async (req: AuthReques
     }
 });
 
-// Admin: Export quiz report
+// Admin: Export formatted exam report to Excel
+router.get('/export/formatted-excel', authenticate, authorizeAdmin, async (req: AuthRequest, res) => {
+    try {
+        const userType = req.query.userType as UserType | undefined;
+        const quizId = req.query.quizId as string | undefined;
+
+        const { buffer, filename } = await ReportGenerator.generateExcelReport(userType, quizId);
+
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+        res.send(buffer);
+    } catch (error) {
+        console.error('Formatted Excel export error:', error);
+        res.status(500).json({ message: 'Failed to generate formatted Excel report' });
+    }
+});
+
+// Admin: Export exam report to PDF
+router.get('/export/pdf', authenticate, authorizeAdmin, async (req: AuthRequest, res) => {
+    try {
+        const userType = req.query.userType as UserType | undefined;
+        const quizId = req.query.quizId as string | undefined;
+
+        const { buffer, filename } = await ReportGenerator.generatePDFReport(userType, quizId);
+
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+        res.send(buffer);
+    } catch (error) {
+        console.error('PDF export error:', error);
+        res.status(500).json({ message: 'Failed to generate PDF report' });
+    }
+});
+
+// Admin: Export quiz report (specific quiz)
 router.get('/export/:quizId', authenticate, authorizeAdmin, async (req: AuthRequest, res) => {
     try {
         const { quizId } = req.params;
@@ -150,8 +185,12 @@ router.get('/export/:quizId', authenticate, authorizeAdmin, async (req: AuthRequ
 
         const buffer = xlsx.write(workbook, { type: 'buffer', bookType: 'xlsx' });
 
+        // Create filename with quiz title (replace spaces with underscores)
+        const quizTitle = sessions.length > 0 ? sessions[0].quiz.title.replace(/\s+/g, '_').toLowerCase() : 'unknown_quiz';
+        const filename = `${quizTitle}_quiz_report.xlsx`;
+
         res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-        res.setHeader('Content-Disposition', `attachment; filename="quiz-report-${quizId}.xlsx"`);
+        res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
         res.send(buffer);
     } catch (error) {
         console.error('Export error:', error);
@@ -167,6 +206,35 @@ router.get('/results', authenticate, authorizeAdmin, async (req: AuthRequest, re
         const pageSize = Math.min(100, Math.max(1, pageSizeRaw));
         const q = typeof req.query.q === 'string' ? req.query.q.trim() : '';
         const status = typeof req.query.status === 'string' ? req.query.status : 'all';
+
+        // Clean up stale sessions before fetching results
+        const staleSessionsThreshold = new Date(Date.now() - 4 * 60 * 60 * 1000); // 4 hours ago
+        const staleSessions = await prisma.quizSession.findMany({
+            where: {
+                endTime: null,
+                startTime: { lt: staleSessionsThreshold }
+            },
+            include: {
+                quiz: { select: { duration: true } }
+            }
+        });
+
+        // Mark stale sessions as completed with 0 score
+        for (const session of staleSessions) {
+            const sessionAge = Date.now() - new Date(session.startTime).getTime();
+            const maxSessionTime = (session.quiz.duration + 60) * 60 * 1000; // duration + 1 hour buffer
+            
+            if (sessionAge > maxSessionTime) {
+                console.log(`[ADMIN_RESULTS] Cleaning up stale session ${session.id} (age: ${Math.round(sessionAge / 60000)} minutes)`);
+                await prisma.quizSession.update({
+                    where: { id: session.id },
+                    data: {
+                        endTime: new Date(),
+                        score: 0
+                    }
+                });
+            }
+        }
 
         const where: any = {};
 
@@ -264,7 +332,7 @@ router.get('/export/excel', authenticate, authorizeAdmin, async (req: AuthReques
         const buffer = xlsx.write(workbook, { type: 'buffer', bookType: 'xlsx' });
 
         res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-        res.setHeader('Content-Disposition', 'attachment; filename="exam_results.xlsx"');
+        res.setHeader('Content-Disposition', 'attachment; filename="all_exams_exam_results.xlsx"');
         res.send(buffer);
     } catch (error) {
         console.error(error);
@@ -273,3 +341,115 @@ router.get('/export/excel', authenticate, authorizeAdmin, async (req: AuthReques
 });
 
 export default router;
+
+
+// Admin: Manually trigger email sending for pending results
+router.post('/trigger-emails', authenticate, authorizeAdmin, async (req: AuthRequest, res) => {
+    try {
+        const now = new Date();
+        
+        // Find sessions that should have been sent but haven't
+        const pendingSessions = await prisma.quizSession.findMany({
+            where: {
+                endTime: { not: null },
+                resultReleasesAt: { 
+                    not: null,
+                    lte: now 
+                },
+                emailSent: false
+            },
+            include: {
+                user: true,
+                quiz: {
+                    include: { questions: true }
+                }
+            }
+        });
+
+        if (pendingSessions.length === 0) {
+            return res.json({ 
+                message: 'No pending emails to send',
+                processed: 0,
+                failed: 0
+            });
+        }
+
+        let processedCount = 0;
+        let failedCount = 0;
+        const results = [];
+
+        for (const session of pendingSessions) {
+            try {
+                const answers = (session.answers as Record<string, string>) || {};
+                const questions = session.quiz.questions;
+
+                const remapRaw = (answers as any).__remap__;
+                const remap: Record<string, string> = remapRaw ? JSON.parse(remapRaw) : {};
+
+                let correctCount = 0;
+                const answerDetails = questions.map((q: any) => {
+                    const selectedOption = answers[q.id];
+                    const correctOption = remap[q.id] ?? q.correctOption;
+                    const isCorrect = selectedOption === correctOption;
+                    if (isCorrect) correctCount++;
+                    return {
+                        question: q.text,
+                        selectedOption: selectedOption || 'No answer',
+                        correctOption,
+                        isCorrect
+                    };
+                });
+
+                const score = session.score || 0;
+
+                // Import sendQuizResultEmail dynamically to avoid circular dependency
+                const { sendQuizResultEmail } = await import('../services/email');
+                const success = await sendQuizResultEmail(
+                    session.user.email,
+                    session.user.name,
+                    score,
+                    answerDetails
+                );
+
+                if (success) {
+                    await prisma.quizSession.update({
+                        where: { id: session.id },
+                        data: { emailSent: true }
+                    });
+                    processedCount++;
+                    results.push({
+                        sessionId: session.id,
+                        email: session.user.email,
+                        status: 'success'
+                    });
+                } else {
+                    failedCount++;
+                    results.push({
+                        sessionId: session.id,
+                        email: session.user.email,
+                        status: 'failed'
+                    });
+                }
+            } catch (err) {
+                failedCount++;
+                results.push({
+                    sessionId: session.id,
+                    email: session.user.email,
+                    status: 'error',
+                    error: err instanceof Error ? err.message : 'Unknown error'
+                });
+            }
+        }
+
+        res.json({
+            message: `Processed ${processedCount + failedCount} emails`,
+            processed: processedCount,
+            failed: failedCount,
+            total: pendingSessions.length,
+            results
+        });
+    } catch (error) {
+        console.error('[ADMIN] Error triggering emails:', error);
+        res.status(500).json({ message: 'Failed to trigger emails' });
+    }
+});

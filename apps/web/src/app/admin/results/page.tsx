@@ -35,7 +35,8 @@ function AdminResultsContent() {
     const [results, setResults] = useState<Result[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState(initialQuery);
-    const [status, setStatus] = useState<'all' | 'completed' | 'running'>('all');
+    const [status, setStatus] = useState<'completed'>('completed');
+    const [userTypeFilter, setUserTypeFilter] = useState<string>('all');
     const [page, setPage] = useState(1);
     const [pageSize] = useState(25);
     const [total, setTotal] = useState(0);
@@ -82,21 +83,81 @@ function AdminResultsContent() {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [searchTerm, status]);
 
-    const handleExport = async () => {
+    const handleExport = async (format: 'excel' | 'formatted-excel' | 'pdf') => {
         const token = localStorage.getItem('token');
         try {
-            const res = await fetch(`${apiUrl}/admin/export/excel`, {
+            const params = new URLSearchParams();
+            if (userTypeFilter !== 'all') {
+                params.append('userType', userTypeFilter);
+            }
+            
+            const endpoint = format === 'excel' 
+                ? `${apiUrl}/admin/export/excel`
+                : `${apiUrl}/admin/export/${format}?${params.toString()}`;
+                
+            const res = await fetch(endpoint, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
+            
             if (res.ok) {
                 const blob = await res.blob();
                 const url = window.URL.createObjectURL(blob);
                 const a = document.createElement('a');
                 a.href = url;
-                a.download = 'exam_results.xlsx';
+                
+                const extension = format === 'pdf' ? 'pdf' : 'xlsx';
+                const formatPrefix = format === 'formatted-excel' ? 'formatted_' : '';
+                
+                // Determine exam type for filename
+                let examTypePrefix = '';
+                
+                if (userTypeFilter !== 'all') {
+                    // Use the dropdown filter
+                    examTypePrefix = `${userTypeFilter.toLowerCase()}_`;
+                } else if (searchTerm.trim()) {
+                    // Try to detect exam type from search term - be more flexible with matching
+                    const searchLower = searchTerm.toLowerCase().trim();
+                    
+                    // Check for exam type keywords in search term
+                    if (searchLower.includes('ambassador') || searchLower.includes('amb')) {
+                        examTypePrefix = 'ambassador_rank_exams_';
+                    } else if (searchLower.includes('extraordinary') || searchLower.includes('extra')) {
+                        examTypePrefix = 'extraordinary_rank_exams_';
+                    } else if (searchLower.includes('pre-plenipotentiary') || searchLower.includes('pre_plenipotentiary') || searchLower.includes('pre plenipotentiary')) {
+                        examTypePrefix = 'pre_plenipotentiary_exams_';
+                    } else if (searchLower.includes('plenipotentiary') && !searchLower.includes('pre')) {
+                        examTypePrefix = 'plenipotentiary_rank_exams_';
+                    } else {
+                        // If search doesn't match any exam type, check if results contain a dominant exam type
+                        const examTypeCounts = results.reduce((acc, result) => {
+                            const title = result.quiz.title.toLowerCase();
+                            if (title.includes('ambassador')) acc.ambassador = (acc.ambassador || 0) + 1;
+                            else if (title.includes('extraordinary')) acc.extraordinary = (acc.extraordinary || 0) + 1;
+                            else if (title.includes('pre-plenipotentiary') || title.includes('pre_plenipotentiary')) acc.pre_plenipotentiary = (acc.pre_plenipotentiary || 0) + 1;
+                            else if (title.includes('plenipotentiary') && !title.includes('pre')) acc.plenipotentiary = (acc.plenipotentiary || 0) + 1;
+                            return acc;
+                        }, {} as Record<string, number>);
+                        
+                        // Find the most common exam type in results
+                        const dominantType = Object.entries(examTypeCounts).reduce((max, [type, count]) => 
+                            count > (max.count || 0) ? { type, count } : max, { type: '', count: 0 });
+                        
+                        if (dominantType.type && dominantType.count > 0) {
+                            examTypePrefix = `${dominantType.type}_rank_exams_`;
+                        } else {
+                            examTypePrefix = 'search_results_';
+                        }
+                    }
+                } else {
+                    examTypePrefix = 'all_exams_';
+                }
+                
+                a.download = `${examTypePrefix}${formatPrefix}exam_results.${extension}`;
+                
                 document.body.appendChild(a);
                 a.click();
                 a.remove();
+                window.URL.revokeObjectURL(url);
             }
         } catch (err) {
             alert('Export failed');
@@ -118,18 +179,34 @@ function AdminResultsContent() {
                             <ArrowLeft size={18} />
                             Back to Dashboard
                         </Link>
-                        <h1 className="text-4xl font-extrabold text-slate-900 dark:text-slate-50 tracking-tight">Exam Results</h1>
-                        <p className="text-slate-500 dark:text-slate-400 mt-2 font-medium">Detailed breakdown of candidate performances across all exams.</p>
+                        <h1 className="text-4xl font-extrabold text-slate-900 dark:text-slate-50 tracking-tight">Completed Exam Results</h1>
+                        <p className="text-slate-500 dark:text-slate-400 mt-2 font-medium">Analysis of completed candidate performances across all examinations.</p>
                     </div>
                     <div className="flex gap-4 items-center">
                         <ThemeToggle />
-                        <button
-                            onClick={handleExport}
-                            className="flex items-center gap-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 px-6 py-3 rounded-2xl font-bold shadow-sm hover:shadow-md transition-all active:scale-95"
-                        >
-                            <FileDown size={18} />
-                            Export Excel
-                        </button>
+                        <div className="flex gap-2">
+                            <button
+                                onClick={() => handleExport('excel')}
+                                className="flex items-center gap-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 px-4 py-3 rounded-2xl font-bold shadow-sm hover:shadow-md transition-all active:scale-95"
+                            >
+                                <FileDown size={18} />
+                                Excel
+                            </button>
+                            <button
+                                onClick={() => handleExport('formatted-excel')}
+                                className="flex items-center gap-2 bg-emerald-600 text-white px-4 py-3 rounded-2xl font-bold shadow-sm hover:shadow-md transition-all active:scale-95"
+                            >
+                                <FileDown size={18} />
+                                Formatted Excel
+                            </button>
+                            <button
+                                onClick={() => handleExport('pdf')}
+                                className="flex items-center gap-2 bg-red-600 text-white px-4 py-3 rounded-2xl font-bold shadow-sm hover:shadow-md transition-all active:scale-95"
+                            >
+                                <FileDown size={18} />
+                                PDF Report
+                            </button>
+                        </div>
                     </div>
                 </header>
 
@@ -190,21 +267,24 @@ function AdminResultsContent() {
                 {/* Results Table */}
                 <section className="bg-white dark:bg-slate-800 rounded-[2.5rem] shadow-xl border border-slate-100 dark:border-slate-700 overflow-hidden animate-slide-up" style={{ animationDelay: '200ms' }}>
                     <div className="p-8 border-b border-slate-50 dark:border-slate-700 flex justify-between items-center bg-slate-50/50 dark:bg-slate-900/50">
-                        <h3 className="text-xl font-bold text-slate-800 dark:text-slate-100">Candidate Attempts</h3>
-                        <span className="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">{total} records found</span>
+                        <h3 className="text-xl font-bold text-slate-800 dark:text-slate-100">Completed Attempts</h3>
+                        <span className="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">{total} completed records</span>
                     </div>
 
                     <div className="px-8 pt-6 flex flex-col md:flex-row gap-4 md:items-center">
-                        <div className="flex gap-2">
-                            {(['all', 'completed', 'running'] as const).map(s => (
-                                <button
-                                    key={s}
-                                    onClick={() => setStatus(s)}
-                                    className={`px-4 py-2 rounded-xl text-sm font-bold border transition-all ${status === s ? 'bg-slate-900 dark:bg-primary text-white border-slate-900 dark:border-primary' : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700'}`}
-                                >
-                                    {s === 'all' ? 'All' : s === 'completed' ? 'Completed' : 'Running'}
-                                </button>
-                            ))}
+                        <div className="flex gap-2 items-center">
+                            <label className="text-sm font-bold text-slate-600 dark:text-slate-400">Filter by Exam Type:</label>
+                            <select
+                                value={userTypeFilter}
+                                onChange={(e) => setUserTypeFilter(e.target.value)}
+                                className="px-3 py-2 rounded-xl text-sm font-bold border bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-700"
+                            >
+                                <option value="all">All Types</option>
+                                <option value="AMBASSADOR_RANK_EXAMS">Ambassador Rank</option>
+                                <option value="EXTRAORDINARY_RANK_EXAMS">Extraordinary Rank</option>
+                                <option value="PRE_PLENIPOTENTIARY_EXAMS">Pre-Plenipotentiary</option>
+                                <option value="PLENIPOTENTIARY_RANK_EXAMS">Plenipotentiary Rank</option>
+                            </select>
                         </div>
 
                         <div className="ml-auto text-sm font-bold text-slate-400 dark:text-slate-500">
@@ -220,7 +300,6 @@ function AdminResultsContent() {
                                     <th className="px-8 py-6">Exam</th>
                                     <th className="px-8 py-6">Score</th>
                                     <th className="px-8 py-6">Timeline</th>
-                                    <th className="px-8 py-6">Status</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-50 dark:divide-slate-700">
@@ -248,7 +327,7 @@ function AdminResultsContent() {
                                             </div>
                                         </td>
                                         <td className="px-8 py-6">
-                                            {result.score !== null ? (
+                                            {result.score !== null && (
                                                 <div className="flex items-center gap-2">
                                                     <div className="flex flex-col">
                                                         <span className={`text-lg font-black ${result.score >= 70 ? 'text-emerald-500' : result.score >= 40 ? 'text-amber-500' : 'text-rose-500'}`}>
@@ -263,8 +342,6 @@ function AdminResultsContent() {
                                                     </div>
                                                     {result.score >= 80 && <Award className="text-amber-400" size={20} />}
                                                 </div>
-                                            ) : (
-                                                <span className="text-slate-400 dark:text-slate-500 font-bold italic text-sm">In Progress</span>
                                             )}
                                         </td>
                                         <td className="px-8 py-6">
@@ -274,18 +351,18 @@ function AdminResultsContent() {
                                             </div>
                                             <div className="text-[10px] text-slate-400 dark:text-slate-500 font-bold mt-1 uppercase tracking-tight">
                                                 Started: {new Date(result.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                                {result.endTime && (
+                                                    <>
+                                                        <br />
+                                                        Completed: {new Date(result.endTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                                    </>
+                                                )}
                                             </div>
-                                        </td>
-                                        <td className="px-8 py-6">
-                                            <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${result.endTime ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400' : 'bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400'}`}>
-                                                <div className={`w-1.5 h-1.5 rounded-full ${result.endTime ? 'bg-emerald-500' : 'bg-blue-50'}`} />
-                                                {result.endTime ? 'Completed' : 'Running'}
-                                            </span>
                                         </td>
                                     </tr>
                                 )) : (
                                     <tr>
-                                        <td colSpan={5} className="px-8 py-20 text-center">
+                                        <td colSpan={4} className="px-8 py-20 text-center">
                                             <div className="flex flex-col items-center gap-3">
                                                 <div className="w-16 h-16 rounded-full bg-slate-100 dark:bg-slate-900 flex items-center justify-center text-slate-300 dark:text-slate-700">
                                                     <Search size={32} />

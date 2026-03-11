@@ -130,7 +130,7 @@ export default function InstructionsPage() {
 
     return (
         <main className="min-h-screen bg-slate-100 dark:bg-slate-900 flex items-center justify-center p-6 transition-colors duration-200">
-            <div className="absolute top-6 right-6">
+            <div className="absolute top-6 right-6 z-50">
                 <ThemeToggle />
             </div>
             <div className="max-w-2xl w-full bg-white dark:bg-slate-800 rounded-[2.5rem] shadow-2xl border border-slate-100 dark:border-slate-700 overflow-hidden animate-slide-up">

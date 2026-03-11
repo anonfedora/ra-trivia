@@ -12,6 +12,7 @@ interface PreviewQuestion {
     optionB: string | null;
     optionC: string | null;
     optionD: string | null;
+    questionType: string;
 }
 
 interface PreviewQuiz {
@@ -33,6 +34,7 @@ export default function AdminQuizPreviewPage() {
 
     const [quiz, setQuiz] = useState<PreviewQuiz | null>(null);
     const [isLoading, setIsLoading] = useState(true);
+    const [questionTypeStats, setQuestionTypeStats] = useState<any>(null);
 
     useEffect(() => {
         const token = localStorage.getItem('token');
@@ -47,17 +49,27 @@ export default function AdminQuizPreviewPage() {
         const fetchPreview = async () => {
             const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
             try {
-                const res = await fetch(`${apiUrl}/quizzes/${quizId}/preview`, {
-                    headers: { 'Authorization': `Bearer ${token}` }
-                });
+                const [quizRes, statsRes] = await Promise.all([
+                    fetch(`${apiUrl}/quizzes/${quizId}/preview`, {
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    }),
+                    fetch(`${apiUrl}/questions/stats/${quizId}`, {
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    })
+                ]);
 
-                if (!res.ok) {
+                if (!quizRes.ok) {
                     router.push('/admin/dashboard');
                     return;
                 }
 
-                const data = await res.json();
-                setQuiz(data);
+                const quizData = await quizRes.json();
+                setQuiz(quizData);
+
+                if (statsRes.ok) {
+                    const statsData = await statsRes.json();
+                    setQuestionTypeStats(statsData);
+                }
             } catch (err) {
                 console.error('Failed to fetch preview', err);
                 router.push('/admin/dashboard');
@@ -94,6 +106,16 @@ export default function AdminQuizPreviewPage() {
         if (!iso) return 'Not set';
         const d = new Date(iso);
         return Number.isNaN(d.getTime()) ? 'Invalid date' : d.toLocaleString();
+    };
+
+    const formatQuestionType = (questionType: string) => {
+        const typeMap: { [key: string]: string } = {
+            'AMBASSADOR_RANK_EXAMS': 'Ambassador Rank Exams',
+            'EXTRAORDINARY_RANK_EXAMS': 'Extraordinary Rank Exams',
+            'PRE_PLENIPOTENTIARY_EXAMS': 'Pre-Plenipotentiary Exams',
+            'PLENIPOTENTIARY_RANK_EXAMS': 'Plenipotentiary Rank Exams'
+        };
+        return typeMap[questionType] || questionType;
     };
 
     return (
@@ -146,6 +168,20 @@ export default function AdminQuizPreviewPage() {
                                     <div className="text-sm font-semibold text-slate-700 mt-2">{formatDate(quiz.endDate)}</div>
                                 </div>
                             </div>
+
+                            {questionTypeStats && questionTypeStats.questionTypeDistribution.length > 0 && (
+                                <div className="mt-6">
+                                    <div className="text-slate-500 text-sm font-bold mb-3">Question Type Distribution</div>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                        {questionTypeStats.questionTypeDistribution.map((stat: any) => (
+                                            <div key={stat.questionType} className="bg-slate-50 rounded-xl p-3 border border-slate-100">
+                                                <div className="text-xs font-bold text-slate-600">{formatQuestionType(stat.questionType)}</div>
+                                                <div className="text-lg font-black text-slate-800">{stat.count} questions ({stat.percentage}%)</div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     </div>
                 </section>
@@ -158,7 +194,12 @@ export default function AdminQuizPreviewPage() {
                     <div className="divide-y divide-slate-50">
                         {quiz.questions.map((q, idx) => (
                             <div key={q.id} className="p-6 md:p-8">
-                                <div className="text-xs font-black text-slate-400 uppercase tracking-widest mb-2">Q{idx + 1}</div>
+                                <div className="flex items-center justify-between mb-2">
+                                    <div className="text-xs font-black text-slate-400 uppercase tracking-widest">Q{idx + 1}</div>
+                                    <div className="px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-bold">
+                                        {formatQuestionType(q.questionType)}
+                                    </div>
+                                </div>
                                 <div className="font-semibold text-slate-800 mb-4 leading-relaxed">{q.text}</div>
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                                     {([

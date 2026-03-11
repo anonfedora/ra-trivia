@@ -9,7 +9,9 @@
     "build:ci": "prisma generate --schema=../../packages/database/prisma/schema.prisma && tsc",
     "start": "node dist/index.js",
     "migrate": "prisma db push --schema=../../packages/database/prisma/schema.prisma",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage"
   },
   "keywords": [],
   "author": "",
@@ -17,6 +19,7 @@
   "packageManager": "pnpm@10.12.3",
   "dependencies": {
     "@prisma/client": "^6.0.0",
+    "@types/puppeteer": "^7.0.4",
     "bcryptjs": "^3.0.3",
     "cors": "^2.8.6",
     "database": "workspace:*",
@@ -28,6 +31,7 @@
     "jsonwebtoken": "^9.0.3",
     "multer": "^2.0.2",
     "nodemailer": "^8.0.1",
+    "puppeteer": "^24.39.0",
     "resend": "^4.0.1",
     "xlsx": "^0.18.5"
   },
@@ -39,8 +43,12 @@
     "@types/multer": "^2.0.0",
     "@types/node": "^20.0.0",
     "@types/nodemailer": "^7.0.11",
+    "@types/supertest": "^6.0.2",
+    "@vitest/coverage-v8": "^2.0.0",
     "prisma": "6.19.2",
+    "supertest": "^7.0.0",
     "ts-node-dev": "^2.0.0",
-    "typescript": "^5.0.0"
+    "typescript": "^5.0.0",
+    "vitest": "^2.1.9"
   }
 }

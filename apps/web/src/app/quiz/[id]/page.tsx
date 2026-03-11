@@ -29,32 +29,77 @@ export default function QuizPage() {
         try {
             const token = localStorage.getItem('token');
             const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
+            
+            console.log('Submitting quiz:', { 
+                sessionId: session?.id, 
+                hasToken: !!token, 
+                apiUrl,
+                tokenPreview: token ? `${token.substring(0, 20)}...` : 'none'
+            });
+            
+            if (!token) {
+                alert('Authentication token not found. Please log in again.');
+                router.push('/login');
+                return;
+            }
+            
+            if (!session?.id) {
+                alert('Session not found. Please restart the quiz.');
+                router.push('/dashboard');
+                return;
+            }
+            
+            const requestBody = { sessionId: session.id };
+            console.log('Request details:', {
+                url: `${apiUrl}/quiz/submit`,
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token.substring(0, 20)}...`
+                },
+                body: requestBody
+            });
+            
             const res = await fetch(`${apiUrl}/quiz/submit`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${token}`
                 },
-                body: JSON.stringify({ sessionId: session.id }),
+                body: JSON.stringify(requestBody),
+            });
+
+            console.log('Response received:', {
+                ok: res.ok,
+                status: res.status,
+                statusText: res.statusText,
+                headers: Object.fromEntries(res.headers.entries())
             });
 
             if (res.ok) {
+                const responseData = await res.json();
+                console.log('Submission successful:', responseData);
+                
                 // Clean up localStorage backup
                 if (session?.id) {
                     localStorage.removeItem(`quiz_backup_${session.id}`);
                 }
-                router.push(`/results?quizId=${quizId}&sessionId=${session.id}`);
+                
+                const redirectUrl = `/results?sessionId=${session.id}`;
+                console.log('Redirecting to:', redirectUrl);
+                router.push(redirectUrl);
             } else {
-                const data = await res.json();
-                alert(data.message || 'Submission failed');
+                const data = await res.json().catch(() => ({ message: 'Unknown error occurred' }));
+                console.error('Submission failed:', { status: res.status, statusText: res.statusText, data });
+                alert(data.message || `Submission failed (${res.status}: ${res.statusText})`);
                 setIsSubmitting(false);
             }
         } catch (err) {
             console.error('Submission error:', err);
-            alert('An error occurred during submission');
+            alert(`An error occurred during submission: ${err instanceof Error ? err.message : 'Unknown error'}`);
             setIsSubmitting(false);
         }
-    }, [isSubmitting, session?.id, router, quizId]);
+    }, [isSubmitting, session?.id, router]);
 
     const fetchQuiz = useCallback(async () => {
         const token = localStorage.getItem('token');
@@ -64,12 +109,16 @@ export default function QuizPage() {
         }
 
         try {
+            console.log('Starting quiz fetch for quizId:', quizId);
+            
             // Clear any existing backup to force fresh randomization
             const backupKeys = Object.keys(localStorage).filter(key => key.startsWith('quiz_backup_'));
             backupKeys.forEach(key => localStorage.removeItem(key));
 
             // For development, we assume there's a quiz with ID 'default'
             const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
+            console.log('Making request to:', `${apiUrl}/quiz/start`);
+            
             const res = await fetch(`${apiUrl}/quiz/start`, {
                 method: 'POST',
                 headers: {
@@ -79,8 +128,24 @@ export default function QuizPage() {
                 body: JSON.stringify({ quizId }),
             });
 
+            console.log('Response status:', res.status);
             const data = await res.json();
+            console.log('Response data:', data);
+            
             if (res.ok) {
+                console.log('Quiz data received:', {
+                    quizTitle: data.quiz?.title,
+                    questionCount: data.quiz?.questions?.length,
+                    hasSession: !!data.session,
+                    sessionId: data.session?.id
+                });
+                
+                // Check if questions have randomizedOptions
+                const questionsWithoutOptions = data.quiz.questions.filter((q: any) => !q.randomizedOptions || q.randomizedOptions.length === 0);
+                if (questionsWithoutOptions.length > 0) {
+                    console.error('Questions without randomizedOptions:', questionsWithoutOptions.map((q: any) => ({ id: q.id, text: q.text.substring(0, 50) })));
+                }
+                
                 setQuiz(data.quiz);
                 setSession(data.session);
 
@@ -106,9 +171,15 @@ export default function QuizPage() {
                     console.log('Setting to full duration due to insufficient time');
                     setTimeLeft(durationSeconds);
                 }
+            } else {
+                console.error('Quiz fetch failed:', data);
+                alert(`Failed to start quiz: ${data.message || 'Unknown error'}`);
+                router.push('/dashboard');
             }
         } catch (err) {
-            console.error('Failed to load quiz');
+            console.error('Quiz fetch error:', err);
+            alert(`An error occurred while starting the quiz: ${err instanceof Error ? err.message : 'Unknown error'}`);
+            router.push('/dashboard');
         }
     }, [quizId, router]);
 
@@ -234,7 +305,7 @@ export default function QuizPage() {
             });
         }, 1000);
         return () => clearInterval(timer);
-    }, [timeLeft, handleSubmit, quiz, session]);
+    }, [timeLeft, handleSubmit, quiz, session, isSubmitting]);
 
     if (!quizId) {
         return <div>Loading...</div>;
@@ -416,21 +487,32 @@ export default function QuizPage() {
                 </h2>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-auto">
-                    {currentQuestion.randomizedOptions?.map((opt: any, index: number) => (
-                        <button
-                            key={opt.key}
-                            onClick={() => saveAnswer(currentQuestion.id, opt.key)}
-                            className={`p-6 rounded-2xl text-left font-semibold transition-all border-2 ${answers[currentQuestion.id] === opt.key
-                                ? 'bg-primary/5 dark:bg-primary/10 border-primary text-primary shadow-md'
-                                : 'bg-slate-50 dark:bg-slate-900/50 border-transparent dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'
-                                }`}
-                        >
-                            <span className={`inline-flex items-center justify-center w-8 h-8 rounded-lg mr-3 shadow-sm transition-all ${answers[currentQuestion.id] === opt.key ? 'bg-primary text-white' : 'bg-white dark:bg-slate-800 text-slate-400'}`}>
-                                {String.fromCharCode(65 + index)}
-                            </span>
-                            {opt.text}
-                        </button>
-                    ))}
+                    {(() => {
+                        const options = currentQuestion.randomizedOptions || [
+                            { key: 'A', text: currentQuestion.optionA },
+                            { key: 'B', text: currentQuestion.optionB },
+                            { key: 'C', text: currentQuestion.optionC },
+                            { key: 'D', text: currentQuestion.optionD }
+                        ].filter(opt => opt && opt.text);
+                        
+                        console.log('Rendering options for question:', currentQuestion.id, options);
+                        
+                        return options.map((opt: any, index: number) => (
+                            <button
+                                key={opt.key}
+                                onClick={() => saveAnswer(currentQuestion.id, opt.key)}
+                                className={`p-6 rounded-2xl text-left font-semibold transition-all border-2 ${answers[currentQuestion.id] === opt.key
+                                    ? 'bg-primary/5 dark:bg-primary/10 border-primary text-primary shadow-md'
+                                    : 'bg-slate-50 dark:bg-slate-900/50 border-transparent dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'
+                                    }`}
+                            >
+                                <span className={`inline-flex items-center justify-center w-8 h-8 rounded-lg mr-3 shadow-sm transition-all ${answers[currentQuestion.id] === opt.key ? 'bg-primary text-white' : 'bg-white dark:bg-slate-800 text-slate-400'}`}>
+                                    {String.fromCharCode(65 + index)}
+                                </span>
+                                {opt.text}
+                            </button>
+                        ));
+                    })()}
                 </div>
             </div>
 

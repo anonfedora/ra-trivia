@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { prisma } from 'database';
+import { prisma, UserType } from 'database';
 import multer from 'multer';
 import * as xlsx from 'xlsx';
 import { authenticate, authorizeAdmin } from '../middlewares/auth';
@@ -34,6 +34,19 @@ router.post('/import', authenticate, authorizeAdmin, upload.single('file'), asyn
         let quizId = req.body.quizId;
         const title = req.body.title;
         const duration = req.body.duration;
+        const questionType = req.body.questionType;
+
+        // Validate questionType is provided and valid
+        if (!questionType) {
+            return res.status(400).json({ message: 'Question type is required' });
+        }
+
+        const validUserTypes = Object.values(UserType);
+        if (!validUserTypes.includes(questionType)) {
+            return res.status(400).json({ 
+                message: 'Invalid question type. Must be one of: ' + validUserTypes.join(', ')
+            });
+        }
 
         if (!quizId) {
             if (!title || !duration) {
@@ -94,6 +107,7 @@ router.post('/import', authenticate, authorizeAdmin, upload.single('file'), asyn
                 optionC: String(optionC || '').trim(),
                 optionD: String(optionD || '').trim(),
                 correctOption: String(correctOptionValue).trim().toUpperCase(),
+                questionType: questionType, // Add the validated questionType
                 quizId
             });
         }
@@ -131,9 +145,55 @@ router.get('/', authenticate, authorizeAdmin, async (req, res) => {
         }
         
         const questions = await prisma.question.findMany({
-            where: { quizId: quizId as string }
+            where: { quizId: quizId as string },
+            select: {
+                id: true,
+                text: true,
+                optionA: true,
+                optionB: true,
+                optionC: true,
+                optionD: true,
+                correctOption: true,
+                questionType: true, // Include questionType in response
+                quizId: true,
+                createdAt: true,
+                updatedAt: true
+            }
         });
         res.json(questions);
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Internal server error' });
+    }
+});
+
+// Admin: Get question type statistics for a quiz
+router.get('/stats/:quizId', authenticate, authorizeAdmin, async (req, res) => {
+    try {
+        const { quizId } = req.params;
+        
+        const questionStats = await prisma.question.groupBy({
+            by: ['questionType'],
+            where: { quizId: quizId as string },
+            _count: {
+                questionType: true
+            }
+        });
+
+        const totalQuestions = await prisma.question.count({
+            where: { quizId: quizId as string }
+        });
+
+        const stats = questionStats.map(stat => ({
+            questionType: stat.questionType,
+            count: stat._count?.questionType || 0,
+            percentage: totalQuestions > 0 ? Math.round(((stat._count?.questionType || 0) / totalQuestions) * 100) : 0
+        }));
+
+        res.json({
+            totalQuestions,
+            questionTypeDistribution: stats
+        });
     } catch (error) {
         console.error(error);
         res.status(500).json({ message: 'Internal server error' });
