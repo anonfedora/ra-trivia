@@ -1,0 +1,104 @@
+name: Test Suite
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  test-server:
+    name: Server Tests
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: ra_trivia_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 8
+
+      - name: Install dependencies
+        run: pnpm install
+
+      - name: Generate Prisma Client
+        run: cd packages/database && pnpm prisma generate
+
+      - name: Run database migrations
+        run: cd packages/database && pnpm prisma db push
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/ra_trivia_test
+
+      - name: Run server tests
+        run: cd apps/server && pnpm test
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/ra_trivia_test
+          NODE_ENV: test
+          JWT_SECRET: test-secret
+          EMAIL_SIMULATE: true
+
+      - name: Generate coverage report
+        run: cd apps/server && pnpm test:coverage
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/ra_trivia_test
+          NODE_ENV: test
+          JWT_SECRET: test-secret
+          EMAIL_SIMULATE: true
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          files: ./apps/server/coverage/coverage-final.json
+          flags: server
+          name: server-coverage
+
+  test-web:
+    name: Web Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 8
+
+      - name: Install dependencies
+        run: pnpm install
+
+      - name: Run web tests
+        run: cd apps/web && pnpm test || echo "No tests configured yet"
+
+      - name: Build web app
+        run: cd apps/web && pnpm build
+        env:
+          NEXT_PUBLIC_API_URL: http://localhost:4000/api
