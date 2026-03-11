@@ -410,8 +410,10 @@ export class ReportGenerator {
 
         const browser = await puppeteer.launch({
             headless: true,
-            // For Render/cloud environments, try different approaches
-            executablePath: isProduction && isRender ? undefined : undefined,
+            // Use system Chrome on Render, default on other environments
+            executablePath: isProduction && isRender 
+                ? '/usr/bin/google-chrome-stable' 
+                : undefined,
             args: [
                 '--no-sandbox',
                 '--disable-setuid-sandbox',

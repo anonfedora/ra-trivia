@@ -4,11 +4,13 @@ services:
     runtime: node
     region: oregon
     plan: free
-    buildCommand: npm install -g pnpm && pnpm install --frozen-lockfile && pnpm --filter server build
+    buildCommand: npm install -g pnpm && pnpm install --frozen-lockfile && cd apps/server && chmod +x ../../scripts/render-build.sh && ../../scripts/render-build.sh
     startCommand: node apps/server/dist/index.js
     envVars:
       - key: NODE_ENV
         value: production
+      - key: RENDER
+        value: "true"
       - key: DATABASE_URL
         sync: false   # Set this manually in Render dashboard
       - key: JWT_SECRET
