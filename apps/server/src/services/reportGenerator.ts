@@ -128,6 +128,10 @@ export class ReportGenerator {
                 console.log('Logo not found, using fallback');
             }
 
+            // Calculate pass/fail statistics
+            const passCount = results.filter(r => (r.score || 0) >= 50).length;
+            const failCount = results.filter(r => (r.score || 0) < 50 && r.score !== null).length;
+            
             html = `
         <!DOCTYPE html>
         <html>
@@ -135,79 +139,183 @@ export class ReportGenerator {
             <meta charset="utf-8">
             <title>Exam Results Report</title>
             <style>
+                * {
+                    margin: 0;
+                    padding: 0;
+                    box-sizing: border-box;
+                }
                 body {
                     font-family: Arial, sans-serif;
-                    margin: 20px;
-                    font-size: 12px;
+                    padding: 20px;
+                    font-size: 11px;
                 }
-                .header {
-                    text-align: center;
-                    margin-bottom: 30px;
+                .header-container {
+                    display: flex;
+                    align-items: center;
+                    background: linear-gradient(to bottom, #1e5ba8 0%, #1e5ba8 50%, #4a7bb8 50%, #4a7bb8 100%);
+                    padding: 15px 20px;
+                    margin-bottom: 2px;
                 }
                 .logo {
-                    max-width: 200px;
-                    max-height: 100px;
+                    width: 80px;
+                    height: 80px;
+                    margin-right: 20px;
+                    background: white;
+                    border-radius: 50%;
+                    padding: 5px;
+                }
+                .header-text {
+                    flex: 1;
+                    color: white;
+                    text-align: center;
+                }
+                .header-text h1 {
+                    font-size: 18px;
+                    font-weight: bold;
+                    margin-bottom: 5px;
+                    letter-spacing: 1px;
+                }
+                .header-text h2 {
+                    font-size: 14px;
+                    font-weight: normal;
+                    margin-bottom: 0;
+                }
+                .yellow-bar {
+                    background-color: #ffd700;
+                    padding: 12px 20px;
+                    text-align: center;
+                    font-weight: bold;
+                    font-size: 14px;
+                    color: #000;
+                    margin-bottom: 20px;
                 }
                 table {
                     width: 100%;
                     border-collapse: collapse;
                     margin-bottom: 20px;
                 }
-                th, td {
-                    border: 1px solid #ddd;
-                    padding: 8px;
-                    text-align: left;
-                }
                 th {
-                    background-color: #f2f2f2;
+                    background-color: #87ceeb;
+                    border: 1px solid #5a9fb8;
+                    padding: 10px 8px;
+                    text-align: center;
                     font-weight: bold;
+                    font-size: 11px;
                 }
-                .total-row {
-                    font-weight: bold;
+                td {
+                    border: 1px solid #ccc;
+                    padding: 8px;
+                    text-align: center;
+                    font-size: 10px;
+                }
+                tr:nth-child(even) {
                     background-color: #f9f9f9;
                 }
+                .summary-table {
+                    width: 50%;
+                    margin: 20px 0;
+                }
+                .summary-table th {
+                    background-color: #666;
+                    color: white;
+                }
+                .pass-row {
+                    background-color: #c8e6c9 !important;
+                }
+                .fail-row {
+                    background-color: #ffcdd2 !important;
+                }
                 .no-record-row {
-                    color: #999;
+                    background-color: #fff9c4 !important;
+                }
+                .total-row {
+                    background-color: #e0e0e0 !important;
+                    font-weight: bold;
+                }
+                .footer-stats {
+                    margin-top: 20px;
+                    font-size: 11px;
+                    line-height: 1.6;
+                }
+                .footer-stats p {
+                    margin: 5px 0;
                 }
             </style>
         </head>
         <body>
-            <div class="header">
-                ${logoBase64 ? `<img src="${logoBase64}" alt="Logo" class="logo">` : ''}
-                <h1>${examTypeName} Results Report - ${currentYear}</h1>
-                <p><strong>Report Generated:</strong> ${new Date().toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' })}</p>
-                <p><strong>Average Score:</strong> ${summary.averageScore}%</p>
-                <p><strong>Highest Score:</strong> ${summary.highestScore}%</p>
-                <p><strong>Lowest Score:</strong> ${summary.lowestScore}%</p>
+            <div class="header-container">
+                ${logoBase64 ? `<img src="${logoBase64}" alt="Logo" class="logo">` : '<div style="width: 80px;"></div>'}
+                <div class="header-text">
+                    <h1>KADUNA BAPTIST CONFERENCE ROYAL AMBASSADORS</h1>
+                    <h2>RANKING COMMITTEE REPORT</h2>
+                </div>
             </div>
+            <div class="yellow-bar">
+                ${currentYear} ${examTypeName} RESULT AND ANALYSIS
+            </div>
+            
             <table>
                 <thead>
                     <tr>
-                        <th>Candidate Name</th>
-                        <th>Email</th>
-                        <th>Quiz Title</th>
-                        <th>Score</th>
-                        <th>Remark</th>
+                        <th>S/N</th>
+                        <th>NAME</th>
+                        <th>CHURCH</th>
+                        <th>ASSOCIATION</th>
+                        <th>EXAM SCORE</th>
+                        <th>REMARK</th>
+                        <th>STATUS</th>
                     </tr>
                 </thead>
                 <tbody>
-                    ${results.map((result: any) => {
+                    ${results.map((result: any, index: number) => {
                         const score = result.score || 0;
-                        const remark = score >= 50 ? 'Cleared' : 'Not Cleared - No Certificates';
+                        const remark = score >= 50 ? 'Pass' : 'Fail';
+                        const status = score >= 50 ? 'Cleared' : 'Not Cleared - No Certificates';
                         
                         return `
                         <tr>
+                            <td>${index + 1}</td>
                             <td>${result.user.name}</td>
-                            <td>${result.user.email}</td>
-                            <td>${result.quiz.title}</td>
+                            <td>N/A</td>
+                            <td>${result.user.association || 'N/A'}</td>
                             <td>${score}</td>
                             <td>${remark}</td>
+                            <td>${status}</td>
                         </tr>
                         `;
                     }).join('')}
                 </tbody>
             </table>
-            <div style="margin-top: 30px; font-size: 11px;">
+            
+            <table class="summary-table">
+                <thead>
+                    <tr>
+                        <th>Exams REMARK</th>
+                        <th>NO of Candidates</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr class="pass-row">
+                        <td><strong>Pass</strong></td>
+                        <td><strong>${passCount}</strong></td>
+                    </tr>
+                    <tr class="fail-row">
+                        <td><strong>Fail</strong></td>
+                        <td><strong>${failCount}</strong></td>
+                    </tr>
+                    <tr class="no-record-row">
+                        <td><strong>No Record</strong></td>
+                        <td><strong>${summary.noRecordCount}</strong></td>
+                    </tr>
+                    <tr class="total-row">
+                        <td><strong>Grand Total</strong></td>
+                        <td><strong>${results.length}</strong></td>
+                    </tr>
+                </tbody>
+            </table>
+            
+            <div class="footer-stats">
+                <p><strong>Report Generated:</strong> ${new Date().toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', year: 'numeric' })}, ${new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}</p>
                 <p><strong>Average Score:</strong> ${summary.averageScore}%</p>
                 <p><strong>Highest Score:</strong> ${summary.highestScore}%</p>
                 <p><strong>Lowest Score:</strong> ${summary.lowestScore}%</p>
