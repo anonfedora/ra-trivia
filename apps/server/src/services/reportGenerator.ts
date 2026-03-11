@@ -86,6 +86,7 @@ export class ReportGenerator {
     static async generatePDFReport(userType?: UserType, quizId?: string): Promise<{ buffer: Buffer; filename: string }> {
         let quizTitle = 'exams';
         let html = '';
+        let browser;
 
         try {
             console.log('[PDF_GENERATION] Starting PDF report generation...');
@@ -216,18 +217,34 @@ export class ReportGenerator {
             // Use downloaded Puppeteer Chrome on Render, default on other environments
             let chromePath = undefined;
             if (isProduction && isRender) {
-                chromePath = '/opt/render/.cache/puppeteer/chrome/linux-146.0.7680.66/chrome-linux64/chrome';
-                // Make Chrome executable
-                try {
-                    const fs = await import('fs');
-                    await fs.promises.chmod(chromePath, 0o755);
-                    console.log('[PDF_GENERATION] Made Chrome executable');
-                } catch (chmodError) {
-                    console.error('[PDF_GENERATION] Failed to make Chrome executable:', chmodError);
+                // Try to find Chrome in Puppeteer's cache
+                const possiblePaths = [
+                    '/opt/render/.cache/puppeteer/chrome/linux-146.0.7680.66/chrome-linux64/chrome',
+                    process.env.PUPPETEER_EXECUTABLE_PATH,
+                ];
+                
+                for (const testPath of possiblePaths) {
+                    if (testPath) {
+                        try {
+                            const fs = await import('fs');
+                            if (fs.existsSync(testPath)) {
+                                await fs.promises.chmod(testPath, 0o755);
+                                chromePath = testPath;
+                                console.log(`[PDF_GENERATION] Using Chrome at: ${chromePath}`);
+                                break;
+                            }
+                        } catch (error) {
+                            console.warn(`[PDF_GENERATION] Could not access Chrome at ${testPath}`);
+                        }
+                    }
+                }
+                
+                if (!chromePath) {
+                    console.warn('[PDF_GENERATION] Chrome not found at expected paths, Puppeteer will use default');
                 }
             }
             
-            const browser = await puppeteer.launch({
+            browser = await puppeteer.launch({
                 headless: true,
                 executablePath: chromePath,
                 args: [
@@ -274,6 +291,16 @@ export class ReportGenerator {
             return { buffer: Buffer.from(pdfBuffer), filename };
         } catch (error) {
             console.error('[PDF_GENERATION] Error generating PDF:', error);
+            
+            // Provide more helpful error message for Chrome issues
+            if (error instanceof Error && error.message.includes('Browser was not found')) {
+                console.error('[PDF_GENERATION] Chrome browser not found. This may be due to:');
+                console.error('  1. Chrome not installed via install-chrome.sh script');
+                console.error('  2. Incorrect PUPPETEER_EXECUTABLE_PATH environment variable');
+                console.error('  3. Missing permissions on Chrome binary');
+                throw new Error('PDF generation failed: Chrome browser not available. Please ensure Chrome is properly installed.');
+            }
+            
             throw new Error(`PDF generation failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
         } finally {
             try {
