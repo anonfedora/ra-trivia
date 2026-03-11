@@ -38,4 +38,4 @@ coverage/
 .vercel
 #/scripts
 /.kiro
-.vscode
+.vscodeapps/server/.cache/

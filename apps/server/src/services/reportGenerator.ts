@@ -1,4 +1,6 @@
 import puppeteer from 'puppeteer';
+import puppeteerCore from 'puppeteer-core';
+import chromium from '@sparticuz/chromium';
 import path from 'path';
 import fs from 'fs';
 import { PrismaClient } from '@prisma/client';
@@ -91,12 +93,12 @@ export class ReportGenerator {
         try {
             console.log('[PDF_GENERATION] Starting PDF report generation...');
             
-            // Check if we're in a production environment that might not support Puppeteer
+            // Check if we're in a production environment
             const isProduction = process.env.NODE_ENV === 'production';
             const isRender = process.env.RENDER === 'true' || process.env.RENDER_SERVICE_ID;
             
             if (isProduction && isRender) {
-                console.log('[PDF_GENERATION] Detected Render environment, using optimized Puppeteer config');
+                console.log('[PDF_GENERATION] Detected Render environment, using @sparticuz/chromium');
             }
             
             const results = await this.getExamResults(userType, quizId);
@@ -214,57 +216,23 @@ export class ReportGenerator {
         </html>
         `;
 
-            // Use downloaded Puppeteer Chrome on Render, default on other environments
-            let chromePath = undefined;
+            // Use @sparticuz/chromium for serverless environments (Render, AWS Lambda, etc.)
+            // Use regular puppeteer for local development
             if (isProduction && isRender) {
-                // Try to find Chrome in Puppeteer's cache
-                const possiblePaths = [
-                    '/opt/render/.cache/puppeteer/chrome/linux-146.0.7680.66/chrome-linux64/chrome',
-                    process.env.PUPPETEER_EXECUTABLE_PATH,
-                ];
-                
-                for (const testPath of possiblePaths) {
-                    if (testPath) {
-                        try {
-                            const fs = await import('fs');
-                            if (fs.existsSync(testPath)) {
-                                await fs.promises.chmod(testPath, 0o755);
-                                chromePath = testPath;
-                                console.log(`[PDF_GENERATION] Using Chrome at: ${chromePath}`);
-                                break;
-                            }
-                        } catch (error) {
-                            console.warn(`[PDF_GENERATION] Could not access Chrome at ${testPath}`);
-                        }
-                    }
-                }
-                
-                if (!chromePath) {
-                    console.warn('[PDF_GENERATION] Chrome not found at expected paths, Puppeteer will use default');
-                }
+                console.log('[PDF_GENERATION] Launching browser with @sparticuz/chromium');
+                browser = await puppeteerCore.launch({
+                    args: chromium.args,
+                    defaultViewport: { width: 1920, height: 1080 },
+                    executablePath: await chromium.executablePath(),
+                    headless: true,
+                });
+            } else {
+                console.log('[PDF_GENERATION] Launching browser with local puppeteer');
+                browser = await puppeteer.launch({
+                    headless: true,
+                    args: ['--no-sandbox', '--disable-setuid-sandbox']
+                });
             }
-            
-            browser = await puppeteer.launch({
-                headless: true,
-                executablePath: chromePath,
-                args: [
-                    '--no-sandbox',
-                    '--disable-setuid-sandbox',
-                    '--disable-dev-shm-usage',
-                    '--disable-accelerated-2d-canvas',
-                    '--no-first-run',
-                    '--no-zygote',
-                    '--single-process',
-                    '--disable-gpu',
-                    // Add Chrome-specific flags for cloud environments
-                    ...(isProduction && isRender ? [
-                        '--disable-extensions',
-                        '--disable-background-timer-throttling',
-                        '--disable-backgrounding-occluded-windows',
-                        '--disable-renderer-backgrounding'
-                    ] : [])
-                ]
-            });
 
             const page = await browser.newPage();
             
