@@ -312,6 +312,23 @@ For support and questions:
 - Real-time quiz experience
 - Scheduling and retake limits
 
+### v1.1.0 (Enhancements)
+- ✅ **Fixed TypeScript Errors**: Resolved all test compilation issues
+- ✅ **Enhanced Exam Preview**: Fixed blank quiz pages with fallback options
+- ✅ **Improved Date Format**: PDF reports now use DD/MM/YYYY format
+- ✅ **Better Filenames**: Export files include exam names with underscores
+- ✅ **Phantom Session Prevention**: Added detection and cleanup for orphaned sessions
+- ✅ **Cloud PDF Generation**: Fixed Puppeteer configuration for Render hosting
+- ✅ **Admin Test Protection**: Added confirmation dialogs to prevent accidental session creation
+- ✅ **Enhanced Logging**: Better debugging and error tracking
+- ✅ **All Tests Passing**: Complete test suite coverage
+
+### v1.2.0 (Recent Fixes)
+- 🔧 **PDF Export**: Fixed syntax errors and cloud deployment issues
+- 🔧 **Session Management**: Resolved phantom session creation bugs
+- 🔧 **Error Handling**: Improved robustness across all services
+- 🔧 **Performance**: Optimized for production environments
+
 ---
 
 **Built with ❤️ for modern assessment and learning**

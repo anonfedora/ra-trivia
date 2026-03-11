@@ -162,33 +162,44 @@ export class ReportGenerator {
     }
 
     static async generatePDFReport(userType?: UserType, quizId?: string): Promise<{ buffer: Buffer; filename: string }> {
-        const results = await this.getExamResults(userType, quizId);
-        const summary = this.calculateSummary(results);
-
-        // Get quiz title for filename
-        let quizTitle = 'all_exams';
-        if (quizId && results.length > 0) {
-            quizTitle = results[0].quiz.title.toLowerCase()
-                .replace(/[^a-z0-9\s]/gi, '_') // Replace special characters with underscores
-                .replace(/_+/g, '_') // Clean up multiple underscores  
-                .replace(/^_+|_+$/g, '') // Remove leading/trailing underscores
-                .substring(0, 50); // Limit length
-        }
-
-        const examTypeName = userType ? userType.replace(/_/g, ' ').replace(/EXAMS/g, 'EXAMINATION') : 'ALL EXAMINATIONS';
-        const currentYear = new Date().getFullYear();
-
-        // Load and convert logo to base64
-        let logoBase64 = '';
         try {
-            const logoPath = path.join(process.cwd(), '../../apps/web/public/favicon.png');
-            if (fs.existsSync(logoPath)) {
-                const logoBuffer = fs.readFileSync(logoPath);
-                logoBase64 = `data:image/png;base64,${logoBuffer.toString('base64')}`;
+            console.log('[PDF_GENERATION] Starting PDF report generation...');
+            
+            // Check if we're in a production environment that might not support Puppeteer
+            const isProduction = process.env.NODE_ENV === 'production';
+            const isRender = process.env.RENDER === 'true' || process.env.RENDER_SERVICE_ID;
+            
+            if (isProduction && isRender) {
+                console.log('[PDF_GENERATION] Detected Render environment, using optimized Puppeteer config');
             }
-        } catch (error) {
-            console.log('Logo not found, using fallback');
-        }
+            
+            const results = await this.getExamResults(userType, quizId);
+            const summary = this.calculateSummary(results);
+            
+            // Get quiz title for filename
+            let quizTitle = 'all_exams';
+            if (quizId && results.length > 0) {
+                quizTitle = results[0].quiz.title.toLowerCase()
+                    .replace(/[^a-z0-9\s]/gi, '_') // Replace special characters with underscores
+                    .replace(/_+/g, '_') // Clean up multiple underscores  
+                    .replace(/^_+|_+$/g, '') // Remove leading/trailing underscores
+                    .substring(0, 50); // Limit length
+            }
+            
+            const examTypeName = userType ? userType.replace(/_/g, ' ').replace(/EXAMS/g, 'EXAMINATION') : 'ALL EXAMINATIONS';
+            const currentYear = new Date().getFullYear();
+
+            // Load and convert logo to base64
+            let logoBase64 = '';
+            try {
+                const logoPath = path.join(process.cwd(), '../../apps/web/public/favicon.png');
+                if (fs.existsSync(logoPath)) {
+                    const logoBuffer = fs.readFileSync(logoPath);
+                    logoBase64 = `data:image/png;base64,${logoBuffer.toString('base64')}`;
+                }
+            } catch (error) {
+                console.log('Logo not found, using fallback');
+            }
 
         const html = `
         <!DOCTYPE html>
@@ -397,13 +408,24 @@ export class ReportGenerator {
 
         const browser = await puppeteer.launch({
             headless: true,
-            args: ['--no-sandbox', '--disable-setuid-sandbox']
+            args: [
+                '--no-sandbox',
+                '--disable-setuid-sandbox',
+                '--disable-dev-shm-usage',
+                '--disable-accelerated-2d-canvas',
+                '--no-first-run',
+                '--no-zygote',
+                '--single-process',
+                '--disable-gpu'
+            ]
         });
 
         try {
+            console.log('[PDF_GENERATION] Starting PDF generation...');
             const page = await browser.newPage();
             await page.setContent(html, { waitUntil: 'networkidle0' });
-
+            
+            console.log('[PDF_GENERATION] Generating PDF buffer...');
             const pdfBuffer = await page.pdf({
                 format: 'A4',
                 printBackground: true,
@@ -415,13 +437,23 @@ export class ReportGenerator {
                 }
             });
 
-            await browser.close();
-
             const filename = `${quizTitle}_exam_report_${new Date().toISOString().split('T')[0]}.pdf`;
-
+            
+            console.log('[PDF_GENERATION] PDF generation successful');
             return { buffer: Buffer.from(pdfBuffer), filename };
+        } catch (error) {
+            console.error('[PDF_GENERATION] Error generating PDF:', error);
+            throw new Error(`PDF generation failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
         } finally {
-            await browser.close();
+            try {
+                await browser.close();
+            } catch (closeError) {
+                console.error('[PDF_GENERATION] Error closing browser:', closeError);
+            }
+        }
+        } catch (error) {
+            console.error('[PDF_GENERATION] Fatal error in PDF generation:', error);
+            throw new Error(`Failed to generate PDF report: ${error instanceof Error ? error.message : 'Unknown error'}`);
         }
     }
 }
