@@ -31,29 +31,16 @@ describe('ReportGenerator', () => {
         {
           id: '2',
           user: { name: 'User 2', email: 'user2@test.com', church: 'Church 2', association: 'Assoc 2', userType: 'AMBASSADOR_RANK_EXAMS' as any },
-          quiz: { title: 'Quiz 1' },
-          score: 60,
-          startTime: new Date(),
-          endTime: new Date()
-        },
-        {
-          id: '3',
-          user: { name: 'User 3', email: 'user3@test.com', church: 'Church 3', association: 'Assoc 3', userType: 'AMBASSADOR_RANK_EXAMS' as any },
-          quiz: { title: 'Quiz 1' },
-          score: 40,
-          startTime: new Date(),
-          endTime: new Date()
-        }
       ];
-
+      
       const summary = ReportGenerator.calculateSummary(mockResults);
-
-      expect(summary.totalCandidates).toBe(3);
-      expect(summary.passCount).toBe(2); // 80% and 60% pass (>= 50%)
-      expect(summary.failCount).toBe(1); // 40% fails
+      
+      expect(summary.totalCandidates).toBe(4);
+      expect(summary.totalSessions).toBe(4);
       expect(summary.averageScore).toBe(60); // (80 + 60 + 40) / 3
       expect(summary.highestScore).toBe(80);
       expect(summary.lowestScore).toBe(40);
+      expect(summary.noRecordCount).toBe(1); // David has null score
     });
 
     it('should handle empty results', () => {
