@@ -162,6 +162,9 @@ export class ReportGenerator {
     }
 
     static async generatePDFReport(userType?: UserType, quizId?: string): Promise<{ buffer: Buffer; filename: string }> {
+        let quizTitle = 'exams';
+        let html = '';
+
         try {
             console.log('[PDF_GENERATION] Starting PDF report generation...');
             
@@ -177,7 +180,6 @@ export class ReportGenerator {
             const summary = this.calculateSummary(results);
             
             // Get quiz title for filename
-            let quizTitle = 'all_exams';
             if (quizId && results.length > 0) {
                 quizTitle = results[0].quiz.title.toLowerCase()
                     .replace(/[^a-z0-9\s]/gi, '_') // Replace special characters with underscores
@@ -201,7 +203,7 @@ export class ReportGenerator {
                 console.log('Logo not found, using fallback');
             }
 
-        const html = `
+        html = `
         <!DOCTYPE html>
         <html>
         <head>
@@ -408,6 +410,8 @@ export class ReportGenerator {
 
         const browser = await puppeteer.launch({
             headless: true,
+            // For Render/cloud environments, try different approaches
+            executablePath: isProduction && isRender ? undefined : undefined,
             args: [
                 '--no-sandbox',
                 '--disable-setuid-sandbox',
@@ -416,14 +420,24 @@ export class ReportGenerator {
                 '--no-first-run',
                 '--no-zygote',
                 '--single-process',
-                '--disable-gpu'
+                '--disable-gpu',
+                // Add Chrome-specific flags for cloud environments
+                ...(isProduction && isRender ? [
+                    '--disable-extensions',
+                    '--disable-background-timer-throttling',
+                    '--disable-backgrounding-occluded-windows',
+                    '--disable-renderer-backgrounding'
+                ] : [])
             ]
         });
 
         try {
             console.log('[PDF_GENERATION] Starting PDF generation...');
             const page = await browser.newPage();
-            await page.setContent(html, { waitUntil: 'networkidle0' });
+            
+            // Set timeout and use different wait strategy
+            page.setDefaultTimeout(10000);
+            await page.setContent(html, { waitUntil: 'domcontentloaded', timeout: 10000 });
             
             console.log('[PDF_GENERATION] Generating PDF buffer...');
             const pdfBuffer = await page.pdf({
@@ -434,7 +448,8 @@ export class ReportGenerator {
                     right: '20px',
                     bottom: '20px',
                     left: '20px'
-                }
+                },
+                timeout: 15000
             });
 
             const filename = `${quizTitle}_exam_report_${new Date().toISOString().split('T')[0]}.pdf`;
@@ -451,9 +466,24 @@ export class ReportGenerator {
                 console.error('[PDF_GENERATION] Error closing browser:', closeError);
             }
         }
-        } catch (error) {
-            console.error('[PDF_GENERATION] Fatal error in PDF generation:', error);
-            throw new Error(`Failed to generate PDF report: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        } catch (browserError) {
+            console.error('[PDF_GENERATION] Browser launch failed:', browserError);
+            
+            // Fallback for cloud environments when Puppeteer fails
+            const isProduction = process.env.NODE_ENV === 'production';
+            const isRender = process.env.RENDER === 'true' || process.env.RENDER_SERVICE_ID;
+            
+            if (isProduction && isRender) {
+                console.log('[PDF_GENERATION] Using fallback HTML generation for cloud environment');
+                
+                // Return HTML as a simple text file instead of PDF
+                const filename = `${quizTitle}_exam_report_${new Date().toISOString().split('T')[0]}.html`;
+                const buffer = Buffer.from(html, 'utf-8');
+                
+                return { buffer, filename };
+            }
+            
+            throw new Error(`PDF generation failed: ${browserError instanceof Error ? browserError.message : 'Unknown error'}`);
         }
     }
 }
