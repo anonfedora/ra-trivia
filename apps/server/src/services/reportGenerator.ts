@@ -410,9 +410,9 @@ export class ReportGenerator {
 
         const browser = await puppeteer.launch({
             headless: true,
-            // Use system Chrome on Render, default on other environments
+            // Use downloaded Puppeteer Chrome on Render, default on other environments
             executablePath: isProduction && isRender 
-                ? '/usr/bin/google-chrome-stable' 
+                ? '/opt/render/.cache/puppeteer/chrome/linux-146.0.7680.66/chrome-linux64/chrome'
                 : undefined,
             args: [
                 '--no-sandbox',
