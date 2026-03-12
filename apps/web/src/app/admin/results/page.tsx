@@ -292,7 +292,7 @@ function AdminResultsContent() {
 
                         <div className="bg-white dark:bg-slate-800 p-6 rounded-3xl shadow-lg border border-slate-100 dark:border-slate-700 flex flex-col justify-center">
                             <h4 className="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-2">Average Score</h4>
-                            <div className="text-4xl font-black text-primary">{summary.averageScore}%</div>
+                            <div className="text-4xl font-black text-primary">{summary.averageScore.toFixed(2)}%</div>
                             <div className="text-[10px] font-bold text-slate-400 mt-1 italic">Across {summary.totalCompleted} completions</div>
                         </div>
 
@@ -302,12 +302,12 @@ function AdminResultsContent() {
                                 <div className="flex items-center gap-8">
                                     <div>
                                         <div className="text-[10px] font-bold text-white/40 uppercase">Highest</div>
-                                        <div className="text-3xl font-black">{summary.highestScore}%</div>
+                                        <div className="text-3xl font-black">{summary.highestScore.toFixed(2)}%</div>
                                     </div>
                                     <div className="w-px h-10 bg-white/10" />
                                     <div>
                                         <div className="text-[10px] font-bold text-white/40 uppercase">Lowest</div>
-                                        <div className="text-3xl font-black text-white/60">{summary.lowestScore}%</div>
+                                        <div className="text-3xl font-black text-white/60">{summary.lowestScore.toFixed(2)}%</div>
                                     </div>
                                 </div>
                             </div>
@@ -348,12 +348,12 @@ function AdminResultsContent() {
                         <table className="w-full text-left border-collapse">
                             <thead>
                                 <tr className="text-slate-400 dark:text-slate-500 text-xs font-bold uppercase tracking-widest border-b border-slate-50 dark:border-slate-700">
-                                    <th className="px-8 py-6">Candidate</th>
-                                    <th className="px-8 py-6">Exam</th>
-                                    <th className="px-8 py-6">Score</th>
-                                    <th className="px-8 py-6">Status</th>
-                                    <th className="px-8 py-6">Timeline</th>
-                                    <th className="px-8 py-6">Actions</th>
+                                    <th className="px-8 py-6 w-[20%]">Candidate</th>
+                                    <th className="px-8 py-6 w-[28%]">Exam</th>
+                                    <th className="px-8 py-6 w-[10%]">Score</th>
+                                    <th className="px-8 py-6 w-[15%]">Status</th>
+                                    <th className="px-8 py-6 w-[15%]">Timeline</th>
+                                    <th className="px-8 py-6 w-[12%]">Actions</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-50 dark:divide-slate-700">
@@ -385,7 +385,7 @@ function AdminResultsContent() {
                                                 <div className="flex items-center gap-2">
                                                     <div className="flex flex-col">
                                                         <span className={`text-lg font-black ${result.score >= 70 ? 'text-emerald-500' : result.score >= 40 ? 'text-amber-500' : 'text-rose-500'}`}>
-                                                            {result.score.toFixed(1)}%
+                                                            {result.score.toFixed(2)}%
                                                         </span>
                                                         <div className="w-16 h-1 bg-slate-100 dark:bg-slate-700 rounded-full mt-1 overflow-hidden">
                                                             <div

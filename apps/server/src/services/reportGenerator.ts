@@ -72,9 +72,9 @@ export class ReportGenerator {
         return {
             totalCandidates,
             totalSessions,
-            averageScore: parseFloat(averageScore.toFixed(1)),
-            highestScore,
-            lowestScore,
+            averageScore: parseFloat(averageScore.toFixed(2)),
+            highestScore: parseFloat(highestScore.toFixed(2)),
+            lowestScore: parseFloat(lowestScore.toFixed(2)),
             noRecordCount
         };
     }
@@ -154,7 +154,7 @@ export class ReportGenerator {
                     display: flex;
                     align-items: center;
                     background: linear-gradient(to bottom, #1e5ba8 0%, #1e5ba8 50%, #4a7bb8 50%, #4a7bb8 100%);
-                    padding: 15px 20px;
+                    padding: 10px 20px;
                     margin-bottom: 2px;
                 }
                 .logo {
@@ -183,7 +183,7 @@ export class ReportGenerator {
                 }
                 .yellow-bar {
                     background-color: #ffd700;
-                    padding: 12px 20px;
+                    padding: 8px 20px;
                     text-align: center;
                     font-weight: bold;
                     font-size: 14px;
@@ -280,7 +280,7 @@ export class ReportGenerator {
                             <td>${result.user.name}</td>
                             <td>${result.user.church || 'N/A'}</td>
                             <td>${result.user.association || 'N/A'}</td>
-                            <td>${score}</td>
+                            <td>${score.toFixed(2)}</td>
                             <td>${remark}</td>
                             <td>${status}</td>
                         </tr>
@@ -318,9 +318,9 @@ export class ReportGenerator {
             
             <div class="footer-stats">
                 <p><strong>Report Generated:</strong> ${new Date().toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' })}, ${new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}</p>
-                <p><strong>Average Score:</strong> ${summary.averageScore}%</p>
-                <p><strong>Highest Score:</strong> ${summary.highestScore}%</p>
-                <p><strong>Lowest Score:</strong> ${summary.lowestScore}%</p>
+                <p><strong>Average Score:</strong> ${summary.averageScore.toFixed(2)}%</p>
+                <p><strong>Highest Score:</strong> ${summary.highestScore.toFixed(2)}%</p>
+                <p><strong>Lowest Score:</strong> ${summary.lowestScore.toFixed(2)}%</p>
             </div>
         </body>
         </html>
