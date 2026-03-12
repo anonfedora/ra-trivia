@@ -25,7 +25,7 @@ const upload = multer({
 });
 
 // Admin: Import questions from Excel
-router.post('/import', authenticate, authorizeAdmin, upload.single('file'), async (req, res) => {
+router.post('/import', authenticate, authorizeAdmin, upload.single('file'), async (req: any, res) => {
     try {
         if (!req.file) {
             return res.status(400).json({ message: 'No file uploaded' });
@@ -53,12 +53,13 @@ router.post('/import', authenticate, authorizeAdmin, upload.single('file'), asyn
                 return res.status(400).json({ message: 'Quiz ID or Title/Duration are required' });
             }
             console.log(`[IMPORT] Creating new quiz: ${title}`);
-            // Create new quiz
+            // Create new quiz with createdById
             const newQuiz = await prisma.quiz.create({
                 data: {
                     title: String(title),
                     duration: Number(duration),
-                    isActive: false
+                    isActive: false,
+                    createdById: req.user?.userId // Associate quiz with creator
                 }
             });
             console.log(`[IMPORT] Created new quiz with ID: ${newQuiz.id}`);

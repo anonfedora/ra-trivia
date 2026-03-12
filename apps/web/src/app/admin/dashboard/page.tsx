@@ -73,6 +73,9 @@ export default function AdminDashboard() {
 
     const fetchData = useCallback(async () => {
         const token = localStorage.getItem('token');
+        const userRaw = localStorage.getItem('user');
+        const currentUser = userRaw ? JSON.parse(userRaw) : null;
+        
         try {
             // Fetch Quizzes — cache-bust to always get fresh data
             const quizRes = await fetch(`${apiUrl}/quizzes?t=${Date.now()}`, {
@@ -80,9 +83,13 @@ export default function AdminDashboard() {
             });
             if (quizRes.ok) {
                 const data = await quizRes.json();
-                setQuizzes(data);
+                // Filter quizzes based on user role
+                const filteredQuizzes = currentUser?.role === 'SUPER_ADMIN' 
+                    ? data 
+                    : data.filter((q: Quiz) => q.createdBy?.id === currentUser?.id);
+                setQuizzes(filteredQuizzes);
                 // Only auto-select if nothing is selected yet
-                setSelectedQuizId(prev => (prev || (data.length > 0 ? data[0].id : '')));
+                setSelectedQuizId(prev => (prev || (filteredQuizzes.length > 0 ? filteredQuizzes[0].id : '')));
             }
 
             // Fetch Recent Results

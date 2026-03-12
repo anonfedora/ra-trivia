@@ -173,7 +173,8 @@ router.post('/', authenticate, authorize(['ADMIN']), async (req: AuthRequest, re
             data: {
                 title,
                 duration: Number(duration),
-                isActive: false
+                isActive: false,
+                createdById: req.user?.userId // Associate quiz with creator
             }
         });
         res.status(201).json(quiz);

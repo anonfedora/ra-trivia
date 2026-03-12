@@ -65,26 +65,26 @@ export default function SetupAdminPage() {
                 if (result.data.user) {
                     // New account created successfully
                     const createdRole = result.data.user.role === 'SUPER_ADMIN' ? 'Super Admin' : 'Admin';
-                    setSuccess(`${createdRole} account created successfully! Please check your email for verification. Redirecting to login...`);
+                    setSuccess(`${createdRole} account created successfully! Please check your email for verification code. Redirecting to verification...`);
                     
-                    // Redirect after showing success message
+                    // Redirect to OTP verification page
                     setTimeout(() => {
-                        router.push('/login');
-                    }, 3000);
+                        router.push(`/verify-otp?email=${encodeURIComponent(email)}`);
+                    }, 2000);
                 } else if (result.data.isUnverified) {
                     // Existing unverified account
-                    setSuccess(`Account already exists but needs verification. A new verification code has been sent to ${result.data.email}. Redirecting to login...`);
+                    setSuccess(`Account already exists but needs verification. A new verification code has been sent to ${result.data.email}. Redirecting to verification...`);
                     
-                    // Redirect after showing success message
+                    // Redirect to OTP verification page
                     setTimeout(() => {
-                        router.push('/login');
-                    }, 3000);
+                        router.push(`/verify-otp?email=${encodeURIComponent(result.data.email || email)}`);
+                    }, 2000);
                 } else {
                     // Unexpected success response structure
-                    setSuccess('Admin account processed successfully! Please check your email if verification is required. Redirecting to login...');
+                    setSuccess('Admin account processed successfully! Please check your email for verification code. Redirecting to verification...');
                     
                     setTimeout(() => {
-                        router.push('/login');
+                        router.push(`/verify-otp?email=${encodeURIComponent(email)}`);
                     }, 2000);
                 }
             } else {

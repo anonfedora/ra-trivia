@@ -9,7 +9,7 @@ import { UserType } from '@prisma/client';
 const prisma = new PrismaClient();
 
 export class ReportGenerator {
-    static async getExamResults(userType?: UserType, quizId?: string) {
+    static async getExamResults(userType?: UserType, quizId?: string, createdById?: string) {
         const whereClause: any = {};
         
         if (userType) {
@@ -18,6 +18,13 @@ export class ReportGenerator {
         
         if (quizId) {
             whereClause.quizId = quizId;
+        }
+        
+        // Filter by quiz creator for regular admins
+        if (createdById) {
+            whereClause.quiz = {
+                createdById: createdById
+            };
         }
         
         const results = await prisma.quizSession.findMany({
@@ -79,14 +86,14 @@ export class ReportGenerator {
         };
     }
 
-    static async generateExcelReport(userType?: UserType, quizId?: string): Promise<{ buffer: Buffer; filename: string }> {
+    static async generateExcelReport(userType?: UserType, quizId?: string, createdById?: string): Promise<{ buffer: Buffer; filename: string }> {
         // Implementation would go here
-        const quizTitle = 'all_exams';
+        const quizTitle = 'exams';
         const filename = `${quizTitle}_exam_report_${new Date().toISOString().split('T')[0]}.xlsx`;
         return { buffer: Buffer.from(''), filename };
     }
 
-    static async generatePDFReport(userType?: UserType, quizId?: string): Promise<{ buffer: Buffer; filename: string }> {
+    static async generatePDFReport(userType?: UserType, quizId?: string, createdById?: string): Promise<{ buffer: Buffer; filename: string }> {
         let quizTitle = 'exams';
         let html = '';
         let browser;
@@ -102,7 +109,7 @@ export class ReportGenerator {
                 console.log('[PDF_GENERATION] Detected Render environment, using @sparticuz/chromium');
             }
             
-            const results = await this.getExamResults(userType, quizId);
+            const results = await this.getExamResults(userType, quizId, createdById);
             const summary = this.calculateSummary(results);
             
             // Get quiz title for filename

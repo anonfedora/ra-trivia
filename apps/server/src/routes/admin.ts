@@ -119,8 +119,9 @@ router.get('/export/formatted-excel', authenticate, authorizeAdmin, async (req: 
     try {
         const userType = req.query.userType as UserType | undefined;
         const quizId = req.query.quizId as string | undefined;
+        const createdById = req.user?.role === 'ADMIN' ? req.user.userId : undefined;
 
-        const { buffer, filename } = await ReportGenerator.generateExcelReport(userType, quizId);
+        const { buffer, filename } = await ReportGenerator.generateExcelReport(userType, quizId, createdById);
 
         res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
         res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
@@ -136,8 +137,9 @@ router.get('/export/pdf', authenticate, authorizeAdmin, async (req: AuthRequest,
     try {
         const userType = req.query.userType as UserType | undefined;
         const quizId = req.query.quizId as string | undefined;
+        const createdById = req.user?.role === 'ADMIN' ? req.user.userId : undefined;
 
-        const { buffer, filename } = await ReportGenerator.generatePDFReport(userType, quizId);
+        const { buffer, filename } = await ReportGenerator.generatePDFReport(userType, quizId, createdById);
 
         res.setHeader('Content-Type', 'application/pdf');
         res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
@@ -151,7 +153,19 @@ router.get('/export/pdf', authenticate, authorizeAdmin, async (req: AuthRequest,
 // Admin: Export quiz report (specific quiz)
 router.get('/export/:quizId', authenticate, authorizeAdmin, async (req: AuthRequest, res) => {
     try {
-        const { quizId } = req.params;
+        const quizId = req.params.quizId as string;
+
+        // Check if admin has permission to export this quiz
+        if (req.user?.role === 'ADMIN') {
+            const quiz = await prisma.quiz.findUnique({
+                where: { id: quizId },
+                select: { createdById: true }
+            });
+            
+            if (!quiz || quiz.createdById !== req.user.userId) {
+                return res.status(403).json({ message: 'You do not have permission to export this quiz' });
+            }
+        }
 
         const sessions = await prisma.quizSession.findMany({
             where: {
@@ -238,6 +252,13 @@ router.get('/results', authenticate, authorizeAdmin, async (req: AuthRequest, re
 
         const where: any = {};
 
+        // Filter by quiz creator for regular admins
+        if (req.user?.role === 'ADMIN') {
+            where.quiz = {
+                createdById: req.user.userId
+            };
+        }
+
         if (status === 'completed') {
             where.endTime = { not: null };
         } else if (status === 'running') {
@@ -302,8 +323,17 @@ router.get('/results', authenticate, authorizeAdmin, async (req: AuthRequest, re
 // Admin: Export results to Excel
 router.get('/export/excel', authenticate, authorizeAdmin, async (req: AuthRequest, res) => {
     try {
+        const where: any = { endTime: { not: null } }; // Only export completed sessions
+        
+        // Filter by quiz creator for regular admins
+        if (req.user?.role === 'ADMIN') {
+            where.quiz = {
+                createdById: req.user.userId
+            };
+        }
+        
         const results = await prisma.quizSession.findMany({
-            where: { endTime: { not: null } }, // Only export completed sessions
+            where,
             include: {
                 user: {
                     select: { name: true, email: true, church: true }
