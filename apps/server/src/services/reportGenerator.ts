@@ -277,9 +277,10 @@ export class ReportGenerator {
                 <tbody>
                     ${results.map((result: any, index: number) => {
                         const score = result.score || 0;
-                        // Use manual status if set, otherwise calculate based on score
+                        // REMARK is based on score (Pass/Fail)
+                        const remark = score >= 50 ? 'Pass' : 'Fail';
+                        // STATUS is the manual status or auto-calculated status (Cleared/Not Cleared)
                         const status = result.manualStatus || (score >= 50 ? 'Cleared' : 'Not Cleared - No Certificates');
-                        const remark = status === 'Cleared' ? 'Pass' : 'Fail';
                         
                         return `
                         <tr>
