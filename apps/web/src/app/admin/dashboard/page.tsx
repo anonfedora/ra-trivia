@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { BookOpen, Clock, PlayCircle, Plus, Upload, Trash2, Power, PowerOff, FileDown, MoreVertical, CheckCircle, BarChart3 } from 'lucide-react';
 import Link from 'next/link';
 import { ThemeToggle } from '../../../components/ThemeToggle';
+import NotificationBell from '../../../components/NotificationBell';
 import UserTypeSelector, { UserType } from '../../../components/UserTypeSelector';
 
 interface Quiz {
@@ -335,6 +336,7 @@ export default function AdminDashboard() {
                         <p className="text-slate-500 dark:text-slate-400 mt-2 font-medium">Manage your exam sessions and candidate records.</p>
                     </div>
                     <div className="flex gap-3 items-center">
+                        <NotificationBell />
                         <ThemeToggle />
                         <Link href="/admin/results" className="flex items-center gap-2 bg-primary text-white px-6 py-3 rounded-2xl font-bold shadow-lg shadow-primary/20 hover:shadow-xl transition-all">
                             <BookOpen size={18} />

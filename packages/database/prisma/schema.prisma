@@ -87,6 +87,24 @@ model UserTypeAuditLog {
   user         User     @relation(fields: [userId], references: [id])
 }
 
+model Notification {
+  id          String   @id @default(uuid())
+  type        String   // "EXAM_SUBMITTED", "EXAM_COMPLETED", etc.
+  title       String
+  message     String
+  quizId      String?
+  sessionId   String?
+  candidateName String?
+  candidateEmail String?
+  isRead      Boolean  @default(false)
+  createdById String?  // Quiz creator ID (for filtering)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@index([createdById, isRead])
+  @@index([createdAt])
+}
+
 enum Role {
   SUPER_ADMIN
   ADMIN

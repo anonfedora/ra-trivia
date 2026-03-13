@@ -5,6 +5,7 @@ import { Search, FileDown, ArrowLeft, User, Mail, GraduationCap, Award, Calendar
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { ThemeToggle } from '../../../components/ThemeToggle';
+import NotificationBell from '../../../components/NotificationBell';
 
 interface Result {
     id: string;
@@ -235,6 +236,7 @@ function AdminResultsContent() {
                         <p className="text-slate-500 dark:text-slate-400 mt-2 font-medium">Analysis of completed candidate performances across all examinations.</p>
                     </div>
                     <div className="flex gap-4 items-center">
+                        <NotificationBell />
                         <ThemeToggle />
                         <div className="flex gap-2">
                             <button

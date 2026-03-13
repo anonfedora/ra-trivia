@@ -13,6 +13,7 @@ import questionRoutes from './routes/questions';
 import quizRoutes from './routes/quiz';
 import adminRoutes from './routes/admin';
 import quizzesRoutes from './routes/quizzes';
+import notificationRoutes from './routes/notifications';
 import passwordRequirementsRoutes from './routes/password-requirements';
 import { initScheduler } from './services/scheduler';
 
@@ -107,6 +108,7 @@ app.use('/api/questions', questionRoutes);
 app.use('/api/quiz', quizRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/quizzes', quizzesRoutes);
+app.use('/api/notifications', notificationRoutes);
 
 app.get('/health', (req, res) => {
     res.json({ status: 'ok', timestamp: new Date().toISOString() });
