@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { Bell, Check, CheckCheck, Trash2, X } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 
@@ -22,9 +23,14 @@ export default function NotificationBell() {
     const [unreadCount, setUnreadCount] = useState(0);
     const [isOpen, setIsOpen] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
+    const [dropdownPos, setDropdownPos] = useState({ top: 0, right: 0 });
     const dropdownRef = useRef<HTMLDivElement>(null);
+    const buttonRef = useRef<HTMLButtonElement>(null);
+    const [mounted, setMounted] = useState(false);
 
     const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
+
+    useEffect(() => { setMounted(true); }, []);
 
     const fetchNotifications = async () => {
         const token = localStorage.getItem('token');
@@ -53,7 +59,10 @@ export default function NotificationBell() {
     // Close dropdown when clicking outside
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
-            if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+            if (
+                dropdownRef.current && !dropdownRef.current.contains(event.target as Node) &&
+                buttonRef.current && !buttonRef.current.contains(event.target as Node)
+            ) {
                 setIsOpen(false);
             }
         };
@@ -66,6 +75,17 @@ export default function NotificationBell() {
             document.removeEventListener('mousedown', handleClickOutside);
         };
     }, [isOpen]);
+
+    const handleToggle = () => {
+        if (!isOpen && buttonRef.current) {
+            const rect = buttonRef.current.getBoundingClientRect();
+            setDropdownPos({
+                top: rect.bottom + window.scrollY + 8,
+                right: window.innerWidth - rect.right,
+            });
+        }
+        setIsOpen(!isOpen);
+    };
 
     const markAsRead = async (notificationId: string) => {
         const token = localStorage.getItem('token');
@@ -115,10 +135,110 @@ export default function NotificationBell() {
         }
     };
 
+    const dropdownContent = (
+        <div
+            ref={dropdownRef}
+            style={{ position: 'fixed', top: dropdownPos.top, right: dropdownPos.right, zIndex: 9999 }}
+            className="w-80 sm:w-96 bg-white dark:bg-slate-800 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 max-h-[600px] flex flex-col"
+        >
+            {/* Header */}
+            <div className="p-4 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center">
+                <h3 className="font-bold text-slate-900 dark:text-slate-100">Notifications</h3>
+                <div className="flex items-center gap-2">
+                    {unreadCount > 0 && (
+                        <button
+                            onClick={markAllAsRead}
+                            disabled={isLoading}
+                            className="text-xs font-bold text-primary hover:underline disabled:opacity-50"
+                            title="Mark all as read"
+                        >
+                            <CheckCheck size={16} />
+                        </button>
+                    )}
+                    <button
+                        onClick={() => setIsOpen(false)}
+                        className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
+                    >
+                        <X size={18} />
+                    </button>
+                </div>
+            </div>
+
+            {/* Notifications List */}
+            <div className="overflow-y-auto flex-1">
+                {notifications.length === 0 ? (
+                    <div className="p-8 text-center text-slate-400 dark:text-slate-500">
+                        <Bell size={48} className="mx-auto mb-3 opacity-30" />
+                        <p className="font-medium">No notifications yet</p>
+                        <p className="text-xs mt-1">You&apos;ll be notified when candidates submit exams</p>
+                    </div>
+                ) : (
+                    notifications.map((notification) => (
+                        <div
+                            key={notification.id}
+                            className={`p-4 border-b border-slate-100 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-900/50 transition-colors ${
+                                !notification.isRead ? 'bg-primary/5 dark:bg-primary/10' : ''
+                            }`}
+                        >
+                            <div className="flex items-start gap-3">
+                                <div className="flex-1 min-w-0">
+                                    <div className="flex items-center gap-2 mb-1">
+                                        <h4 className="font-bold text-sm text-slate-900 dark:text-slate-100">
+                                            {notification.title}
+                                        </h4>
+                                        {!notification.isRead && (
+                                            <span className="w-2 h-2 bg-primary rounded-full flex-shrink-0" />
+                                        )}
+                                    </div>
+                                    <p className="text-xs text-slate-600 dark:text-slate-400 mb-2">
+                                        {notification.message}
+                                    </p>
+                                    <p className="text-[10px] text-slate-400 dark:text-slate-500 font-medium">
+                                        {formatDistanceToNow(new Date(notification.createdAt), { addSuffix: true })}
+                                    </p>
+                                </div>
+                                <div className="flex items-center gap-1 flex-shrink-0">
+                                    {!notification.isRead && (
+                                        <button
+                                            onClick={() => markAsRead(notification.id)}
+                                            className="p-1.5 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-500 dark:text-slate-400"
+                                            title="Mark as read"
+                                        >
+                                            <Check size={14} />
+                                        </button>
+                                    )}
+                                    <button
+                                        onClick={() => deleteNotification(notification.id)}
+                                        className="p-1.5 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/30 text-red-500"
+                                        title="Delete"
+                                    >
+                                        <Trash2 size={14} />
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    ))
+                )}
+            </div>
+
+            {notifications.length > 0 && (
+                <div className="p-3 border-t border-slate-200 dark:border-slate-700 text-center">
+                    <button
+                        onClick={() => setIsOpen(false)}
+                        className="text-xs font-bold text-primary hover:underline"
+                    >
+                        View All Notifications
+                    </button>
+                </div>
+            )}
+        </div>
+    );
+
     return (
-        <div className="relative" ref={dropdownRef}>
+        <div className="relative">
             <button
-                onClick={() => setIsOpen(!isOpen)}
+                ref={buttonRef}
+                onClick={handleToggle}
                 className="relative p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
                 aria-label="Notifications"
             >
@@ -130,104 +250,7 @@ export default function NotificationBell() {
                 )}
             </button>
 
-            {isOpen && (
-                <div className="absolute right-0 mt-2 w-96 bg-white dark:bg-slate-800 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 z-50 max-h-[600px] flex flex-col">
-                    {/* Header */}
-                    <div className="p-4 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center">
-                        <h3 className="font-bold text-slate-900 dark:text-slate-100">Notifications</h3>
-                        <div className="flex items-center gap-2">
-                            {unreadCount > 0 && (
-                                <button
-                                    onClick={markAllAsRead}
-                                    disabled={isLoading}
-                                    className="text-xs font-bold text-primary hover:underline disabled:opacity-50"
-                                    title="Mark all as read"
-                                >
-                                    <CheckCheck size={16} />
-                                </button>
-                            )}
-                            <button
-                                onClick={() => setIsOpen(false)}
-                                className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
-                            >
-                                <X size={18} />
-                            </button>
-                        </div>
-                    </div>
-
-                    {/* Notifications List */}
-                    <div className="overflow-y-auto flex-1">
-                        {notifications.length === 0 ? (
-                            <div className="p-8 text-center text-slate-400 dark:text-slate-500">
-                                <Bell size={48} className="mx-auto mb-3 opacity-30" />
-                                <p className="font-medium">No notifications yet</p>
-                                <p className="text-xs mt-1">You&apos;ll be notified when candidates submit exams</p>
-                            </div>
-                        ) : (
-                            notifications.map((notification) => (
-                                <div
-                                    key={notification.id}
-                                    className={`p-4 border-b border-slate-100 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-900/50 transition-colors ${
-                                        !notification.isRead ? 'bg-primary/5 dark:bg-primary/10' : ''
-                                    }`}
-                                >
-                                    <div className="flex items-start gap-3">
-                                        <div className="flex-1 min-w-0">
-                                            <div className="flex items-center gap-2 mb-1">
-                                                <h4 className="font-bold text-sm text-slate-900 dark:text-slate-100">
-                                                    {notification.title}
-                                                </h4>
-                                                {!notification.isRead && (
-                                                    <span className="w-2 h-2 bg-primary rounded-full flex-shrink-0" />
-                                                )}
-                                            </div>
-                                            <p className="text-xs text-slate-600 dark:text-slate-400 mb-2">
-                                                {notification.message}
-                                            </p>
-                                            <p className="text-[10px] text-slate-400 dark:text-slate-500 font-medium">
-                                                {formatDistanceToNow(new Date(notification.createdAt), { addSuffix: true })}
-                                            </p>
-                                        </div>
-                                        <div className="flex items-center gap-1 flex-shrink-0">
-                                            {!notification.isRead && (
-                                                <button
-                                                    onClick={() => markAsRead(notification.id)}
-                                                    className="p-1.5 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-500 dark:text-slate-400"
-                                                    title="Mark as read"
-                                                >
-                                                    <Check size={14} />
-                                                </button>
-                                            )}
-                                            <button
-                                                onClick={() => deleteNotification(notification.id)}
-                                                className="p-1.5 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/30 text-red-500"
-                                                title="Delete"
-                                            >
-                                                <Trash2 size={14} />
-                                            </button>
-                                        </div>
-                                    </div>
-                                </div>
-                            ))
-                        )}
-                    </div>
-
-                    {/* Footer */}
-                    {notifications.length > 0 && (
-                        <div className="p-3 border-t border-slate-200 dark:border-slate-700 text-center">
-                            <button
-                                onClick={() => {
-                                    setIsOpen(false);
-                                    // Could navigate to a full notifications page if you create one
-                                }}
-                                className="text-xs font-bold text-primary hover:underline"
-                            >
-                                View All Notifications
-                            </button>
-                        </div>
-                    )}
-                </div>
-            )}
+            {isOpen && mounted && createPortal(dropdownContent, document.body)}
         </div>
     );
 }
