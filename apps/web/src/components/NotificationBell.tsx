@@ -161,7 +161,7 @@ export default function NotificationBell() {
                             <div className="p-8 text-center text-slate-400 dark:text-slate-500">
                                 <Bell size={48} className="mx-auto mb-3 opacity-30" />
                                 <p className="font-medium">No notifications yet</p>
-                                <p className="text-xs mt-1">You'll be notified when candidates submit exams</p>
+                                <p className="text-xs mt-1">You&apos;ll be notified when candidates submit exams</p>
                             </div>
                         ) : (
                             notifications.map((notification) => (
