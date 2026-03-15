@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { Bell, Check, CheckCheck, Trash2, X } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
+import Link from 'next/link';
 
 interface Notification {
     id: string;
@@ -223,12 +224,13 @@ export default function NotificationBell() {
 
             {notifications.length > 0 && (
                 <div className="p-3 border-t border-slate-200 dark:border-slate-700 text-center">
-                    <button
+                    <Link
+                        href="/admin/notifications"
                         onClick={() => setIsOpen(false)}
                         className="text-xs font-bold text-primary hover:underline"
                     >
                         View All Notifications
-                    </button>
+                    </Link>
                 </div>
             )}
         </div>
