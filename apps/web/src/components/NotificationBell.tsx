@@ -80,9 +80,13 @@ export default function NotificationBell() {
     const handleToggle = () => {
         if (!isOpen && buttonRef.current) {
             const rect = buttonRef.current.getBoundingClientRect();
+            const dropdownWidth = window.innerWidth < 640 ? Math.min(window.innerWidth - 16, 384) : 384;
+            // Align to right edge of button, but clamp so it doesn't overflow left
+            const rightFromEdge = window.innerWidth - rect.right;
+            const clampedRight = Math.min(rightFromEdge, window.innerWidth - dropdownWidth - 8);
             setDropdownPos({
                 top: rect.bottom + window.scrollY + 8,
-                right: window.innerWidth - rect.right,
+                right: Math.max(8, clampedRight),
             });
         }
         setIsOpen(!isOpen);
@@ -139,8 +143,8 @@ export default function NotificationBell() {
     const dropdownContent = (
         <div
             ref={dropdownRef}
-            style={{ position: 'fixed', top: dropdownPos.top, right: dropdownPos.right, zIndex: 9999 }}
-            className="w-80 sm:w-96 bg-white dark:bg-slate-800 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 max-h-[600px] flex flex-col"
+            style={{ position: 'fixed', top: dropdownPos.top, right: dropdownPos.right, zIndex: 9999, width: 'min(24rem, calc(100vw - 16px))' }}
+            className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 max-h-[600px] flex flex-col"
         >
             {/* Header */}
             <div className="p-4 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center">

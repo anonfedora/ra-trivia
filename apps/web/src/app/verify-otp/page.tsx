@@ -188,7 +188,7 @@ function VerifyOTPContent() {
                 <ThemeToggle />
             </div>
             <div className="w-full max-w-md">
-                <div className="bg-white dark:bg-slate-800 rounded-[2.5rem] shadow-2xl p-8 border border-slate-100 dark:border-slate-700 animate-slide-up">
+                <div className="bg-white dark:bg-slate-800 rounded-[2.5rem] shadow-2xl p-6 sm:p-8 border border-slate-100 dark:border-slate-700 animate-slide-up">
                     <div className="text-center mb-8">
                         <div className="inline-flex items-center justify-center w-20 h-20 bg-primary rounded-3xl mb-6 shadow-lg">
                             <span className="text-white font-bold text-2xl">RA</span>
@@ -202,17 +202,18 @@ function VerifyOTPContent() {
 
                     <form onSubmit={handleVerifyOTP} className="space-y-8">
                         {/* OTP Input Boxes */}
-                        <div className="flex justify-center gap-3 mb-4">
+                        <div className="flex justify-center gap-2 sm:gap-3 mb-4 px-2">
                             {otp.map((digit, index) => (
                                 <input
                                     key={index}
                                     ref={(el) => { inputRefs.current[index] = el; }}
                                     type="text"
+                                    inputMode="numeric"
                                     value={digit}
                                     onChange={(e) => handleInputChange(index, e.target.value)}
                                     onKeyDown={(e) => handleKeyDown(index, e)}
                                     onPaste={index === 0 ? handlePaste : undefined}
-                                    className="w-14 h-14 text-center text-2xl font-bold bg-slate-50 dark:bg-slate-900 border-2 border-slate-200 dark:border-slate-700 rounded-2xl focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all outline-none text-slate-900 dark:text-slate-50"
+                                    className="w-10 h-12 sm:w-14 sm:h-14 text-center text-xl sm:text-2xl font-bold bg-slate-50 dark:bg-slate-700 border-2 border-slate-200 dark:border-slate-600 rounded-xl sm:rounded-2xl focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all outline-none text-slate-900 dark:text-slate-50"
                                     maxLength={1}
                                     required
                                     placeholder="•"
