@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect, useCallback } from 'react';
-import { Bell, Check, CheckCheck, Trash2, ArrowLeft } from 'lucide-react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
+import { Bell, Check, CheckCheck, Trash2, ArrowLeft, ClipboardList, UserPlus, ShieldCheck, Users } from 'lucide-react';
 import Link from 'next/link';
 import { formatDistanceToNow } from 'date-fns';
 import { ThemeToggle } from '../../../components/ThemeToggle';
@@ -15,16 +15,43 @@ interface Notification {
     createdAt: string;
 }
 
+type FilterType = 'ALL' | 'EXAM_SUBMITTED' | 'NEW_CANDIDATE' | 'NEW_ADMIN';
+
+const FILTERS: { key: FilterType; label: string; icon: React.ReactNode }[] = [
+    { key: 'ALL',           label: 'All',          icon: <Bell size={14} /> },
+    { key: 'EXAM_SUBMITTED',label: 'Exams',        icon: <ClipboardList size={14} /> },
+    { key: 'NEW_CANDIDATE', label: 'Candidates',   icon: <UserPlus size={14} /> },
+    { key: 'NEW_ADMIN',     label: 'Admins',       icon: <ShieldCheck size={14} /> },
+];
+
+function matchesFilter(type: string, filter: FilterType): boolean {
+    if (filter === 'ALL') return true;
+    if (filter === 'EXAM_SUBMITTED') return type === 'EXAM_SUBMITTED';
+    if (filter === 'NEW_CANDIDATE') return type === 'NEW_USER_REGISTERED';
+    if (filter === 'NEW_ADMIN') return type === 'NEW_ADMIN_REGISTERED' || (type === 'NEW_USER_REGISTERED' && false);
+    return true;
+}
+
+// More precise: candidate = NEW_USER_REGISTERED where role is candidate
+// We rely on the type field set by the server
+function getFilter(type: string): FilterType {
+    if (type === 'EXAM_SUBMITTED') return 'EXAM_SUBMITTED';
+    if (type === 'NEW_ADMIN_REGISTERED') return 'NEW_ADMIN';
+    if (type === 'NEW_USER_REGISTERED') return 'NEW_CANDIDATE';
+    return 'ALL';
+}
+
 export default function NotificationsPage() {
     const [notifications, setNotifications] = useState<Notification[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [unreadCount, setUnreadCount] = useState(0);
+    const [activeFilter, setActiveFilter] = useState<FilterType>('ALL');
     const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
 
     const fetchNotifications = useCallback(async () => {
         const token = localStorage.getItem('token');
         try {
-            const res = await fetch(`${apiUrl}/notifications?pageSize=50`, {
+            const res = await fetch(`${apiUrl}/notifications?pageSize=100`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
             if (res.ok) {
@@ -40,6 +67,22 @@ export default function NotificationsPage() {
     }, [apiUrl]);
 
     useEffect(() => { fetchNotifications(); }, [fetchNotifications]);
+
+    const filtered = useMemo(() =>
+        notifications.filter(n => {
+            if (activeFilter === 'ALL') return true;
+            return getFilter(n.type) === activeFilter;
+        }),
+        [notifications, activeFilter]
+    );
+
+    // Count per filter for badges
+    const counts = useMemo(() => ({
+        ALL: notifications.length,
+        EXAM_SUBMITTED: notifications.filter(n => n.type === 'EXAM_SUBMITTED').length,
+        NEW_CANDIDATE: notifications.filter(n => n.type === 'NEW_USER_REGISTERED').length,
+        NEW_ADMIN: notifications.filter(n => n.type === 'NEW_ADMIN_REGISTERED').length,
+    }), [notifications]);
 
     const markAsRead = async (id: string) => {
         const token = localStorage.getItem('token');
@@ -77,9 +120,9 @@ export default function NotificationsPage() {
     }
 
     return (
-        <main className="min-h-screen bg-slate-50 dark:bg-slate-900 p-6 md:p-12 transition-colors duration-200">
+        <main className="min-h-screen bg-slate-50 dark:bg-slate-900 p-4 md:p-12 transition-colors duration-200">
             <div className="max-w-3xl mx-auto">
-                <header className="flex flex-col sm:flex-row sm:justify-between sm:items-start mb-10 gap-4">
+                <header className="flex flex-col sm:flex-row sm:justify-between sm:items-start mb-8 gap-4">
                     <div>
                         <Link href="/admin/dashboard" className="flex items-center gap-2 text-primary font-bold mb-4 hover:gap-3 transition-all">
                             <ArrowLeft size={18} /> Back to Dashboard
@@ -104,16 +147,41 @@ export default function NotificationsPage() {
                     </div>
                 </header>
 
+                {/* Filter tabs */}
+                <div className="flex gap-2 mb-6 overflow-x-auto pb-1 scrollbar-hide">
+                    {FILTERS.map(f => (
+                        <button
+                            key={f.key}
+                            onClick={() => setActiveFilter(f.key)}
+                            className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all flex-shrink-0 ${
+                                activeFilter === f.key
+                                    ? 'bg-primary text-white shadow-md'
+                                    : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700 hover:border-primary/50'
+                            }`}
+                        >
+                            {f.icon}
+                            {f.label}
+                            {counts[f.key] > 0 && (
+                                <span className={`ml-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-bold ${
+                                    activeFilter === f.key ? 'bg-white/20 text-white' : 'bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400'
+                                }`}>
+                                    {counts[f.key]}
+                                </span>
+                            )}
+                        </button>
+                    ))}
+                </div>
+
                 <section className="bg-white dark:bg-slate-800 rounded-[2rem] shadow-xl border border-slate-100 dark:border-slate-700 overflow-hidden">
-                    {notifications.length === 0 ? (
+                    {filtered.length === 0 ? (
                         <div className="p-16 text-center text-slate-400 dark:text-slate-500">
-                            <Bell size={56} className="mx-auto mb-4 opacity-20" />
-                            <p className="font-bold text-lg">No notifications yet</p>
-                            <p className="text-sm mt-1">You&apos;ll be notified when candidates submit exams</p>
+                            <Users size={56} className="mx-auto mb-4 opacity-20" />
+                            <p className="font-bold text-lg">No notifications</p>
+                            <p className="text-sm mt-1">Nothing here for this filter</p>
                         </div>
                     ) : (
                         <ul className="divide-y divide-slate-100 dark:divide-slate-700">
-                            {notifications.map((n) => (
+                            {filtered.map((n) => (
                                 <li key={n.id} className={`flex items-start gap-3 p-4 md:p-5 hover:bg-slate-50 dark:hover:bg-slate-900/50 transition-colors ${!n.isRead ? 'bg-primary/5 dark:bg-primary/10' : ''}`}>
                                     <div className="flex-1 min-w-0">
                                         <div className="flex items-center gap-2 mb-0.5">

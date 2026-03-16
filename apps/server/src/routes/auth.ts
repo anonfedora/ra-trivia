@@ -353,10 +353,12 @@ router.post('/verify-otp', [
             select: { id: true }
         });
         if (superAdmins.length > 0) {
+            const isAdminRole = user.role === 'SUPER_ADMIN' || user.role === 'ADMIN';
             const roleLabel = user.role === 'SUPER_ADMIN' ? 'Super Admin' : user.role === 'ADMIN' ? 'Admin' : 'Candidate';
+            const notifType = isAdminRole ? 'NEW_ADMIN_REGISTERED' : 'NEW_USER_REGISTERED';
             await prisma.notification.createMany({
                 data: superAdmins.map(sa => ({
-                    type: 'NEW_USER_REGISTERED',
+                    type: notifType,
                     title: `New ${roleLabel} Registered`,
                     message: `${user.name} (${user.email}) has verified their account and joined as ${roleLabel}.`,
                     candidateName: user.name,
