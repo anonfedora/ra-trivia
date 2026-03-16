@@ -347,26 +347,24 @@ router.post('/verify-otp', [
             }
         });
 
-        // Notify all SUPER_ADMINs when a new ADMIN or SUPER_ADMIN account is verified
-        if (user.role === 'ADMIN' || user.role === 'SUPER_ADMIN') {
-            const superAdmins = await prisma.user.findMany({
-                where: { role: 'SUPER_ADMIN', emailVerified: true },
-                select: { id: true }
+        // Notify all SUPER_ADMINs when any new account is verified
+        const superAdmins = await prisma.user.findMany({
+            where: { role: 'SUPER_ADMIN', emailVerified: true },
+            select: { id: true }
+        });
+        if (superAdmins.length > 0) {
+            const roleLabel = user.role === 'SUPER_ADMIN' ? 'Super Admin' : user.role === 'ADMIN' ? 'Admin' : 'Candidate';
+            await prisma.notification.createMany({
+                data: superAdmins.map(sa => ({
+                    type: 'NEW_USER_REGISTERED',
+                    title: `New ${roleLabel} Registered`,
+                    message: `${user.name} (${user.email}) has verified their account and joined as ${roleLabel}.`,
+                    candidateName: user.name,
+                    candidateEmail: user.email,
+                    isRead: false,
+                    createdById: sa.id,
+                }))
             });
-            if (superAdmins.length > 0) {
-                const roleLabel = user.role === 'SUPER_ADMIN' ? 'Super Admin' : 'Admin';
-                await prisma.notification.createMany({
-                    data: superAdmins.map(sa => ({
-                        type: 'NEW_ADMIN_REGISTERED',
-                        title: `New ${roleLabel} Registered`,
-                        message: `${user.name} (${user.email}) has verified their account and joined as ${roleLabel}.`,
-                        candidateName: user.name,
-                        candidateEmail: user.email,
-                        isRead: false,
-                        createdById: sa.id,
-                    }))
-                });
-            }
         }
 
         const token = jwt.sign({ userId: user.id, role: user.role, userType: user.userType }, JWT_SECRET, { expiresIn: '24h' });
