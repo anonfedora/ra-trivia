@@ -35,6 +35,15 @@ function VerifyOTPContent() {
         }
     }, [isClient, searchParams]);
 
+    // Auto-focus first input once client is ready
+    useEffect(() => {
+        if (isClient) {
+            setTimeout(() => {
+                inputRefs.current[0]?.focus();
+            }, 100);
+        }
+    }, [isClient]);
+
     const handleInputChange = (index: number, value: string) => {
         // Reset submitting flag when user changes OTP
         if (error) {

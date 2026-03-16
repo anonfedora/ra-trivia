@@ -270,11 +270,49 @@ router.patch('/:id/toggle', authenticate, authorize(['ADMIN', 'SUPER_ADMIN']), a
         }
         // Super admins can toggle any quiz, including those with null createdById
 
-        console.log(`[QUIZ_TOGGLE] QuizID: ${id}, NewState: ${!quiz.isActive}`);
+        const newIsActive = !quiz.isActive;
+        console.log(`[QUIZ_TOGGLE] QuizID: ${id}, NewState: ${newIsActive}`);
         const updatedQuiz = await prisma.quiz.update({
             where: { id },
-            data: { isActive: !quiz.isActive }
+            data: { isActive: newIsActive }
         });
+
+        // When a quiz is activated, notify matching candidates
+        if (newIsActive) {
+            // Find distinct question types in this quiz
+            const questionTypes = await prisma.question.findMany({
+                where: { quizId: id },
+                select: { questionType: true },
+                distinct: ['questionType']
+            });
+            const types = questionTypes.map(q => q.questionType);
+
+            if (types.length > 0) {
+                // Find all verified candidates whose userType matches
+                const candidates = await prisma.user.findMany({
+                    where: {
+                        role: 'CANDIDATE',
+                        emailVerified: true,
+                        userType: { in: types }
+                    },
+                    select: { id: true, userType: true }
+                });
+
+                if (candidates.length > 0) {
+                    await prisma.notification.createMany({
+                        data: candidates.map(c => ({
+                            type: 'NEW_EXAM_AVAILABLE',
+                            title: 'New Exam Available',
+                            message: `A new exam "${quiz.title}" is now available for you to take.`,
+                            quizId: id,
+                            isRead: false,
+                            createdById: c.id, // candidate's own ID for filtering
+                        }))
+                    });
+                    console.log(`[QUIZ_TOGGLE] Notified ${candidates.length} candidates about quiz "${quiz.title}"`);
+                }
+            }
+        }
 
         res.json(updatedQuiz);
     } catch (error) {

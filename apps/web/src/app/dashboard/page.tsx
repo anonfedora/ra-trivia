@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { BookOpen, Clock, PlayCircle, LogOut, Calendar, Repeat, User } from 'lucide-react';
 import { ThemeToggle } from '../../components/ThemeToggle';
+import NotificationBell from '../../components/NotificationBell';
 
 interface Quiz {
     id: string;
@@ -151,6 +152,7 @@ export default function DashboardPage() {
                         </div>
                     </div>
                     <div className="flex items-center gap-3">
+                        <NotificationBell />
                         <Link
                             href="/profile"
                             className="hidden md:flex items-center gap-2 px-6 py-3 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-2xl font-semibold border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700 transition-all shadow-sm"

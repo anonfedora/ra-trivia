@@ -4,23 +4,22 @@ import { authenticate, authorizeAdmin, AuthRequest } from '../middlewares/auth';
 
 const router = Router();
 
-// Get notifications for the logged-in admin
-router.get('/', authenticate, authorizeAdmin, async (req: AuthRequest, res) => {
+// Get notifications for the logged-in user (any role)
+router.get('/', authenticate, async (req: AuthRequest, res) => {
     try {
         const userId = req.user?.userId;
         const userRole = req.user?.role;
         const page = Math.max(1, parseInt(String(req.query.page ?? '1'), 10) || 1);
-        const pageSize = Math.min(50, Math.max(1, parseInt(String(req.query.pageSize ?? '20'), 10) || 20));
+        const pageSize = Math.min(100, Math.max(1, parseInt(String(req.query.pageSize ?? '20'), 10) || 20));
         const unreadOnly = req.query.unreadOnly === 'true';
 
         const where: any = {};
 
-        // Filter notifications based on role
-        if (userRole === 'ADMIN') {
-            // Regular admins only see notifications for quizzes they created
+        if (userRole !== 'SUPER_ADMIN') {
+            // Admins and candidates only see their own notifications
             where.createdById = userId;
         }
-        // SUPER_ADMIN sees all notifications (no filter)
+        // SUPER_ADMIN sees all notifications
 
         if (unreadOnly) {
             where.isRead = false;
@@ -40,27 +39,20 @@ router.get('/', authenticate, authorizeAdmin, async (req: AuthRequest, res) => {
             where: { ...where, isRead: false }
         });
 
-        res.json({
-            notifications,
-            total,
-            unreadCount,
-            page,
-            pageSize
-        });
+        res.json({ notifications, total, unreadCount, page, pageSize });
     } catch (error) {
         console.error('Fetch notifications error:', error);
         res.status(500).json({ message: 'Failed to fetch notifications' });
     }
 });
 
-// Mark notification as read
-router.patch('/:id/read', authenticate, authorizeAdmin, async (req: AuthRequest, res) => {
+// Mark notification as read (any authenticated user, own notifications only)
+router.patch('/:id/read', authenticate, async (req: AuthRequest, res) => {
     try {
         const notificationId = req.params.id as string;
         const userId = req.user?.userId;
         const userRole = req.user?.role;
 
-        // Check if admin has permission to mark this notification
         const notification = await prisma.notification.findUnique({
             where: { id: notificationId }
         });
@@ -69,8 +61,7 @@ router.patch('/:id/read', authenticate, authorizeAdmin, async (req: AuthRequest,
             return res.status(404).json({ message: 'Notification not found' });
         }
 
-        // Regular admins can only mark their own notifications
-        if (userRole === 'ADMIN' && notification.createdById !== userId) {
+        if (userRole !== 'SUPER_ADMIN' && notification.createdById !== userId) {
             return res.status(403).json({ message: 'You do not have permission to mark this notification' });
         }
 
@@ -87,15 +78,14 @@ router.patch('/:id/read', authenticate, authorizeAdmin, async (req: AuthRequest,
 });
 
 // Mark all notifications as read
-router.post('/mark-all-read', authenticate, authorizeAdmin, async (req: AuthRequest, res) => {
+router.post('/mark-all-read', authenticate, async (req: AuthRequest, res) => {
     try {
         const userId = req.user?.userId;
         const userRole = req.user?.role;
 
         const where: any = { isRead: false };
 
-        // Filter by creator for regular admins
-        if (userRole === 'ADMIN') {
+        if (userRole !== 'SUPER_ADMIN') {
             where.createdById = userId;
         }
 
@@ -112,13 +102,12 @@ router.post('/mark-all-read', authenticate, authorizeAdmin, async (req: AuthRequ
 });
 
 // Delete a notification
-router.delete('/:id', authenticate, authorizeAdmin, async (req: AuthRequest, res) => {
+router.delete('/:id', authenticate, async (req: AuthRequest, res) => {
     try {
         const notificationId = req.params.id as string;
         const userId = req.user?.userId;
         const userRole = req.user?.role;
 
-        // Check permission
         const notification = await prisma.notification.findUnique({
             where: { id: notificationId }
         });
@@ -127,13 +116,11 @@ router.delete('/:id', authenticate, authorizeAdmin, async (req: AuthRequest, res
             return res.status(404).json({ message: 'Notification not found' });
         }
 
-        if (userRole === 'ADMIN' && notification.createdById !== userId) {
+        if (userRole !== 'SUPER_ADMIN' && notification.createdById !== userId) {
             return res.status(403).json({ message: 'You do not have permission to delete this notification' });
         }
 
-        await prisma.notification.delete({
-            where: { id: notificationId }
-        });
+        await prisma.notification.delete({ where: { id: notificationId } });
 
         res.json({ message: 'Notification deleted successfully' });
     } catch (error) {
