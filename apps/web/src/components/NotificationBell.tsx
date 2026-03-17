@@ -28,10 +28,19 @@ export default function NotificationBell() {
     const dropdownRef = useRef<HTMLDivElement>(null);
     const buttonRef = useRef<HTMLButtonElement>(null);
     const [mounted, setMounted] = useState(false);
+    const [notificationsHref, setNotificationsHref] = useState('/admin/notifications');
 
     const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
 
-    useEffect(() => { setMounted(true); }, []);
+    useEffect(() => {
+        setMounted(true);
+        try {
+            const user = JSON.parse(localStorage.getItem('user') || '{}');
+            if (user?.role === 'CANDIDATE') {
+                setNotificationsHref('/notifications');
+            }
+        } catch {}
+    }, []);
 
     const fetchNotifications = async () => {
         const token = localStorage.getItem('token');
@@ -229,7 +238,7 @@ export default function NotificationBell() {
             {notifications.length > 0 && (
                 <div className="p-3 border-t border-slate-200 dark:border-slate-700 text-center">
                     <Link
-                        href="/admin/notifications"
+                        href={notificationsHref}
                         onClick={() => setIsOpen(false)}
                         className="text-xs font-bold text-primary hover:underline"
                     >

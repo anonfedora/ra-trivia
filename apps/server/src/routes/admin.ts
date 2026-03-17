@@ -516,11 +516,32 @@ router.post('/sessions/release', authenticate, authorizeAdmin, async (req: AuthR
             return res.status(400).json({ message: 'sessionIds must be a non-empty array' });
         }
 
+        // Fetch sessions with user + quiz info before updating
+        const sessions = await prisma.quizSession.findMany({
+            where: { id: { in: sessionIds } },
+            include: { user: true, quiz: { select: { title: true } } }
+        });
+
         // Set resultReleasesAt to now for all specified sessions
         const updated = await prisma.quizSession.updateMany({
             where: { id: { in: sessionIds } },
             data: { resultReleasesAt: new Date() }
         });
+
+        // Notify each candidate their result is ready
+        if (sessions.length > 0) {
+            await prisma.notification.createMany({
+                data: sessions.map(s => ({
+                    type: 'RESULT_RELEASED',
+                    title: 'Your Result is Ready',
+                    message: `Your result for "${s.quiz.title}" has been released. Check your results now.`,
+                    quizId: s.quizId,
+                    sessionId: s.id,
+                    isRead: false,
+                    createdById: s.userId,
+                }))
+            });
+        }
 
         res.json({ message: `Released ${updated.count} result(s) successfully`, count: updated.count });
     } catch (error) {
@@ -534,14 +555,32 @@ router.post('/quizzes/:quizId/release-all', authenticate, authorizeAdmin, async 
     try {
         const quizId = req.params.quizId as string;
 
+        // Fetch sessions before updating so we have user info
+        const sessions = await prisma.quizSession.findMany({
+            where: { quizId, endTime: { not: null } },
+            include: { user: true, quiz: { select: { title: true } } }
+        });
+
         // Set resultReleasesAt to now for all sessions of this quiz
         const updated = await prisma.quizSession.updateMany({
-            where: { 
-                quizId,
-                endTime: { not: null } // Only release completed sessions
-            },
+            where: { quizId, endTime: { not: null } },
             data: { resultReleasesAt: new Date() }
         });
+
+        // Notify each candidate
+        if (sessions.length > 0) {
+            await prisma.notification.createMany({
+                data: sessions.map(s => ({
+                    type: 'RESULT_RELEASED',
+                    title: 'Your Result is Ready',
+                    message: `Your result for "${s.quiz.title}" has been released. Check your results now.`,
+                    quizId: s.quizId,
+                    sessionId: s.id,
+                    isRead: false,
+                    createdById: s.userId,
+                }))
+            });
+        }
 
         res.json({ message: `Released ${updated.count} result(s) for this quiz`, count: updated.count });
     } catch (error) {

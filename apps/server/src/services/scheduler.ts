@@ -88,6 +88,20 @@ async function processResultsRelease() {
                         where: { id: session.id },
                         data: { emailSent: true }
                     });
+
+                    // Notify the candidate in-app
+                    await prisma.notification.create({
+                        data: {
+                            type: 'RESULT_RELEASED',
+                            title: 'Your Result is Ready',
+                            message: `Your result for "${session.quiz.title}" has been released. Check your results now.`,
+                            quizId: session.quizId,
+                            sessionId: session.id,
+                            isRead: false,
+                            createdById: session.userId,
+                        }
+                    });
+
                     processedCount++;
                     console.log(`[SCHEDULER] ✅ Successfully sent email for session ${session.id}`);
                 } else {
