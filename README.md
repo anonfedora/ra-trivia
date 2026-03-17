@@ -4,31 +4,47 @@ A modern, feature-rich quiz application built for candidate assessment and exami
 
 ## 🎯 Overview
 
-RA Trivia is a comprehensive quiz platform designed for organizations to create, manage, and administer quizzes to candidates. It features real-time timers, progress tracking, email verification, scheduling, and detailed analytics.
+RA Trivia is a comprehensive quiz platform designed for organizations to create, manage, and administer quizzes to candidates. It features real-time timers, progress tracking, email verification, scheduling, detailed analytics, and a full in-app notification system.
 
 ## ✨ Key Features
 
 ### 🚀 For Candidates
 - **Real-time Quiz Experience**: Live timers, progress saving, and instant feedback
+- **User Type Filtering**: Candidates only see exams that match their rank/type (e.g. `AMBASSADOR_RANK_EXAMS`)
 - **Mobile Responsive**: Optimized for all devices and screen sizes
-- **Secure Authentication**: Email verification and secure login system
+- **Secure Authentication**: Email verification with auto-focused 6-digit OTP input
 - **Quiz History**: Track past attempts and view detailed results
 - **Flexible Submission**: Review answers or submit immediately
+- **In-App Notifications**: Get notified when a new matching exam is available or when results are released
+- **Candidate Notifications Page**: Filter notifications by New Exams or Results
 
 ### 🛠️ For Administrators
 - **Quiz Management**: Create, edit, and organize quizzes with ease
-- **Question Bank**: Support for multiple choice questions with randomized options
+- **Question Bank**: Support for multiple choice questions with randomized options per user type
 - **Scheduling Control**: Set start/end dates and time limits
 - **Retake Limits**: Configure maximum attempts per quiz
 - **Analytics Dashboard**: Monitor candidate performance and quiz statistics
 - **User Management**: View and manage candidate accounts
+- **Result Release**: Manually release results per-session or bulk per-quiz; scheduler auto-releases on time
+- **In-App Notifications**: Bell icon with dropdown — new account registrations, exam submissions, result releases
+- **Notification Filters**: Filter by All, Exams, Candidates, or Admins
+- **SUPER_ADMIN Oversight**: Sees all notifications across all admins and candidates
+
+### 🔔 Notification System
+- **NEW_EXAM_AVAILABLE**: Sent to matching candidates when an admin activates a quiz
+- **RESULT_RELEASED**: Sent to each candidate when their result is manually or automatically released
+- **NEW_USER_REGISTERED**: Sent to SUPER_ADMIN when any candidate registers
+- **NEW_ADMIN_REGISTERED**: Sent to SUPER_ADMIN when a new admin or super admin account is created
+- **EXAM_SUBMITTED**: Sent to admins when a candidate submits an exam
+- Bell dropdown floats above all content via React portal, mobile-safe with overflow clamping
 
 ### 🔧 Technical Features
 - **Modern Tech Stack**: Next.js 14, React 18, TypeScript, Prisma ORM
 - **Database**: PostgreSQL with optimized schema design
-- **Email Service**: Resend integration for verification and notifications
-- **Security**: Input sanitization, JWT authentication, and role-based access
+- **Email Service**: Resend integration for verification and result notifications
+- **Security**: Input sanitization, JWT authentication, and role-based access control
 - **Performance**: Optimized builds, lazy loading, and caching strategies
+- **CI Pipeline**: TypeScript checks, ESLint, build validation via `./scripts/test-ci-local.sh`
 
 ## 🏗️ Architecture
 
@@ -136,27 +152,47 @@ The application uses the following main entities:
 ### Authentication Endpoints
 
 ```bash
-POST /api/auth/register    # User registration
-POST /api/auth/login       # User login
-POST /api/auth/verify      # Email verification
+POST /api/auth/register          # User registration
+POST /api/auth/login             # User login
+POST /api/auth/verify-otp        # Email OTP verification (triggers account notifications)
+POST /api/auth/resend-otp        # Resend OTP code
 ```
 
 ### Quiz Endpoints
 
 ```bash
-GET  /api/quizzes          # List all quizzes
-GET  /api/quizzes/:id      # Get quiz details
-POST /api/quizzes/start    # Start quiz session
-POST /api/quizzes/submit   # Submit quiz answers
+GET    /api/quizzes              # List quizzes (filtered by role & user type)
+GET    /api/quizzes/:id          # Get quiz details
+PATCH  /api/quizzes/:id          # Update quiz metadata (admin)
+PATCH  /api/quizzes/:id/toggle   # Activate/deactivate quiz (notifies matching candidates)
+DELETE /api/quizzes/:id          # Delete quiz
+GET    /api/quiz/my-sessions     # Candidate's own sessions
+POST   /api/quiz/start           # Start quiz session
+POST   /api/quiz/submit          # Submit quiz answers
 ```
 
 ### Admin Endpoints
 
 ```bash
-GET  /api/admin/quizzes    # Manage quizzes
-POST /api/admin/quizzes    # Create quiz
-PUT  /api/admin/quizzes/:id # Update quiz
-DELETE /api/admin/quizzes/:id # Delete quiz
+GET  /api/admin/results                        # All candidate results (paginated, searchable)
+GET  /api/admin/analytics                      # Quiz performance analytics
+GET  /api/admin/global-stats                   # Platform-wide statistics
+POST /api/admin/sessions/release               # Manually release results for sessions
+POST /api/admin/quizzes/:quizId/release-all    # Release all results for a quiz
+PATCH /api/admin/sessions/:sessionId/status    # Set manual pass/fail status
+POST /api/admin/trigger-emails                 # Manually trigger pending result emails
+GET  /api/admin/export/formatted-excel         # Export formatted Excel report
+GET  /api/admin/export/pdf                     # Export PDF report
+GET  /api/admin/export/:quizId                 # Export per-quiz Excel report
+```
+
+### Notification Endpoints
+
+```bash
+GET  /api/notifications              # Get notifications (own for candidates/admins, all for SUPER_ADMIN)
+PATCH /api/notifications/:id/read    # Mark notification as read
+POST /api/notifications/mark-all-read # Mark all as read
+DELETE /api/notifications/:id        # Delete notification
 ```
 
 ## 🧪 Testing
@@ -304,7 +340,7 @@ For support and questions:
 
 ## 🔄 Version History
 
-### v1.0.0 (Current)
+### v1.0.0
 - Core quiz functionality
 - User authentication and verification
 - Admin dashboard
@@ -312,22 +348,30 @@ For support and questions:
 - Real-time quiz experience
 - Scheduling and retake limits
 
-### v1.1.0 (Enhancements)
-- ✅ **Fixed TypeScript Errors**: Resolved all test compilation issues
-- ✅ **Enhanced Exam Preview**: Fixed blank quiz pages with fallback options
-- ✅ **Improved Date Format**: PDF reports now use DD/MM/YYYY format
-- ✅ **Better Filenames**: Export files include exam names with underscores
-- ✅ **Phantom Session Prevention**: Added detection and cleanup for orphaned sessions
-- ✅ **Cloud PDF Generation**: Fixed Puppeteer configuration for Render hosting
-- ✅ **Admin Test Protection**: Added confirmation dialogs to prevent accidental session creation
-- ✅ **Enhanced Logging**: Better debugging and error tracking
-- ✅ **All Tests Passing**: Complete test suite coverage
+### v1.1.0
+- Fixed TypeScript errors and test compilation issues
+- Enhanced exam preview with fallback options
+- PDF reports with DD/MM/YYYY date format and exam-named filenames
+- Phantom session detection and cleanup
+- Puppeteer configuration for cloud (Render) PDF generation
+- Admin test protection with confirmation dialogs
 
-### v1.2.0 (Recent Fixes)
-- 🔧 **PDF Export**: Fixed syntax errors and cloud deployment issues
-- 🔧 **Session Management**: Resolved phantom session creation bugs
-- 🔧 **Error Handling**: Improved robustness across all services
-- 🔧 **Performance**: Optimized for production environments
+### v1.2.0
+- PDF export and session management bug fixes
+- Improved error handling and robustness across services
+
+### v1.3.0 (Current)
+- **User Type Filtering**: Candidates only see and are notified about exams matching their type
+- **Full Notification System**: In-app bell with portal dropdown for admins and candidates
+  - `NEW_EXAM_AVAILABLE` — candidates notified when a matching quiz is activated
+  - `RESULT_RELEASED` — candidates notified on manual or scheduled result release
+  - `NEW_USER_REGISTERED` / `NEW_ADMIN_REGISTERED` — SUPER_ADMIN notified on all new accounts
+  - `EXAM_SUBMITTED` — admins notified when candidates submit
+- **Notification Pages**: Admin page with Exams/Candidates/Admins filter tabs; candidate page with New Exams/Results tabs
+- **OTP UX**: Auto-focus on first input box after redirect from registration; responsive layout on narrow screens
+- **Mobile Fixes**: Notification dropdown overflow clamped on narrow screens; OTP inputs scale correctly on 320px devices
+- **CI Fix**: Removed `500.tsx` (Pages Router file incompatible with App Router) that caused build failures
+- **@types/react override**: Pinned to `^18.3.0` via pnpm workspace overrides to prevent version conflicts
 
 ---
 
