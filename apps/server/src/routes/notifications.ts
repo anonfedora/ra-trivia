@@ -15,11 +15,23 @@ router.get('/', authenticate, async (req: AuthRequest, res) => {
 
         const where: any = {};
 
-        if (userRole !== 'SUPER_ADMIN') {
-            // Admins and candidates only see their own notifications
+        // Candidate-only notification types — never shown to admins
+        const CANDIDATE_TYPES = ['NEW_EXAM_AVAILABLE', 'RESULT_RELEASED'];
+        // Admin-only notification types — never shown to candidates
+        const ADMIN_TYPES = ['EXAM_SUBMITTED', 'NEW_USER_REGISTERED', 'NEW_ADMIN_REGISTERED'];
+
+        if (userRole === 'SUPER_ADMIN') {
+            // SUPER_ADMIN only sees admin-relevant notifications, not candidate-scoped ones
+            where.type = { in: ADMIN_TYPES };
+        } else if (userRole === 'ADMIN') {
+            // Regular admins see only their own admin notifications
             where.createdById = userId;
+            where.type = { in: ADMIN_TYPES };
+        } else {
+            // Candidates see only their own candidate notifications
+            where.createdById = userId;
+            where.type = { in: CANDIDATE_TYPES };
         }
-        // SUPER_ADMIN sees all notifications
 
         if (unreadOnly) {
             where.isRead = false;
@@ -83,10 +95,19 @@ router.post('/mark-all-read', authenticate, async (req: AuthRequest, res) => {
         const userId = req.user?.userId;
         const userRole = req.user?.role;
 
+        const CANDIDATE_TYPES = ['NEW_EXAM_AVAILABLE', 'RESULT_RELEASED'];
+        const ADMIN_TYPES = ['EXAM_SUBMITTED', 'NEW_USER_REGISTERED', 'NEW_ADMIN_REGISTERED'];
+
         const where: any = { isRead: false };
 
-        if (userRole !== 'SUPER_ADMIN') {
+        if (userRole === 'SUPER_ADMIN') {
+            where.type = { in: ADMIN_TYPES };
+        } else if (userRole === 'ADMIN') {
             where.createdById = userId;
+            where.type = { in: ADMIN_TYPES };
+        } else {
+            where.createdById = userId;
+            where.type = { in: CANDIDATE_TYPES };
         }
 
         const result = await prisma.notification.updateMany({
