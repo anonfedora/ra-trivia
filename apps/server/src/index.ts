@@ -2,8 +2,10 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 import express from 'express';
+import { createServer } from 'http';
 import cors from 'cors';
 import helmet from 'helmet';
+import { Server as SocketIOServer } from 'socket.io';
 import { validateEnv } from './utils/envValidator';
 import { apiLimiter, authLimiter } from './middlewares/rateLimiter';
 import { globalErrorHandler } from './middlewares/errorHandler';
@@ -16,6 +18,7 @@ import quizzesRoutes from './routes/quizzes';
 import notificationRoutes from './routes/notifications';
 import passwordRequirementsRoutes from './routes/password-requirements';
 import { initScheduler } from './services/scheduler';
+import { initSocketIO } from './services/socketService';
 
 // Validate environment variables on startup
 validateEnv();
@@ -36,6 +39,7 @@ async function testDatabaseConnection() {
 testDatabaseConnection();
 
 const app = express();
+const httpServer = createServer(app);
 const PORT = process.env.PORT || 4000;
 
 // Trust proxy for Render deployment (only trust Render's proxy)
@@ -117,7 +121,17 @@ app.get('/health', (req, res) => {
 // Global error handler (must be last)
 app.use(globalErrorHandler);
 
-app.listen(PORT, () => {
+// Initialize Socket.IO
+const io = new SocketIOServer(httpServer, {
+    cors: {
+        origin: allowedOrigins,
+        methods: ['GET', 'POST'],
+        credentials: true
+    }
+});
+initSocketIO(io);
+
+httpServer.listen(PORT, () => {
     console.log(`🚀 Server is running on port ${PORT}`);
     console.log(`📝 Environment: ${process.env.NODE_ENV || 'development'}`);
 

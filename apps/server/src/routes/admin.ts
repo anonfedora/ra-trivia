@@ -3,6 +3,7 @@ import { prisma, UserType } from 'database';
 import { authenticate, authorizeAdmin, AuthRequest } from '../middlewares/auth';
 import * as xlsx from 'xlsx';
 import { ReportGenerator } from '../services/reportGenerator';
+import { emitNotification } from '../services/socketService';
 
 const router = Router();
 
@@ -530,17 +531,19 @@ router.post('/sessions/release', authenticate, authorizeAdmin, async (req: AuthR
 
         // Notify each candidate their result is ready
         if (sessions.length > 0) {
-            await prisma.notification.createMany({
-                data: sessions.map(s => ({
-                    type: 'RESULT_RELEASED',
-                    title: 'Your Result is Ready',
-                    message: `Your result for "${s.quiz.title}" has been released. Check your results now.`,
-                    quizId: s.quizId,
-                    sessionId: s.id,
-                    isRead: false,
-                    createdById: s.userId,
-                }))
-            });
+            const notifData = sessions.map(s => ({
+                type: 'RESULT_RELEASED',
+                title: 'Your Result is Ready',
+                message: `Your result for "${s.quiz.title}" has been released. Check your results now.`,
+                quizId: s.quizId,
+                sessionId: s.id,
+                isRead: false,
+                createdById: s.userId,
+            }));
+            await prisma.notification.createMany({ data: notifData });
+            for (const notif of notifData) {
+                emitNotification(notif.createdById, { ...notif, createdAt: new Date().toISOString() });
+            }
         }
 
         res.json({ message: `Released ${updated.count} result(s) successfully`, count: updated.count });
@@ -569,17 +572,19 @@ router.post('/quizzes/:quizId/release-all', authenticate, authorizeAdmin, async 
 
         // Notify each candidate
         if (sessions.length > 0) {
-            await prisma.notification.createMany({
-                data: sessions.map(s => ({
-                    type: 'RESULT_RELEASED',
-                    title: 'Your Result is Ready',
-                    message: `Your result for "${s.quiz.title}" has been released. Check your results now.`,
-                    quizId: s.quizId,
-                    sessionId: s.id,
-                    isRead: false,
-                    createdById: s.userId,
-                }))
-            });
+            const notifData = sessions.map(s => ({
+                type: 'RESULT_RELEASED',
+                title: 'Your Result is Ready',
+                message: `Your result for "${s.quiz.title}" has been released. Check your results now.`,
+                quizId: s.quizId,
+                sessionId: s.id,
+                isRead: false,
+                createdById: s.userId,
+            }));
+            await prisma.notification.createMany({ data: notifData });
+            for (const notif of notifData) {
+                emitNotification(notif.createdById, { ...notif, createdAt: new Date().toISOString() });
+            }
         }
 
         res.json({ message: `Released ${updated.count} result(s) for this quiz`, count: updated.count });

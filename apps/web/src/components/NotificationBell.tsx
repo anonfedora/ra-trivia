@@ -5,6 +5,7 @@ import { createPortal } from 'react-dom';
 import { Bell, Check, CheckCheck, Trash2, X } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import Link from 'next/link';
+import { io, Socket } from 'socket.io-client';
 
 interface Notification {
     id: string;
@@ -60,9 +61,33 @@ export default function NotificationBell() {
 
     useEffect(() => {
         fetchNotifications();
-        // Poll for new notifications every 30 seconds
-        const interval = setInterval(fetchNotifications, 30000);
-        return () => clearInterval(interval);
+
+        // Connect to Socket.IO for real-time notifications
+        const token = localStorage.getItem('token');
+        if (!token) return;
+
+        const socketUrl = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api').replace('/api', '');
+        const socket: Socket = io(socketUrl, {
+            auth: { token },
+            transports: ['websocket', 'polling'],
+            reconnectionAttempts: 5,
+        });
+
+        socket.on('notification', () => {
+            // A new notification arrived — refresh the list
+            fetchNotifications();
+        });
+
+        socket.on('connect_error', (err) => {
+            console.warn('[SOCKET] Connection error, falling back to polling:', err.message);
+            // Fallback: poll every 30s if socket fails
+            const interval = setInterval(fetchNotifications, 30000);
+            return () => clearInterval(interval);
+        });
+
+        return () => {
+            socket.disconnect();
+        };
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 

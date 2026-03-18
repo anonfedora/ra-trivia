@@ -5,13 +5,14 @@ import crypto from 'crypto';
 import { prisma } from 'database';
 import { body } from 'express-validator';
 import { handleValidationErrors } from '../middlewares/errorHandler';
-import { sendVerificationEmail, generateOTP } from '../services/email';
+import { sendVerificationEmail, generateOTP, sendPasswordResetEmail } from '../services/email';
 import { authenticate, AuthRequest } from '../middlewares/auth';
 import {
     passwordValidation,
     emailValidation,
     nameValidation
 } from '../utils/validation';
+import { emitNotification } from '../services/socketService';
 
 const router = Router();
 const JWT_SECRET = process.env.JWT_SECRET!; // Will be validated on startup
@@ -356,17 +357,19 @@ router.post('/verify-otp', [
             const isAdminRole = user.role === 'SUPER_ADMIN' || user.role === 'ADMIN';
             const roleLabel = user.role === 'SUPER_ADMIN' ? 'Super Admin' : user.role === 'ADMIN' ? 'Admin' : 'Candidate';
             const notifType = isAdminRole ? 'NEW_ADMIN_REGISTERED' : 'NEW_USER_REGISTERED';
-            await prisma.notification.createMany({
-                data: superAdmins.map(sa => ({
-                    type: notifType,
-                    title: `New ${roleLabel} Registered`,
-                    message: `${user.name} (${user.email}) has verified their account and joined as ${roleLabel}.`,
-                    candidateName: user.name,
-                    candidateEmail: user.email,
-                    isRead: false,
-                    createdById: sa.id,
-                }))
-            });
+            const notifData = superAdmins.map(sa => ({
+                type: notifType,
+                title: `New ${roleLabel} Registered`,
+                message: `${user.name} (${user.email}) has verified their account and joined as ${roleLabel}.`,
+                candidateName: user.name,
+                candidateEmail: user.email,
+                isRead: false,
+                createdById: sa.id,
+            }));
+            await prisma.notification.createMany({ data: notifData });
+            for (const notif of notifData) {
+                emitNotification(notif.createdById, { ...notif, createdAt: new Date().toISOString() });
+            }
         }
 
         const token = jwt.sign({ userId: user.id, role: user.role, userType: user.userType }, JWT_SECRET, { expiresIn: '24h' });
@@ -566,6 +569,82 @@ router.put('/profile', authenticate, [
     } catch (error) {
         console.error('[AUTH] Update profile error:', error);
         res.status(500).json({ message: 'Internal server error' });
+    }
+});
+
+// Forgot password — send reset link
+router.post('/forgot-password', [
+    body('email').isEmail().withMessage('Please provide a valid email address').trim()
+], handleValidationErrors, async (req: Request, res: Response) => {
+    try {
+        const { email } = req.body as { email: string };
+        const user = await prisma.user.findUnique({ where: { email } });
+
+        // Always return the same message to prevent user enumeration
+        const genericMsg = 'If an account exists for this email, a password reset link has been sent.';
+
+        if (!user || !user.emailVerified) {
+            return res.json({ message: genericMsg });
+        }
+
+        const rawToken = crypto.randomBytes(32).toString('hex');
+        const tokenHash = crypto.createHash('sha256').update(rawToken).digest('hex');
+        const expiresAt = new Date(Date.now() + 1000 * 60 * 60); // 1 hour
+
+        await prisma.user.update({
+            where: { id: user.id },
+            data: {
+                passwordResetTokenHash: tokenHash,
+                passwordResetTokenExpiresAt: expiresAt
+            }
+        });
+
+        const resetUrl = `${WEB_URL}/reset-password?token=${rawToken}`;
+        sendPasswordResetEmail(user.email, user.name, resetUrl)
+            .catch(err => console.error('[AUTH] Password reset email failed:', err));
+
+        return res.json({ message: genericMsg });
+    } catch (error) {
+        console.error('[AUTH] Forgot password error:', error);
+        return res.status(500).json({ message: 'Internal server error' });
+    }
+});
+
+// Reset password — consume token and set new password
+router.post('/reset-password', [
+    body('token').notEmpty().withMessage('Reset token is required'),
+    passwordValidation()
+], handleValidationErrors, async (req: Request, res: Response) => {
+    try {
+        const { token, password } = req.body as { token: string; password: string };
+
+        const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+        const user = await prisma.user.findFirst({
+            where: {
+                passwordResetTokenHash: tokenHash,
+                passwordResetTokenExpiresAt: { gt: new Date() }
+            }
+        });
+
+        if (!user) {
+            return res.status(400).json({ message: 'Reset link is invalid or has expired.' });
+        }
+
+        const hashedPassword = await bcrypt.hash(password, 12);
+
+        await prisma.user.update({
+            where: { id: user.id },
+            data: {
+                password: hashedPassword,
+                passwordResetTokenHash: null,
+                passwordResetTokenExpiresAt: null
+            }
+        });
+
+        return res.json({ message: 'Password reset successfully. You can now log in.' });
+    } catch (error) {
+        console.error('[AUTH] Reset password error:', error);
+        return res.status(500).json({ message: 'Internal server error' });
     }
 });
 

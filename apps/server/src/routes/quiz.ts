@@ -3,6 +3,7 @@ import { prisma } from 'database';
 import { authenticate, AuthRequest } from '../middlewares/auth';
 import { validateUserTypeAccess, filterQuestionsByUserType } from '../middlewares/userTypeAccess';
 import { sendQuizResultEmail } from '../services/email';
+import { emitNotification } from '../services/socketService';
 
 const router = Router();
 
@@ -347,7 +348,7 @@ router.post('/submit', authenticate, async (req: AuthRequest, res) => {
         // Create notification for the quiz creator
         if (updatedSession.quiz.createdById) {
             try {
-                await prisma.notification.create({
+                const notif = await prisma.notification.create({
                     data: {
                         type: 'EXAM_SUBMITTED',
                         title: 'New Exam Submission',
@@ -360,6 +361,7 @@ router.post('/submit', authenticate, async (req: AuthRequest, res) => {
                         isRead: false
                     }
                 });
+                emitNotification(updatedSession.quiz.createdById, notif);
                 console.log(`[NOTIFICATION] Created notification for quiz creator ${updatedSession.quiz.createdById}`);
             } catch (notifError) {
                 console.error('[NOTIFICATION] Failed to create notification:', notifError);

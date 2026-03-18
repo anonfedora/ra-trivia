@@ -1,5 +1,6 @@
 import { prisma } from 'database';
 import { sendQuizResultEmail } from './email';
+import { emitNotification } from './socketService';
 
 export const initScheduler = () => {
     console.log('⏰ Initializing results release scheduler...');
@@ -90,7 +91,7 @@ async function processResultsRelease() {
                     });
 
                     // Notify the candidate in-app
-                    await prisma.notification.create({
+                    const notif = await prisma.notification.create({
                         data: {
                             type: 'RESULT_RELEASED',
                             title: 'Your Result is Ready',
@@ -101,6 +102,7 @@ async function processResultsRelease() {
                             createdById: session.userId,
                         }
                     });
+                    emitNotification(session.userId, notif);
 
                     processedCount++;
                     console.log(`[SCHEDULER] ✅ Successfully sent email for session ${session.id}`);

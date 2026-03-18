@@ -122,8 +122,33 @@ export const sendQuizResultEmail = async (
   return ok;
 };
 
-export const generateOTP = (): string => {
-  return Math.floor(100000 + Math.random() * 900000).toString().padStart(6, '0');
+export const sendPasswordResetEmail = async (
+  email: string,
+  name: string,
+  resetUrl: string
+): Promise<boolean> => {
+  const html = `
+    <div style="font-family: sans-serif; max-width: 600px; margin: auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 10px;">
+      <h1 style="color: #1e293b;">Reset Your Password</h1>
+      <p style="font-size: 16px; color: #334155;">Hi ${name},</p>
+      <p style="font-size: 16px; color: #334155;">We received a request to reset your password. Click the button below to set a new one. This link expires in <strong>1 hour</strong>.</p>
+      <div style="text-align: center; margin: 30px 0;">
+        <a href="${resetUrl}" style="background-color: #2563eb; color: white; padding: 14px 28px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block;">Reset Password</a>
+      </div>
+      <p style="font-size: 14px; color: #64748b;">If you didn't request this, you can safely ignore this email — your password won't change.</p>
+      <p style="font-size: 12px; color: #94a3b8; word-break: break-all; background: #f8fafc; padding: 10px; border-radius: 4px;">${resetUrl}</p>
+      <p style="margin-top: 20px; color: #94a3b8; font-size: 12px; border-top: 1px solid #eee; padding-top: 20px;">This is an automated message. Please do not reply.</p>
+    </div>
+  `;
+
+  if (logEmailForDev(email, 'Reset your password', html)) return true;
+
+  const ok = await sendMail(email, 'Reset your password', html, `Reset your password: ${resetUrl}`);
+  console.log(`[EMAIL] Password reset email to ${email}: ${ok ? 'OK' : 'FAILED'}`);
+  return ok;
+};
+
+export const generateOTP = (): string => {  return Math.floor(100000 + Math.random() * 900000).toString().padStart(6, '0');
 };
 
 export const sendVerificationEmail = async (

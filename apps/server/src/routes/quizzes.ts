@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { prisma } from 'database';
 import { authenticate, AuthRequest, authorize } from '../middlewares/auth';
 import { validateQuizListAccess, validateUserTypeAccess } from '../middlewares/userTypeAccess';
+import { emitNotification } from '../services/socketService';
 
 const router = Router();
 
@@ -299,16 +300,20 @@ router.patch('/:id/toggle', authenticate, authorize(['ADMIN', 'SUPER_ADMIN']), a
                 });
 
                 if (candidates.length > 0) {
-                    await prisma.notification.createMany({
-                        data: candidates.map(c => ({
-                            type: 'NEW_EXAM_AVAILABLE',
-                            title: 'New Exam Available',
-                            message: `A new exam "${quiz.title}" is now available for you to take.`,
-                            quizId: id,
-                            isRead: false,
-                            createdById: c.id, // candidate's own ID for filtering
-                        }))
-                    });
+                    const notifData = candidates.map(c => ({
+                        type: 'NEW_EXAM_AVAILABLE',
+                        title: 'New Exam Available',
+                        message: `A new exam "${quiz.title}" is now available for you to take.`,
+                        quizId: id,
+                        isRead: false,
+                        createdById: c.id,
+                    }));
+                    await prisma.notification.createMany({ data: notifData });
+
+                    // Emit real-time notification to each candidate
+                    for (const notif of notifData) {
+                        emitNotification(notif.createdById, { ...notif, createdAt: new Date().toISOString() });
+                    }
                     console.log(`[QUIZ_TOGGLE] Notified ${candidates.length} candidates about quiz "${quiz.title}"`);
                 }
             }
