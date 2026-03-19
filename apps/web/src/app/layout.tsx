@@ -2,6 +2,9 @@ import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "../contexts/ThemeContext";
+import { ToastProvider } from "../contexts/ToastContext";
+import Toaster from "../components/Toaster";
+import ErrorBoundary from "../components/ErrorBoundary";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -23,9 +26,14 @@ export default function RootLayout({
     return (
         <html lang="en">
             <ThemeProvider>
-                <body className={`${inter.className} bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-slate-50 transition-colors duration-200`}>
-                    {children}
-                </body>
+                <ToastProvider>
+                    <body className={`${inter.className} bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-slate-50 transition-colors duration-200`}>
+                        <ErrorBoundary>
+                            {children}
+                        </ErrorBoundary>
+                        <Toaster />
+                    </body>
+                </ToastProvider>
             </ThemeProvider>
         </html>
     );
