@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { ThemeToggle } from '../../../components/ThemeToggle';
+import { useToast } from '../../../contexts/ToastContext';
 
 export const dynamic = 'force-dynamic';
 
@@ -21,6 +22,7 @@ export default function QuizPage() {
     const [showReview, setShowReview] = useState(false);
     const [leaveCount, setLeaveCount] = useState(0);
     const leaveCountRef = useRef(0);
+    const { toast } = useToast();
 
     const handleSubmit = useCallback(async () => {
         if (isSubmitting) return;
@@ -38,13 +40,13 @@ export default function QuizPage() {
             });
             
             if (!token) {
-                alert('Authentication token not found. Please log in again.');
+                toast('Authentication token not found. Please log in again.', 'error');
                 router.push('/login');
                 return;
             }
             
             if (!session?.id) {
-                alert('Session not found. Please restart the quiz.');
+                toast('Session not found. Please restart the quiz.', 'error');
                 router.push('/dashboard');
                 return;
             }
@@ -91,12 +93,12 @@ export default function QuizPage() {
             } else {
                 const data = await res.json().catch(() => ({ message: 'Unknown error occurred' }));
                 console.error('Submission failed:', { status: res.status, statusText: res.statusText, data });
-                alert(data.message || `Submission failed (${res.status}: ${res.statusText})`);
+                toast(data.message || `Submission failed (${res.status}: ${res.statusText})`, 'error');
                 setIsSubmitting(false);
             }
         } catch (err) {
             console.error('Submission error:', err);
-            alert(`An error occurred during submission: ${err instanceof Error ? err.message : 'Unknown error'}`);
+            toast(`An error occurred during submission: ${err instanceof Error ? err.message : 'Unknown error'}`, 'error');
             setIsSubmitting(false);
         }
     }, [isSubmitting, session?.id, router]);
@@ -173,12 +175,12 @@ export default function QuizPage() {
                 }
             } else {
                 console.error('Quiz fetch failed:', data);
-                alert(`Failed to start quiz: ${data.message || 'Unknown error'}`);
+                toast(`Failed to start quiz: ${data.message || 'Unknown error'}`, 'error');
                 router.push('/dashboard');
             }
         } catch (err) {
             console.error('Quiz fetch error:', err);
-            alert(`An error occurred while starting the quiz: ${err instanceof Error ? err.message : 'Unknown error'}`);
+            toast(`An error occurred while starting the quiz: ${err instanceof Error ? err.message : 'Unknown error'}`, 'error');
             router.push('/dashboard');
         }
     }, [quizId, router]);
@@ -265,10 +267,25 @@ export default function QuizPage() {
         fetchQuiz();
     }, [fetchQuiz]);
 
+    // Disable copy, paste, cut, and right-click during the exam
     useEffect(() => {
-        // Don't run timer logic if quiz or session aren't loaded yet
+        if (!session) return;
+        const prevent = (e: Event) => e.preventDefault();
+        document.addEventListener('copy', prevent);
+        document.addEventListener('paste', prevent);
+        document.addEventListener('cut', prevent);
+        document.addEventListener('contextmenu', prevent);
+        return () => {
+            document.removeEventListener('copy', prevent);
+            document.removeEventListener('paste', prevent);
+            document.removeEventListener('cut', prevent);
+            document.removeEventListener('contextmenu', prevent);
+        };
+    }, [session]);
+
+    useEffect(() => {
         if (!quiz || !session) return;
-        
+
         console.log('Timer useEffect triggered:', {
             timeLeft,
             quizLoaded: !!quiz,

@@ -5,6 +5,7 @@ import { Bell, Check, CheckCheck, Trash2, ArrowLeft, ClipboardList, UserPlus, Sh
 import Link from 'next/link';
 import { formatDistanceToNow } from 'date-fns';
 import { ThemeToggle } from '../../../components/ThemeToggle';
+import { useToast } from '../../../contexts/ToastContext';
 
 interface Notification {
     id: string;
@@ -47,6 +48,7 @@ export default function NotificationsPage() {
     const [unreadCount, setUnreadCount] = useState(0);
     const [activeFilter, setActiveFilter] = useState<FilterType>('ALL');
     const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
+    const { toast } = useToast();
 
     const fetchNotifications = useCallback(async () => {
         const token = localStorage.getItem('token');
@@ -61,6 +63,7 @@ export default function NotificationsPage() {
             }
         } catch (err) {
             console.error('Failed to fetch notifications', err);
+            toast('Failed to load notifications. Please refresh.', 'error');
         } finally {
             setIsLoading(false);
         }

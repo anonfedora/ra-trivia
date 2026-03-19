@@ -1,6 +1,7 @@
 "use client";
 
 import Link from 'next/link';
+import Image from 'next/image';
 import { ThemeToggle } from '../components/ThemeToggle';
 
 export default function LandingPage() {
@@ -15,9 +16,11 @@ export default function LandingPage() {
 
             <div className="max-w-3xl w-full">
                 <div className="mb-10 animate-fade-in">
-                    <img
+                    <Image
                         src="/favicon.png"
                         alt="RA Logo"
+                        width={80}
+                        height={80}
                         className="w-20 h-20 mx-auto mb-6 rounded-xl shadow-lg"
                     />
                     <h1 className="text-6xl font-extrabold text-slate-900 dark:text-slate-50 tracking-tight mb-6">

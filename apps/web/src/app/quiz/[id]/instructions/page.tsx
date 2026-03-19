@@ -18,6 +18,7 @@ interface Quiz {
 }
 
 import { ThemeToggle } from '../../../../components/ThemeToggle';
+import { useToast } from '../../../../contexts/ToastContext';
 
 export default function InstructionsPage() {
     const [quiz, setQuiz] = useState<Quiz | null>(null);
@@ -25,6 +26,7 @@ export default function InstructionsPage() {
     const router = useRouter();
     const params = useParams();
     const quizId = params?.id as string;
+    const { toast } = useToast();
 
     useEffect(() => {
         const token = localStorage.getItem('token');
@@ -53,13 +55,13 @@ export default function InstructionsPage() {
                     // Check scheduling
                     const now = new Date();
                     if (quizData.startDate && now < new Date(quizData.startDate)) {
-                        alert('This quiz has not started yet. Please check back later.');
+                        toast('This quiz has not started yet. Please check back later.', 'warning');
                         router.push('/dashboard');
                         return;
                     }
 
                     if (quizData.endDate && now > new Date(quizData.endDate)) {
-                        alert('This quiz has ended. You can no longer take this exam.');
+                        toast('This quiz has ended. You can no longer take this exam.', 'warning');
                         router.push('/dashboard');
                         return;
                     }
@@ -67,7 +69,7 @@ export default function InstructionsPage() {
                     // Check retake limit
                     const completedAttempts = sessionsData.filter((s: any) => s.status === 'COMPLETED').length;
                     if (quizData.retakeLimit !== null && completedAttempts >= quizData.retakeLimit) {
-                        alert('You have reached the maximum number of attempts for this quiz.');
+                        toast('You have reached the maximum number of attempts for this quiz.', 'warning');
                         router.push('/dashboard');
                         return;
                     }

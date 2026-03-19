@@ -4,7 +4,7 @@ import "./globals.css";
 import { ThemeProvider } from "../contexts/ThemeContext";
 import { ToastProvider } from "../contexts/ToastContext";
 import Toaster from "../components/Toaster";
-import ErrorBoundary from "../components/ErrorBoundary";
+import ClientProviders from "../components/ClientProviders";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -28,9 +28,9 @@ export default function RootLayout({
             <ThemeProvider>
                 <ToastProvider>
                     <body className={`${inter.className} bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-slate-50 transition-colors duration-200`}>
-                        <ErrorBoundary>
+                        <ClientProviders>
                             {children}
-                        </ErrorBoundary>
+                        </ClientProviders>
                         <Toaster />
                     </body>
                 </ToastProvider>

@@ -3,9 +3,11 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import Image from 'next/image';
 import { BookOpen, Clock, PlayCircle, LogOut, Calendar, Repeat, User } from 'lucide-react';
 import { ThemeToggle } from '../../components/ThemeToggle';
 import NotificationBell from '../../components/NotificationBell';
+import { useToast } from '../../contexts/ToastContext';
 
 interface Quiz {
     id: string;
@@ -39,6 +41,7 @@ export default function DashboardPage() {
     const [isLoading, setIsLoading] = useState(true);
     const [user, setUser] = useState<any>(null);
     const router = useRouter();
+    const { toast } = useToast();
 
     const formatDateTime = (value: string) => {
         const d = new Date(value);
@@ -111,9 +114,12 @@ export default function DashboardPage() {
 
                     setQuizzes(quizzesWithAttempts);
                     setPastSessions(sessionsData);
+                } else {
+                    toast('Failed to load dashboard data. Please refresh.', 'error');
                 }
             } catch (err) {
                 console.error('Failed to fetch data', err);
+                toast('Network error. Could not load dashboard.', 'error');
             } finally {
                 setIsLoading(false);
             }
@@ -141,9 +147,11 @@ export default function DashboardPage() {
             <div className="max-w-6xl mx-auto">
                 <header className="flex justify-between items-center mb-12 animate-fade-in text-center md:text-left">
                     <div className="flex items-center gap-4 text-left">
-                        <img
+                        <Image
                             src="/favicon.png"
                             alt="RA Logo"
+                            width={48}
+                            height={48}
                             className="w-12 h-12 rounded-lg"
                         />
                         <div>
@@ -233,7 +241,7 @@ export default function DashboardPage() {
                                                         onClick={(e) => {
                                                             if (remainingTries === 0) {
                                                                 e.preventDefault();
-                                                                alert('You have no attempts left for this exam.');
+                                                                toast('You have no attempts left for this exam.', 'warning');
                                                             }
                                                         }}
                                                     >
