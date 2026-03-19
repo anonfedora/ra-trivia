@@ -192,23 +192,45 @@ export default function InstructionsPage() {
 
                     <div className="space-y-4">
                         <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
-                            System Rules & Guidelines
+                            <CheckCircle size={18} className="text-emerald-500" /> Exam Guidelines
                         </h3>
                         <ul className="space-y-3">
                             {[
                                 "The timer starts immediately after you click 'Start Exam'.",
                                 "Answers are automatically saved as you navigate between questions.",
-                                "You can move back and forth to review your answers.",
+                                "You can move back and forth to review your answers before submitting.",
                                 "Ensure you have a stable internet connection throughout the session.",
-                                "Do not refresh the page or close the tab as the timer continues running.",
                                 "The exam will auto-submit when the timer expires."
                             ].map((rule, i) => (
                                 <li key={i} className="flex gap-3 text-slate-600 dark:text-slate-400">
-                                    <CheckCircle size={18} className="text-emerald-500 mt-1 flex-shrink-0" />
+                                    <CheckCircle size={18} className="text-emerald-500 mt-0.5 flex-shrink-0" />
                                     <span className="font-medium text-sm leading-relaxed">{rule}</span>
                                 </li>
                             ))}
                         </ul>
+                    </div>
+
+                    <div className="space-y-4">
+                        <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+                            <AlertCircle size={18} className="text-red-500" /> Anti-Cheat & Violations
+                        </h3>
+                        <div className="bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-900/40 rounded-2xl p-5">
+                            <ul className="space-y-3">
+                                {[
+                                    "Switching tabs or minimizing the browser window is detected and logged.",
+                                    "Copying, pasting, or right-clicking is disabled during the exam.",
+                                    "Do not refresh the page or close the tab — the timer keeps running.",
+                                    "Each violation is recorded and may be reviewed by the examiner.",
+                                    "Excessive violations may result in automatic exam termination.",
+                                    "Using external tools, AI assistants, or other aids is strictly prohibited."
+                                ].map((rule, i) => (
+                                    <li key={i} className="flex gap-3 text-red-700 dark:text-red-300">
+                                        <AlertCircle size={16} className="text-red-500 mt-0.5 flex-shrink-0" />
+                                        <span className="font-medium text-sm leading-relaxed">{rule}</span>
+                                    </li>
+                                ))}
+                            </ul>
+                        </div>
                     </div>
 
                     <button

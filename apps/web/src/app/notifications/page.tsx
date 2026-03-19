@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { Bell, Check, CheckCheck, Trash2, ArrowLeft, ClipboardList, BookOpen } from 'lucide-react';
+import { Bell, Check, CheckCheck, Trash2, ArrowLeft, ClipboardList, BookOpen, ExternalLink } from 'lucide-react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { formatDistanceToNow } from 'date-fns';
 import { ThemeToggle } from '../../components/ThemeToggle';
 
@@ -11,6 +12,8 @@ interface Notification {
     type: string;
     title: string;
     message: string;
+    quizId?: string | null;
+    sessionId?: string | null;
     isRead: boolean;
     createdAt: string;
 }
@@ -28,6 +31,7 @@ export default function CandidateNotificationsPage() {
     const [isLoading, setIsLoading] = useState(true);
     const [unreadCount, setUnreadCount] = useState(0);
     const [activeFilter, setActiveFilter] = useState<FilterType>('ALL');
+    const router = useRouter();
     const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
 
     const fetchNotifications = useCallback(async () => {
@@ -169,6 +173,17 @@ export default function CandidateNotificationsPage() {
                                         <p className="text-xs text-slate-400 dark:text-slate-500 mt-1 font-medium">
                                             {formatDistanceToNow(new Date(n.createdAt), { addSuffix: true })}
                                         </p>
+                                        {n.type === 'RESULT_RELEASED' && n.quizId && n.sessionId && (
+                                            <button
+                                                onClick={() => {
+                                                    if (!n.isRead) markAsRead(n.id);
+                                                    router.push(`/results?quizId=${n.quizId}&sessionId=${n.sessionId}`);
+                                                }}
+                                                className="mt-2 inline-flex items-center gap-1.5 text-xs font-bold text-primary hover:underline"
+                                            >
+                                                <ExternalLink size={12} /> View Result
+                                            </button>
+                                        )}
                                     </div>
                                     <div className="flex items-center gap-1 flex-shrink-0 pt-1">
                                         {!n.isRead && (
