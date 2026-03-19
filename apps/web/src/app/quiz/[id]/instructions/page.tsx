@@ -87,7 +87,7 @@ export default function InstructionsPage() {
         };
 
         fetchQuizDetails();
-    }, [quizId, router]);
+    }, [quizId, router, toast]);
 
     if (!quizId) {
         return <div>Loading...</div>;

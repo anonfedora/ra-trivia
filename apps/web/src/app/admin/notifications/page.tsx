@@ -67,7 +67,7 @@ export default function NotificationsPage() {
         } finally {
             setIsLoading(false);
         }
-    }, [apiUrl]);
+    }, [apiUrl, toast]);
 
     useEffect(() => { fetchNotifications(); }, [fetchNotifications]);
 

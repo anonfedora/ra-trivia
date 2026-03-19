@@ -53,7 +53,7 @@ export default function CandidateNotificationsPage() {
         } finally {
             setIsLoading(false);
         }
-    }, [apiUrl]);
+    }, [apiUrl, toast]);
 
     useEffect(() => { fetchNotifications(); }, [fetchNotifications]);
 

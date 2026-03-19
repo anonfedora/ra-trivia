@@ -3,8 +3,6 @@
 import { Component } from 'react';
 import { AlertCircle } from 'lucide-react';
 
-// Use `any` to avoid @types/react version conflicts between server/client contexts on Vercel
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 interface Props { children: any }
 interface State { hasError: boolean; message: string }
 

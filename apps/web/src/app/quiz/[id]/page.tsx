@@ -101,7 +101,7 @@ export default function QuizPage() {
             toast(`An error occurred during submission: ${err instanceof Error ? err.message : 'Unknown error'}`, 'error');
             setIsSubmitting(false);
         }
-    }, [isSubmitting, session?.id, router]);
+    }, [isSubmitting, session?.id, router, toast]);
 
     const fetchQuiz = useCallback(async () => {
         const token = localStorage.getItem('token');
@@ -183,7 +183,7 @@ export default function QuizPage() {
             toast(`An error occurred while starting the quiz: ${err instanceof Error ? err.message : 'Unknown error'}`, 'error');
             router.push('/dashboard');
         }
-    }, [quizId, router]);
+    }, [quizId, router, toast]);
 
     // Check for tab reload and show warning
     useEffect(() => {

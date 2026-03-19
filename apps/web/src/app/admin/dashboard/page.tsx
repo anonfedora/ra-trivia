@@ -109,7 +109,7 @@ export default function AdminDashboard() {
         } finally {
             setIsLoading(false);
         }
-    }, [apiUrl]);
+    }, [apiUrl, toast]);
 
     useEffect(() => {
         const token = localStorage.getItem('token');

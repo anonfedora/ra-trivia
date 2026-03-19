@@ -75,7 +75,7 @@ function AdminResultsContent() {
         } finally {
             setIsLoading(false);
         }
-    }, [apiUrl, page, pageSize, searchTerm, status]);
+    }, [apiUrl, page, pageSize, searchTerm, status, toast]);
 
     useEffect(() => {
         fetchResults();
