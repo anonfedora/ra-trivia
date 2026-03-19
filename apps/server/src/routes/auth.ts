@@ -589,7 +589,7 @@ router.post('/forgot-password', [
 
         const rawToken = crypto.randomBytes(32).toString('hex');
         const tokenHash = crypto.createHash('sha256').update(rawToken).digest('hex');
-        const expiresAt = new Date(Date.now() + 1000 * 60 * 60); // 1 hour
+        const expiresAt = new Date(Date.now() + 1000 * 60 * 15); // 15 minutes
 
         await prisma.user.update({
             where: { id: user.id },
