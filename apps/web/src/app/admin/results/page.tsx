@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { ThemeToggle } from '../../../components/ThemeToggle';
 import NotificationBell from '../../../components/NotificationBell';
+import { useToast } from '../../../contexts/ToastContext';
 
 interface Result {
     id: string;
@@ -47,6 +48,7 @@ function AdminResultsContent() {
     const [summary, setSummary] = useState<any>(null);
 
     const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
+    const { toast } = useToast();
 
     const fetchResults = useCallback(async (overridePage?: number) => {
         const token = localStorage.getItem('token');
@@ -69,10 +71,11 @@ function AdminResultsContent() {
             }
         } catch (err) {
             console.error('Failed to fetch results', err);
+            toast('Failed to load results. Please refresh.', 'error');
         } finally {
             setIsLoading(false);
         }
-    }, [apiUrl, page, pageSize, searchTerm, status]);
+    }, [apiUrl, page, pageSize, searchTerm, status, toast]);
 
     useEffect(() => {
         fetchResults();
@@ -100,14 +103,13 @@ function AdminResultsContent() {
             });
 
             if (res.ok) {
-                // Refresh results to show updated status
                 fetchResults();
             } else {
-                alert('Failed to update status');
+                toast('Failed to update status', 'error');
             }
         } catch (err) {
             console.error('Status update error:', err);
-            alert('Failed to update status');
+            toast('Failed to update status', 'error');
         }
     };
 
@@ -125,14 +127,14 @@ function AdminResultsContent() {
 
             if (res.ok) {
                 const data = await res.json();
-                alert(data.message);
+                toast(data.message, 'success');
                 fetchResults();
             } else {
-                alert('Failed to release results');
+                toast('Failed to release results', 'error');
             }
         } catch (err) {
             console.error('Release error:', err);
-            alert('Failed to release results');
+            toast('Failed to release results', 'error');
         }
     };
 
@@ -213,7 +215,7 @@ function AdminResultsContent() {
                 window.URL.revokeObjectURL(url);
             }
         } catch (err) {
-            alert('Export failed');
+            toast('Export failed', 'error');
         }
     };
 

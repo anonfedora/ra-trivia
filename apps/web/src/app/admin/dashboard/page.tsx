@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { ThemeToggle } from '../../../components/ThemeToggle';
 import NotificationBell from '../../../components/NotificationBell';
 import UserTypeSelector, { UserType } from '../../../components/UserTypeSelector';
+import { useToast } from '../../../contexts/ToastContext';
 
 interface Quiz {
     id: string;
@@ -56,6 +57,7 @@ export default function AdminDashboard() {
     const [user, setUser] = useState<any>(null);
     const [questionType, setQuestionType] = useState<UserType | null>(null);
     const [questionTypeError, setQuestionTypeError] = useState<string>('');
+    const { toast } = useToast();
 
     // Edit Selected Quiz
     const [editTitle, setEditTitle] = useState('');
@@ -103,10 +105,11 @@ export default function AdminDashboard() {
             }
         } catch (err) {
             console.error('Failed to fetch data', err);
+            toast('Failed to load dashboard data. Please refresh.', 'error');
         } finally {
             setIsLoading(false);
         }
-    }, [apiUrl]);
+    }, [apiUrl, toast]);
 
     useEffect(() => {
         const token = localStorage.getItem('token');
@@ -172,13 +175,13 @@ export default function AdminDashboard() {
 
             if (res.ok) {
                 fetchQuizzes();
-                alert('Exam updated successfully');
+                toast('Exam updated successfully', 'success');
             } else {
                 const errData = await res.json().catch(() => ({}));
-                alert(`Update failed: ${errData.message || 'Unknown error'}`);
+                toast(`Update failed: ${errData.message || 'Unknown error'}`, 'error');
             }
         } catch (err) {
-            alert('Update error: Could not connect to the server');
+            toast('Update error: Could not connect to the server', 'error');
         } finally {
             setIsSavingEdit(false);
         }
@@ -203,10 +206,10 @@ export default function AdminDashboard() {
             if (res.ok) {
                 setNewTitle('');
                 fetchQuizzes();
-                alert('Quiz created successfully!');
+                toast('Quiz created successfully', 'success');
             }
         } catch (err) {
-            alert('Creation failed');
+            toast('Creation failed', 'error');
         } finally {
             setIsCreating(false);
         }
@@ -224,6 +227,7 @@ export default function AdminDashboard() {
             if (res.ok) fetchQuizzes();
         } catch (err) {
             console.error('Toggle failed');
+            toast('Failed to toggle exam status', 'error');
         }
     };
 
@@ -249,11 +253,11 @@ export default function AdminDashboard() {
                 fetchQuizzes();
             } else {
                 const errData = await res.json().catch(() => ({}));
-                alert(`Delete failed: ${errData.message || 'Unknown error'}`);
+                toast(`Delete failed: ${errData.message || 'Unknown error'}`, 'error');
             }
         } catch (err) {
             console.error('Delete error:', err);
-            alert('Could not connect to server for deletion');
+            toast('Could not connect to server for deletion', 'error');
         }
     };
 
@@ -272,11 +276,11 @@ export default function AdminDashboard() {
         }
 
         if (!file || (importToExisting && !selectedQuizId)) {
-            alert('Please select a file and a quiz');
+            toast('Please select a file and a quiz', 'warning');
             return;
         }
         if (!importToExisting && (!importTitle || !importDuration)) {
-            alert('Please provide a title and duration for the new exam');
+            toast('Please provide a title and duration for the new exam', 'warning');
             return;
         }
         setIsUploading(true);
@@ -300,17 +304,17 @@ export default function AdminDashboard() {
             });
 
             if (res.ok) {
-                alert('Import successful!');
+                toast('Import successful', 'success');
                 setImportTitle('');
                 setFile(null);
                 setQuestionType(null); // Reset question type selection
                 fetchQuizzes();
             } else {
                 const errorData = await res.json();
-                alert(`Import failed: ${errorData.message || 'Unknown error'}`);
+                toast(`Import failed: ${errorData.message || 'Unknown error'}`, 'error');
             }
         } catch (err) {
-            alert('Upload error: Could not connect to the server');
+            toast('Upload error: Could not connect to the server', 'error');
         } finally {
             setIsUploading(false);
         }

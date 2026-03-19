@@ -1,9 +1,9 @@
 "use client";
 
-import { Component, ReactNode } from 'react';
+import { Component } from 'react';
 import { AlertCircle } from 'lucide-react';
 
-interface Props { children: ReactNode }
+interface Props { children: any }
 interface State { hasError: boolean; message: string }
 
 export default class ErrorBoundary extends Component<Props, State> {
@@ -13,7 +13,7 @@ export default class ErrorBoundary extends Component<Props, State> {
         return { hasError: true, message: error.message || 'Something went wrong.' };
     }
 
-    componentDidCatch(error: Error, info: React.ErrorInfo) {
+    componentDidCatch(error: Error, info: { componentStack: string }) {
         console.error('[ErrorBoundary]', error, info.componentStack);
     }
 

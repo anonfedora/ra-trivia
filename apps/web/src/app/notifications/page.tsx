@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { formatDistanceToNow } from 'date-fns';
 import { ThemeToggle } from '../../components/ThemeToggle';
+import { useToast } from '../../contexts/ToastContext';
 
 interface Notification {
     id: string;
@@ -33,6 +34,7 @@ export default function CandidateNotificationsPage() {
     const [activeFilter, setActiveFilter] = useState<FilterType>('ALL');
     const router = useRouter();
     const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
+    const { toast } = useToast();
 
     const fetchNotifications = useCallback(async () => {
         const token = localStorage.getItem('token');
@@ -47,10 +49,11 @@ export default function CandidateNotificationsPage() {
             }
         } catch (err) {
             console.error('Failed to fetch notifications', err);
+            toast('Failed to load notifications. Please refresh.', 'error');
         } finally {
             setIsLoading(false);
         }
-    }, [apiUrl]);
+    }, [apiUrl, toast]);
 
     useEffect(() => { fetchNotifications(); }, [fetchNotifications]);
 

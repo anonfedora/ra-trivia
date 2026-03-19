@@ -18,7 +18,7 @@ interface ToastContextValue {
 
 const ToastContext = createContext<ToastContextValue | null>(null);
 
-export function ToastProvider({ children }: { children: React.ReactNode }) {
+export function ToastProvider({ children }: { children: any }) {
     const [toasts, setToasts] = useState<Toast[]>([]);
     const timers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
 

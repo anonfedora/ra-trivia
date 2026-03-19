@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import Image from 'next/image';
 import { apiJson } from '../../lib/api';
 import { ThemeToggle } from '../../components/ThemeToggle';
 import PasswordInput from '../../components/PasswordInput';
@@ -58,9 +59,11 @@ export default function RegisterPage() {
             </div>
             <div className="bg-white dark:bg-slate-800 p-10 rounded-[2.5rem] shadow-2xl max-w-md w-full border border-slate-100 dark:border-slate-700 animate-slide-up">
                 <div className="text-center mb-8">
-                    <img
+                    <Image
                         src="/favicon.png"
                         alt="RA Logo"
+                        width={64}
+                        height={64}
                         className="w-16 h-16 mx-auto mb-4 rounded-lg"
                     />
                     <h2 className="text-3xl font-bold text-slate-900 dark:text-slate-50 mb-2">Create Account</h2>

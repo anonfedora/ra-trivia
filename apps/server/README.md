@@ -1,0 +1,205 @@
+# RA Trivia — Server
+
+Express.js + TypeScript REST API for the RA Trivia quiz platform. Deployed on Render.
+
+## Stack
+
+- **Runtime**: Node.js 18+
+- **Framework**: Express.js 5
+- **Database**: PostgreSQL via Prisma ORM 6
+- **Auth**: JWT + bcryptjs
+- **Email**: Resend (transactional) + Nodemailer
+- **Real-time**: Socket.IO 4
+- **PDF**: Puppeteer + @sparticuz/chromium (Render-compatible)
+- **Excel**: xlsx
+- **Validation**: express-validator
+- **Security**: helmet, express-rate-limit, custom sanitize middleware
+- **Tests**: Vitest + Supertest
+
+## Project Structure
+
+```
+src/
+├── index.ts                  # App entry — Express + Socket.IO setup
+├── config/
+│   └── index.ts              # Centralised config
+├── middlewares/
+│   ├── auth.ts               # JWT authenticate + authorizeAdmin
+│   ├── errorHandler.ts       # Global error handler
+│   ├── rateLimiter.ts        # API + auth rate limits
+│   ├── sanitize.ts           # XSS sanitization
+│   └── userTypeAccess.ts     # User-type-based question filtering
+├── routes/
+│   ├── auth.ts               # Register, login, OTP, password reset
+│   ├── quiz.ts               # Start, submit, update-answer, my-sessions
+│   ├── quizzes.ts            # CRUD + toggle (admin)
+│   ├── questions.ts          # Import questions from Excel
+│   ├── admin.ts              # Results, analytics, release, export
+│   ├── notifications.ts      # CRUD notifications
+│   └── password-requirements.ts
+├── services/
+│   ├── email.ts              # Resend email helpers
+│   ├── reportGenerator.ts    # PDF + Excel generation
+│   ├── scheduler.ts          # Auto-release cron job
+│   └── socketService.ts      # Socket.IO singleton + emitNotification
+└── utils/
+    ├── envValidator.ts        # Startup env check
+    └── validation.ts          # Shared validators
+```
+
+## Setup
+
+```bash
+# From workspace root
+pnpm install
+
+# Copy env
+cp apps/server/.env.example apps/server/.env
+```
+
+### Required Environment Variables
+
+```bash
+DATABASE_URL="postgresql://user:pass@localhost:5432/ra_trivia"
+JWT_SECRET="change-me-in-production"
+WEB_URL="https://ra-trivia.vercel.app"   # Used in password reset emails
+RESEND_API_KEY="re_..."
+FROM_EMAIL="noreply@yourdomain.com"
+PORT=4000
+CORS_ORIGIN="https://ra-trivia.vercel.app,http://localhost:3000"
+```
+
+> `WEB_URL` must be set on Render — it defaults to `localhost:3000` which breaks password reset links in production.
+
+## Scripts
+
+```bash
+# Development (hot reload)
+pnpm --filter server dev
+
+# Production build
+pnpm --filter server build
+
+# CI build (no db push)
+pnpm --filter server build:ci
+
+# Start production
+pnpm --filter server start
+
+# Run tests (single pass)
+pnpm --filter server test
+
+# Run tests in watch mode
+pnpm --filter server test:watch
+
+# Coverage report
+pnpm --filter server test:coverage
+```
+
+## API Endpoints
+
+### Auth — `/api/auth`
+
+| Method | Path | Auth | Description |
+|---|---|---|---|
+| POST | `/register` | — | Register candidate or admin |
+| POST | `/login` | — | Login, returns JWT |
+| POST | `/verify-otp` | — | Verify 6-digit OTP; triggers account notifications |
+| POST | `/resend-otp` | — | Resend OTP to email |
+| POST | `/forgot-password` | — | Send 15-min password reset link |
+| POST | `/reset-password` | — | Validate token, set new password |
+
+### Quizzes — `/api/quizzes`
+
+| Method | Path | Auth | Description |
+|---|---|---|---|
+| GET | `/` | Candidate/Admin | List quizzes filtered by role + user type |
+| GET | `/:id` | Any | Get quiz details |
+| POST | `/` | Admin | Create quiz |
+| PATCH | `/:id` | Admin | Update title, duration, retake limit, schedule |
+| PATCH | `/:id/toggle` | Admin | Activate/deactivate; notifies matching candidates |
+| DELETE | `/:id` | Admin | Delete quiz + all sessions |
+
+### Quiz Session — `/api/quiz`
+
+| Method | Path | Auth | Description |
+|---|---|---|---|
+| POST | `/start` | Candidate | Start session, returns randomised questions |
+| POST | `/submit` | Candidate | Submit answers, calculate score |
+| POST | `/update-answer` | Candidate | Auto-save single answer |
+| GET | `/my-sessions` | Candidate | Own session history |
+
+### Admin — `/api/admin`
+
+| Method | Path | Auth | Description |
+|---|---|---|---|
+| GET | `/results` | Admin | Paginated results with search + user type filter |
+| GET | `/analytics` | Admin | Per-quiz performance stats |
+| GET | `/global-stats` | Admin | Platform-wide stats |
+| POST | `/sessions/release` | Admin | Release results for given session IDs |
+| POST | `/quizzes/:id/release-all` | Admin | Release all sessions for a quiz |
+| PATCH | `/sessions/:id/status` | Admin | Set manual pass/fail override |
+| POST | `/trigger-emails` | Admin | Manually trigger pending result emails |
+| GET | `/export/formatted-excel` | Admin | Formatted Excel export |
+| GET | `/export/pdf` | Admin | PDF report (Puppeteer) |
+
+### Notifications — `/api/notifications`
+
+| Method | Path | Auth | Description |
+|---|---|---|---|
+| GET | `/` | Any | Own notifications (role-scoped) |
+| PATCH | `/:id/read` | Any | Mark one as read |
+| POST | `/mark-all-read` | Any | Mark all as read |
+| DELETE | `/:id` | Any | Delete notification |
+
+### Notification Scoping
+
+- **SUPER_ADMIN**: `EXAM_SUBMITTED`, `NEW_USER_REGISTERED`, `NEW_ADMIN_REGISTERED`
+- **ADMIN**: same types, own notifications only (`createdById = userId`)
+- **CANDIDATE**: `NEW_EXAM_AVAILABLE`, `RESULT_RELEASED` (own only)
+
+## Real-time (Socket.IO)
+
+Clients connect with `{ auth: { token } }`. On connection the server verifies the JWT and joins the socket to a private room `user:<userId>`.
+
+```ts
+// Emit to a specific user
+import { emitNotification } from './services/socketService';
+emitNotification(userId, notificationPayload);
+```
+
+The frontend `NotificationBell` listens on the `notification` event and refreshes the list. Falls back to 30s polling if the socket fails to connect.
+
+## Scheduler
+
+`initScheduler()` runs on startup. It polls every minute for sessions where `resultReleasesAt <= now` and `isReleased = false`, releases them, sends emails, and emits Socket.IO notifications to each candidate.
+
+## Security
+
+- **Rate limiting**: 100 req/15min general; 20 req/15min on auth routes
+- **Helmet**: Sets security headers
+- **CORS**: Whitelist via `CORS_ORIGIN` env var + hardcoded Vercel/Render origins
+- **Sanitization**: Custom middleware strips `<script>` tags and HTML from request bodies
+- **JWT**: HS256, expiry configurable via `JWT_EXPIRES_IN`
+- **Password hashing**: bcryptjs with salt rounds 12
+
+## Testing
+
+Tests live in `src/__tests__/`. See [`src/__tests__/README.md`](src/__tests__/README.md) for full details.
+
+```bash
+# Run once
+pnpm --filter server test
+
+# Watch
+pnpm --filter server test:watch
+```
+
+Test database uses `.env.test` — set `DATABASE_URL` to a separate test DB to avoid polluting development data.
+
+## Deployment (Render)
+
+1. Set all env vars in Render dashboard (especially `WEB_URL`)
+2. Build command: `pnpm run build:ci`
+3. Start command: `node dist/index.js`
+4. Puppeteer uses `@sparticuz/chromium` — no extra Chrome install needed on Render
