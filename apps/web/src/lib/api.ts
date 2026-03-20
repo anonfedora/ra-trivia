@@ -15,6 +15,13 @@ export async function apiJson<T>(input: RequestInfo | URL, init?: RequestInit): 
         const res = await fetch(input, init);
         const status = res.status;
 
+        // Fire a global event so ClientProviders can redirect to login
+        if (status === 401) {
+            if (typeof window !== 'undefined') {
+                window.dispatchEvent(new CustomEvent('auth:expired'));
+            }
+        }
+
         const raw = await safeReadText(res);
         const parsed = raw ? (() => { try { return JSON.parse(raw); } catch { return null; } })() : null;
 

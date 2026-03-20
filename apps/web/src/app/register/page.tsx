@@ -7,6 +7,7 @@ import Image from 'next/image';
 import { apiJson } from '../../lib/api';
 import { ThemeToggle } from '../../components/ThemeToggle';
 import PasswordInput from '../../components/PasswordInput';
+import PasswordStrength from '../../components/PasswordStrength';
 import UserTypeSelector, { UserType } from '../../components/UserTypeSelector';
 
 export default function RegisterPage() {
@@ -149,6 +150,7 @@ export default function RegisterPage() {
                             placeholder="••••••••"
                             required
                         />
+                        <PasswordStrength password={password} />
                     </div>
 
                     <button
