@@ -15,6 +15,7 @@ function VerifyOTPContent() {
     const [success, setSuccess] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [isClient, setIsClient] = useState(false);
+    const [resendCooldown, setResendCooldown] = useState(60);
     const router = useRouter();
     const searchParams = useSearchParams();
     const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
@@ -43,6 +44,13 @@ function VerifyOTPContent() {
             }, 100);
         }
     }, [isClient]);
+
+    // Resend cooldown countdown
+    useEffect(() => {
+        if (resendCooldown <= 0) return;
+        const timer = setTimeout(() => setResendCooldown(c => c - 1), 1000);
+        return () => clearTimeout(timer);
+    }, [resendCooldown]);
 
     const handleInputChange = (index: number, value: string) => {
         // Reset submitting flag when user changes OTP
@@ -178,6 +186,7 @@ function VerifyOTPContent() {
 
             if (response.ok) {
                 setSuccess('New OTP sent to your email!');
+                setResendCooldown(60);
                 // Clear OTP inputs
                 setOtp(['', '', '', '', '', '']);
                 inputRefs.current[0]?.focus();
@@ -254,10 +263,12 @@ function VerifyOTPContent() {
                             <button
                                 type="button"
                                 onClick={handleResendOTP}
-                                disabled={isLoading || !email || !isClient}
+                                disabled={isLoading || !email || !isClient || resendCooldown > 0}
                                 className="text-primary hover:underline font-medium text-sm transition-colors disabled:opacity-50"
                             >
-                                Didn&apos;t receive the code? Resend
+                                {resendCooldown > 0
+                                    ? `Resend in ${resendCooldown}s`
+                                    : "Didn't receive the code? Resend"}
                             </button>
                             <p className="text-slate-500 dark:text-slate-500 text-xs">
                                 The code will expire in 10 minutes

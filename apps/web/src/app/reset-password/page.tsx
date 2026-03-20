@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { ArrowLeft, CheckCircle } from 'lucide-react';
 import { ThemeToggle } from '../../components/ThemeToggle';
 import PasswordInput from '../../components/PasswordInput';
+import PasswordStrength from '../../components/PasswordStrength';
 
 function ResetPasswordForm() {
     const [password, setPassword] = useState('');
@@ -92,6 +93,7 @@ function ResetPasswordForm() {
                                 placeholder="••••••••"
                                 required
                             />
+                            <PasswordStrength password={password} />
                         </div>
                         <div className="space-y-2">
                             <label className="text-sm font-semibold text-slate-700 dark:text-slate-300 ml-1">Confirm Password</label>
