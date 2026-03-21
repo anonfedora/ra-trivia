@@ -2,8 +2,10 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter, useParams } from 'next/navigation';
+import { CheckCircle2, XCircle } from 'lucide-react';
 import { ThemeToggle } from '../../../components/ThemeToggle';
 import { useToast } from '../../../contexts/ToastContext';
+import ConfirmModal from '../../../components/ConfirmModal';
 
 export const dynamic = 'force-dynamic';
 
@@ -20,7 +22,9 @@ export default function QuizPage() {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [showWarning, setShowWarning] = useState<string | null>(null);
     const [showReview, setShowReview] = useState(false);
+    const [showSubmitConfirm, setShowSubmitConfirm] = useState(false);
     const [leaveCount, setLeaveCount] = useState(0);
+    const [savedFlash, setSavedFlash] = useState<string | null>(null); // questionId that just saved
     const leaveCountRef = useRef(0);
     const { toast } = useToast();
 
@@ -332,6 +336,10 @@ export default function QuizPage() {
         const newAnswers = { ...answers, [questionId]: option };
         setAnswers(newAnswers);
 
+        // Flash feedback
+        setSavedFlash(questionId);
+        setTimeout(() => setSavedFlash(null), 600);
+
         // Backup to localStorage for recovery
         if (session?.id) {
             localStorage.setItem(`quiz_backup_${session.id}`, JSON.stringify(newAnswers));
@@ -379,6 +387,14 @@ export default function QuizPage() {
     const currentQuestion = quiz.questions[currentIndex];
     const answeredCount = Object.keys(answers).length;
     const unansweredCount = quiz.questions.length - answeredCount;
+    const progressPct = Math.round((answeredCount / quiz.questions.length) * 100);
+
+    // Timer color thresholds
+    const timerCls = timeLeft <= 60
+        ? 'bg-red-50 dark:bg-rose-900/20 text-red-600 dark:text-rose-400 border-red-200 dark:border-rose-900/50 animate-pulse'
+        : timeLeft <= 300
+        ? 'bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400 border-amber-200 dark:border-amber-900/50'
+        : 'bg-white dark:bg-slate-800 text-primary dark:text-primary border-slate-100 dark:border-slate-700';
 
     // Review Screen
     if (showReview) {
@@ -410,25 +426,29 @@ export default function QuizPage() {
                                     <div
                                         key={question.id}
                                         className={`p-4 rounded-2xl border-2 cursor-pointer transition-all ${hasAnswer
-                                            ? 'bg-green-50 dark:bg-emerald-900/10 border-green-200 dark:border-emerald-900/30 hover:bg-green-100 dark:hover:bg-emerald-900/20'
-                                            : 'bg-red-50 dark:bg-rose-900/10 border-red-200 dark:border-rose-900/30 hover:bg-red-100 dark:hover:bg-rose-900/20'
+                                            ? 'bg-emerald-50 dark:bg-emerald-900/10 border-emerald-200 dark:border-emerald-900/30 hover:bg-emerald-100 dark:hover:bg-emerald-900/20'
+                                            : 'bg-rose-50 dark:bg-rose-900/10 border-rose-200 dark:border-rose-900/30 hover:bg-rose-100 dark:hover:bg-rose-900/20'
                                             }`}
                                         onClick={() => {
                                             setShowReview(false);
                                             setCurrentIndex(index);
                                         }}
                                     >
-                                        <div className="flex justify-between items-center">
-                                            <div className="flex-1">
+                                        <div className="flex items-center gap-3">
+                                            {hasAnswer
+                                                ? <CheckCircle2 size={18} className="text-emerald-500 flex-shrink-0" />
+                                                : <XCircle size={18} className="text-rose-400 flex-shrink-0" />
+                                            }
+                                            <div className="flex-1 min-w-0">
                                                 <span className="font-bold text-slate-700 dark:text-slate-200">Q{index + 1}:</span>
-                                                <span className="ml-2 text-slate-600 dark:text-slate-400">{question.text.substring(0, 80)}...</span>
+                                                <span className="ml-2 text-slate-600 dark:text-slate-400 text-sm">{question.text.substring(0, 80)}{question.text.length > 80 ? '…' : ''}</span>
                                             </div>
-                                            <div className={`px-3 py-1 rounded-full text-sm font-bold ${hasAnswer
-                                                ? 'bg-green-100 dark:bg-emerald-900/30 text-green-700 dark:text-emerald-400'
-                                                : 'bg-red-100 dark:bg-rose-900/30 text-red-700 dark:text-rose-400'
+                                            <span className={`flex-shrink-0 px-2.5 py-1 rounded-full text-xs font-bold ${hasAnswer
+                                                ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400'
+                                                : 'bg-rose-100 dark:bg-rose-900/30 text-rose-600 dark:text-rose-400'
                                                 }`}>
-                                                {hasAnswer ? 'Answered' : 'Not Answered'}
-                                            </div>
+                                                {hasAnswer ? 'Answered' : 'Skipped'}
+                                            </span>
                                         </div>
                                     </div>
                                 );
@@ -444,14 +464,26 @@ export default function QuizPage() {
                             Continue Editing
                         </button>
                         <button
-                            onClick={handleSubmit}
-                            disabled={isSubmitting || unansweredCount > 0}
+                            onClick={() => setShowSubmitConfirm(true)}
+                            disabled={isSubmitting}
                             className="flex-1 px-8 py-4 rounded-2xl font-bold text-white bg-green-600 hover:bg-green-700 shadow-xl shadow-green-100 dark:shadow-none transition-all transform hover:-translate-y-1 disabled:opacity-50 disabled:cursor-not-allowed"
                         >
-                            {isSubmitting ? 'Submitting...' : unansweredCount > 0 ? `Submit (${unansweredCount} unanswered)` : 'Submit Quiz'}
+                            {isSubmitting ? 'Submitting...' : 'Submit Quiz'}
                         </button>
                     </div>
                 </div>
+
+                <ConfirmModal
+                    isOpen={showSubmitConfirm}
+                    title="Submit Exam"
+                    message={unansweredCount > 0
+                        ? `You have ${unansweredCount} unanswered question${unansweredCount !== 1 ? 's' : ''}. Are you sure you want to submit?`
+                        : 'Are you sure you want to submit your exam? This cannot be undone.'}
+                    confirmLabel={isSubmitting ? 'Submitting...' : 'Submit'}
+                    variant="warning"
+                    onConfirm={handleSubmit}
+                    onCancel={() => setShowSubmitConfirm(false)}
+                />
             </main>
         );
     }
@@ -471,6 +503,14 @@ export default function QuizPage() {
                 <div className="mb-4 md:mb-0">
                     <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-50">{quiz.title}</h1>
                     <p className="text-slate-500 dark:text-slate-400 font-medium">Question {currentIndex + 1} of {quiz.questions.length}</p>
+                    {/* Progress bar */}
+                    <div className="mt-2 w-48 h-1.5 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
+                        <div
+                            className="h-full bg-primary rounded-full transition-all duration-300"
+                            style={{ width: `${progressPct}%` }}
+                        />
+                    </div>
+                    <p className="text-xs text-slate-400 mt-1">{answeredCount}/{quiz.questions.length} answered</p>
                 </div>
                 <div className="flex flex-col sm:flex-row items-center gap-3 justify-center md:justify-end">
                     {/* Violation Counter */}
@@ -492,7 +532,7 @@ export default function QuizPage() {
                     >
                         Review &amp; Submit
                     </button>
-                    <div className={`px-6 py-3 rounded-2xl font-mono text-xl font-bold shadow-sm transition-all ${timeLeft < 60 ? 'bg-red-50 dark:bg-rose-900/20 text-red-600 dark:text-rose-400 border border-red-100 dark:border-rose-900/50 animate-pulse' : 'bg-white dark:bg-slate-800 text-primary dark:text-primary border border-slate-100 dark:border-slate-700'}`}>
+                    <div className={`px-6 py-3 rounded-2xl font-mono text-xl font-bold shadow-sm border transition-all ${timerCls}`}>
                         {formatTime(timeLeft)}
                     </div>
                 </div>
@@ -514,21 +554,33 @@ export default function QuizPage() {
                         
                         console.log('Rendering options for question:', currentQuestion.id, options);
                         
-                        return options.map((opt: any, index: number) => (
-                            <button
-                                key={opt.key}
-                                onClick={() => saveAnswer(currentQuestion.id, opt.key)}
-                                className={`p-6 rounded-2xl text-left font-semibold transition-all border-2 ${answers[currentQuestion.id] === opt.key
-                                    ? 'bg-primary/5 dark:bg-primary/10 border-primary text-primary shadow-md'
-                                    : 'bg-slate-50 dark:bg-slate-900/50 border-transparent dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'
+                        return options.map((opt: any, index: number) => {
+                            const isSelected = answers[currentQuestion.id] === opt.key;
+                            const isFlashing = savedFlash === currentQuestion.id && isSelected;
+                            return (
+                                <button
+                                    key={opt.key}
+                                    onClick={() => saveAnswer(currentQuestion.id, opt.key)}
+                                    className={`p-6 rounded-2xl text-left font-semibold transition-all border-2 relative overflow-hidden ${
+                                        isSelected
+                                            ? 'bg-primary/5 dark:bg-primary/10 border-primary text-primary shadow-md'
+                                            : 'bg-slate-50 dark:bg-slate-900/50 border-transparent dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'
                                     }`}
-                            >
-                                <span className={`inline-flex items-center justify-center w-8 h-8 rounded-lg mr-3 shadow-sm transition-all ${answers[currentQuestion.id] === opt.key ? 'bg-primary text-white' : 'bg-white dark:bg-slate-800 text-slate-400'}`}>
-                                    {String.fromCharCode(65 + index)}
-                                </span>
-                                {opt.text}
-                            </button>
-                        ));
+                                >
+                                    {/* Save flash overlay */}
+                                    {isFlashing && (
+                                        <span className="absolute inset-0 bg-primary/10 animate-ping rounded-2xl pointer-events-none" />
+                                    )}
+                                    <span className={`inline-flex items-center justify-center w-8 h-8 rounded-lg mr-3 shadow-sm transition-all ${isSelected ? 'bg-primary text-white' : 'bg-white dark:bg-slate-800 text-slate-400'}`}>
+                                        {isSelected && isFlashing
+                                            ? <CheckCircle2 size={16} />
+                                            : String.fromCharCode(65 + index)
+                                        }
+                                    </span>
+                                    {opt.text}
+                                </button>
+                            );
+                        });
                     })()}
                 </div>
             </div>
