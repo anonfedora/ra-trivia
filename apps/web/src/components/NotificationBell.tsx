@@ -111,17 +111,37 @@ export default function NotificationBell() {
         };
     }, [isOpen]);
 
+    const markAllUnreadAsRead = async () => {
+        if (unreadCount === 0) return;
+        const token = localStorage.getItem('token');
+        try {
+            await fetch(`${apiUrl}/notifications/mark-all-read`, {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            fetchNotifications();
+        } catch {}
+    };
+
+    const getNotificationHref = (n: Notification): string | null => {
+        if (n.type === 'NEW_EXAM_AVAILABLE' && n.quizId) {
+            return `/quiz/${n.quizId}/instructions`;
+        }
+        return null;
+    };
+
     const handleToggle = () => {
         if (!isOpen && buttonRef.current) {
             const rect = buttonRef.current.getBoundingClientRect();
             const dropdownWidth = window.innerWidth < 640 ? Math.min(window.innerWidth - 16, 384) : 384;
-            // Align to right edge of button, but clamp so it doesn't overflow left
             const rightFromEdge = window.innerWidth - rect.right;
             const clampedRight = Math.min(rightFromEdge, window.innerWidth - dropdownWidth - 8);
             setDropdownPos({
                 top: rect.bottom + window.scrollY + 8,
                 right: Math.max(8, clampedRight),
             });
+            // Mark all unread as read when opening
+            markAllUnreadAsRead();
         }
         setIsOpen(!isOpen);
     };
@@ -203,6 +223,15 @@ export default function NotificationBell() {
                 </div>
             </div>
 
+            {/* Unread summary */}
+            {unreadCount > 0 && (
+                <div className="px-4 py-2 bg-primary/5 dark:bg-primary/10 border-b border-slate-200 dark:border-slate-700">
+                    <p className="text-xs font-semibold text-primary">
+                        You have {unreadCount} unread notification{unreadCount !== 1 ? 's' : ''}
+                    </p>
+                </div>
+            )}
+
             {/* Notifications List */}
             <div className="overflow-y-auto flex-1">
                 {notifications.length === 0 ? (
@@ -212,13 +241,9 @@ export default function NotificationBell() {
                         <p className="text-xs mt-1">You&apos;ll be notified when candidates submit exams</p>
                     </div>
                 ) : (
-                    notifications.map((notification) => (
-                        <div
-                            key={notification.id}
-                            className={`p-4 border-b border-slate-100 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-900/50 transition-colors ${
-                                !notification.isRead ? 'bg-primary/5 dark:bg-primary/10' : ''
-                            }`}
-                        >
+                    notifications.map((notification) => {
+                        const href = getNotificationHref(notification);
+                        const itemContent = (
                             <div className="flex items-start gap-3">
                                 <div className="flex-1 min-w-0">
                                     <div className="flex items-center gap-2 mb-1">
@@ -239,7 +264,7 @@ export default function NotificationBell() {
                                 <div className="flex items-center gap-1 flex-shrink-0">
                                     {!notification.isRead && (
                                         <button
-                                            onClick={() => markAsRead(notification.id)}
+                                            onClick={(e) => { e.preventDefault(); e.stopPropagation(); markAsRead(notification.id); }}
                                             className="p-1.5 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-500 dark:text-slate-400"
                                             title="Mark as read"
                                         >
@@ -247,7 +272,7 @@ export default function NotificationBell() {
                                         </button>
                                     )}
                                     <button
-                                        onClick={() => deleteNotification(notification.id)}
+                                        onClick={(e) => { e.preventDefault(); e.stopPropagation(); deleteNotification(notification.id); }}
                                         className="p-1.5 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/30 text-red-500"
                                         title="Delete"
                                     >
@@ -255,8 +280,30 @@ export default function NotificationBell() {
                                     </button>
                                 </div>
                             </div>
-                        </div>
-                    ))
+                        );
+
+                        return href ? (
+                            <Link
+                                key={notification.id}
+                                href={href}
+                                onClick={() => setIsOpen(false)}
+                                className={`block p-4 border-b border-slate-100 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-900/50 transition-colors ${
+                                    !notification.isRead ? 'bg-primary/5 dark:bg-primary/10' : ''
+                                }`}
+                            >
+                                {itemContent}
+                            </Link>
+                        ) : (
+                            <div
+                                key={notification.id}
+                                className={`p-4 border-b border-slate-100 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-900/50 transition-colors ${
+                                    !notification.isRead ? 'bg-primary/5 dark:bg-primary/10' : ''
+                                }`}
+                            >
+                                {itemContent}
+                            </div>
+                        );
+                    })
                 )}
             </div>
 
