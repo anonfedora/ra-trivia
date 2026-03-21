@@ -7,6 +7,7 @@ import { useSearchParams } from 'next/navigation';
 import { ThemeToggle } from '../../../components/ThemeToggle';
 import NotificationBell from '../../../components/NotificationBell';
 import { useToast } from '../../../contexts/ToastContext';
+import ConfirmModal from '../../../components/ConfirmModal';
 
 interface Result {
     id: string;
@@ -46,6 +47,7 @@ function AdminResultsContent() {
     const [pageSize] = useState(25);
     const [total, setTotal] = useState(0);
     const [summary, setSummary] = useState<any>(null);
+    const [releaseModal, setReleaseModal] = useState<string[] | null>(null);
 
     const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
     const { toast } = useToast();
@@ -138,6 +140,13 @@ function AdminResultsContent() {
         }
     };
 
+    const confirmRelease = async () => {
+        if (!releaseModal) return;
+        const ids = releaseModal;
+        setReleaseModal(null);
+        await handleReleaseResults(ids);
+    };
+
     const handleExport = async (format: 'excel' | 'formatted-excel' | 'pdf') => {
         const token = localStorage.getItem('token');
         try {
@@ -226,6 +235,7 @@ function AdminResultsContent() {
     }
 
     return (
+        <>
         <main className="min-h-screen bg-slate-50 dark:bg-slate-900 p-6 md:p-12 transition-colors duration-200">
             <div className="max-w-7xl mx-auto">
                 <header className="flex flex-col md:flex-row justify-between items-start md:items-center mb-12 gap-6 animate-fade-in">
@@ -429,7 +439,7 @@ function AdminResultsContent() {
                                         </td>
                                         <td className="px-8 py-6">
                                             <button
-                                                onClick={() => handleReleaseResults([result.id])}
+                                                onClick={() => setReleaseModal([result.id])}
                                                 disabled={!!result.resultReleasesAt && new Date(result.resultReleasesAt) <= new Date()}
                                                 className="px-4 py-2 rounded-xl text-xs font-bold bg-primary text-white hover:bg-primary/90 disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-sm hover:shadow-md active:scale-95"
                                             >
@@ -478,6 +488,17 @@ function AdminResultsContent() {
                 </section>
             </div>
         </main>
+        <ConfirmModal
+            isOpen={!!releaseModal}
+            title="Release Results"
+            message="This will notify the candidate that their result is available. This action cannot be undone."
+            confirmLabel="Release"
+            cancelLabel="Cancel"
+            variant="warning"
+            onConfirm={confirmRelease}
+            onCancel={() => setReleaseModal(null)}
+        />
+        </>
     );
 }
 

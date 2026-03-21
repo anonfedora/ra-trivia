@@ -560,50 +560,37 @@ export default function QuizPage() {
             </div>
 
             {/* Question Navigation Boxes */}
-            <div className="max-w-4xl w-full bg-white dark:bg-slate-800 rounded-[2.5rem] shadow-xl shadow-slate-200/50 dark:shadow-none p-4 sm:p-6 border border-slate-100 dark:border-slate-700 mb-6">
-                <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100 mb-3">Question Navigation</h3>
-                <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-16 gap-1.5 sm:gap-2 mb-3">
+            <div className="max-w-4xl w-full bg-white dark:bg-slate-800 rounded-[2.5rem] shadow-xl shadow-slate-200/50 dark:shadow-none p-5 sm:p-6 border border-slate-100 dark:border-slate-700 mb-6">
+                <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-sm font-bold text-slate-800 dark:text-slate-100 uppercase tracking-widest">Question Navigation</h3>
+                    <span className="text-xs font-semibold text-slate-400">{answeredCount}/{quiz.questions.length} answered</span>
+                </div>
+                <div className="grid grid-cols-5 sm:grid-cols-8 md:grid-cols-10 lg:grid-cols-15 gap-2">
                     {quiz.questions.map((question: any, index: number) => {
                         const isAnswered = isQuestionAnswered(question.id);
                         const isCurrent = index === currentIndex;
-                        
                         return (
                             <button
                                 key={question.id}
                                 onClick={() => jumpToQuestion(index)}
-                                className={`p-1.5 sm:p-2 rounded-lg border transition-all text-xs font-medium ${
+                                title={isCurrent ? 'Current' : isAnswered ? 'Answered' : 'Unanswered'}
+                                className={`min-h-[44px] w-full rounded-xl border-2 font-bold text-sm transition-all active:scale-95 ${
                                     isCurrent
-                                        ? 'bg-primary text-white border-primary shadow-md scale-105'
+                                        ? 'bg-primary text-white border-primary shadow-md'
                                         : isAnswered
-                                        ? 'bg-green-100 dark:bg-emerald-900/20 text-green-700 dark:text-emerald-400 border-green-200 dark:border-emerald-900/30 hover:bg-green-200 dark:hover:bg-emerald-900/30'
-                                        : 'bg-slate-50 dark:bg-slate-900/50 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700'
+                                        ? 'bg-emerald-100 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-900/30'
+                                        : 'bg-slate-50 dark:bg-slate-900/50 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-700'
                                 }`}
-                                title={isCurrent ? 'Current Question' : isAnswered ? 'Answered - Click to Review' : 'Not Answered - Click to Skip'}
                             >
-                                <div className="text-center">
-                                    <div className="font-bold text-xs sm:text-sm mb-1">Q{index + 1}</div>
-                                    <div className={`w-2 h-2 rounded-full mx-auto mb-1 ${
-                                        isCurrent
-                                            ? 'bg-white text-primary'
-                                            : isAnswered
-                                            ? 'bg-green-500 text-white'
-                                            : 'bg-slate-300 text-slate-600'
-                                    }`}>
-                                        {isCurrent ? '•' : isAnswered ? '✓' : ''}
-                                    </div>
-                                    <div className={`text-xs hidden sm:block ${
-                                        isCurrent
-                                            ? 'text-primary'
-                                            : isAnswered
-                                            ? 'text-green-600 dark:text-emerald-400'
-                                            : 'text-slate-500'
-                                    }`}>
-                                        {isCurrent ? 'Current' : isAnswered ? 'Answered' : 'Not'}
-                                    </div>
-                                </div>
+                                {index + 1}
                             </button>
                         );
                     })}
+                </div>
+                <div className="flex items-center gap-4 mt-4 text-xs font-semibold text-slate-400">
+                    <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded bg-primary inline-block" />Current</span>
+                    <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded bg-emerald-400 inline-block" />Answered</span>
+                    <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded bg-slate-200 dark:bg-slate-700 inline-block" />Unanswered</span>
                 </div>
             </div>
         </main>

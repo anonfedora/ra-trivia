@@ -7,6 +7,7 @@ import { ThemeToggle } from '../../../components/ThemeToggle';
 import NotificationBell from '../../../components/NotificationBell';
 import UserTypeSelector, { UserType } from '../../../components/UserTypeSelector';
 import { useToast } from '../../../contexts/ToastContext';
+import ConfirmModal from '../../../components/ConfirmModal';
 
 interface Quiz {
     id: string;
@@ -234,11 +235,13 @@ export default function AdminDashboard() {
     const handleDelete = async (e: React.MouseEvent, id: string, title: string) => {
         e.preventDefault();
         e.stopPropagation();
+        setDeleteModal({ id, title });
+    };
 
-        if (!window.confirm(`Are you sure you want to delete "${title}"? This will also delete all associated questions and candidate sessions.`)) {
-            return;
-        }
-
+    const confirmDelete = async () => {
+        if (!deleteModal) return;
+        const { id } = deleteModal;
+        setDeleteModal(null);
         const token = localStorage.getItem('token');
         try {
             const res = await fetch(`${apiUrl}/quizzes/${id}`, {
@@ -246,10 +249,8 @@ export default function AdminDashboard() {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
             if (res.ok) {
-                // Immediately remove from local state — don't wait for re-fetch
                 setQuizzes(prev => prev.filter(q => q.id !== id));
                 if (selectedQuizId === id) setSelectedQuizId('');
-                // Then re-fetch to confirm server state is in sync
                 fetchQuizzes();
             } else {
                 const errData = await res.json().catch(() => ({}));
@@ -264,6 +265,9 @@ export default function AdminDashboard() {
     const [importToExisting, setImportToExisting] = useState(true);
     const [importTitle, setImportTitle] = useState('');
     const [importDuration, setImportDuration] = useState('30');
+
+    // Delete confirmation modal
+    const [deleteModal, setDeleteModal] = useState<{ id: string; title: string } | null>(null);
 
     const handleUpload = async () => {
         // Clear previous errors
@@ -332,6 +336,7 @@ export default function AdminDashboard() {
     const selected = quizzes.find(q => q.id === selectedQuizId);
 
     return (
+        <>
         <main className="min-h-screen bg-slate-50 dark:bg-slate-900 p-6 md:p-12 transition-colors duration-200">
             <div className="max-w-7xl mx-auto">
                 <header className="flex flex-col md:flex-row justify-between items-start md:items-center mb-12 gap-6 animate-fade-in">
@@ -363,7 +368,65 @@ export default function AdminDashboard() {
                                 <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">{quizzes.length} Total</span>
                             </div>
 
-                            <div className="overflow-x-auto">
+                            {/* Mobile card list — shown below md */}
+                            <div className="md:hidden divide-y divide-slate-100 dark:divide-slate-700">
+                                {quizzes.length === 0 ? (
+                                    <div className="p-8 text-center">
+                                        <div className="flex flex-col items-center gap-3">
+                                            <div className="w-16 h-16 rounded-full bg-slate-100 dark:bg-slate-900 flex items-center justify-center">
+                                                <BookOpen size={32} className="text-slate-300 dark:text-slate-700" />
+                                            </div>
+                                            <p className="text-slate-400 dark:text-slate-500 font-bold">No exam sessions yet</p>
+                                            <p className="text-slate-400 dark:text-slate-600 text-sm">Create your first exam using the form below.</p>
+                                        </div>
+                                    </div>
+                                ) : quizzes.map((quiz) => (
+                                    <div
+                                        key={quiz.id}
+                                        onClick={() => setSelectedQuizId(quiz.id)}
+                                        className={`p-5 cursor-pointer transition-colors ${selectedQuizId === quiz.id ? 'bg-primary/5 dark:bg-primary/10' : 'hover:bg-slate-50 dark:hover:bg-slate-700/50'}`}
+                                    >
+                                        <div className="flex items-start justify-between gap-3">
+                                            <div className="flex-1 min-w-0">
+                                                <p className="font-bold text-slate-900 dark:text-slate-100 truncate">{quiz.title}</p>
+                                                <p className="text-xs text-slate-400 mt-0.5 font-mono">ID: {quiz.id.slice(0, 8)}</p>
+                                                <div className="flex items-center gap-3 mt-2 text-xs text-slate-500 dark:text-slate-400 font-semibold">
+                                                    <span>{quiz._count.questions} questions</span>
+                                                    <span>·</span>
+                                                    <span>{quiz.duration} min</span>
+                                                </div>
+                                            </div>
+                                            <div className="flex flex-col items-end gap-2 flex-shrink-0">
+                                                <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold ${quiz.isActive ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400' : 'bg-slate-200 dark:bg-slate-700 text-slate-500 dark:text-slate-400'}`}>
+                                                    <div className={`w-1.5 h-1.5 rounded-full ${quiz.isActive ? 'bg-emerald-500' : 'bg-slate-400'}`} />
+                                                    {quiz.isActive ? 'Active' : 'Inactive'}
+                                                </span>
+                                                <div className="flex gap-1.5">
+                                                    <button
+                                                        type="button"
+                                                        onClick={(e) => handleToggle(e, quiz.id)}
+                                                        className={`p-2 rounded-xl border transition-all ${quiz.isActive ? 'bg-amber-50 border-amber-100 text-amber-600 hover:bg-amber-100' : 'bg-emerald-50 border-emerald-100 text-emerald-600 hover:bg-emerald-100'}`}
+                                                        title={quiz.isActive ? 'Deactivate' : 'Activate'}
+                                                    >
+                                                        {quiz.isActive ? <PowerOff size={16} /> : <Power size={16} />}
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        onClick={(e) => handleDelete(e, quiz.id, quiz.title)}
+                                                        className="p-2 rounded-xl border border-rose-100 bg-rose-50 text-rose-600 hover:bg-rose-100 transition-all"
+                                                        title="Delete"
+                                                    >
+                                                        <Trash2 size={16} />
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+
+                            {/* Desktop table — hidden below md */}
+                            <div className="hidden md:block overflow-x-auto">
                                 <table className="w-full text-left border-collapse">
                                     <thead>
                                         <tr className="text-slate-400 dark:text-slate-500 text-xs font-bold uppercase tracking-widest border-b border-slate-50 dark:border-slate-700">
@@ -375,7 +438,19 @@ export default function AdminDashboard() {
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-slate-50">
-                                        {quizzes.map((quiz) => (
+                                        {quizzes.length === 0 ? (
+                                            <tr>
+                                                <td colSpan={5} className="px-8 py-20 text-center">
+                                                    <div className="flex flex-col items-center gap-3">
+                                                        <div className="w-16 h-16 rounded-full bg-slate-100 dark:bg-slate-900 flex items-center justify-center">
+                                                            <BookOpen size={32} className="text-slate-300 dark:text-slate-700" />
+                                                        </div>
+                                                        <p className="text-slate-400 dark:text-slate-500 font-bold text-lg">No exam sessions yet</p>
+                                                        <p className="text-slate-400 dark:text-slate-600 text-sm">Create your first exam using the form on the right.</p>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        ) : quizzes.map((quiz) => (
                                             <tr
                                                 key={quiz.id}
                                                 onClick={() => setSelectedQuizId(quiz.id)}
@@ -514,11 +589,13 @@ export default function AdminDashboard() {
                                             <input
                                                 type="number"
                                                 min={1}
+                                                max={300}
                                                 value={editDuration}
                                                 onChange={(e) => setEditDuration(e.target.value)}
                                                 disabled={user?.role === 'ADMIN' && selected?.createdBy?.id !== user?.id}
                                                 className="w-full px-5 py-3 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all outline-none text-sm text-slate-900 dark:text-slate-100"
                                             />
+                                            <p className="text-[10px] text-slate-400 ml-1">1 – 300 minutes</p>
                                         </div>
                                         <div className="space-y-2">
                                             <label className="text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">Retake Limit</label>
@@ -531,6 +608,7 @@ export default function AdminDashboard() {
                                                 disabled={user?.role === 'ADMIN' && selected?.createdBy?.id !== user?.id}
                                                 className="w-full px-5 py-3 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all outline-none text-sm text-slate-900 dark:text-slate-100"
                                             />
+                                            <p className="text-[10px] text-slate-400 ml-1">1 – 10 attempts</p>
                                         </div>
                                     </div>
                                     <div className="space-y-2">
@@ -695,5 +773,14 @@ export default function AdminDashboard() {
                 </div>
             </div>
         </main>
+        <ConfirmModal
+            isOpen={!!deleteModal}
+            title="Delete Exam"
+            message={`Are you sure you want to delete "${deleteModal?.title}"? This will also delete all associated questions and candidate sessions.`}
+            confirmLabel="Delete"
+            onConfirm={confirmDelete}
+            onCancel={() => setDeleteModal(null)}
+        />
+        </>
     );
 }
