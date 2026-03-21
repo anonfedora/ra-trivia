@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
-import { BookOpen, Clock, PlayCircle, LogOut, Calendar, Repeat, User } from 'lucide-react';
+import { BookOpen, Clock, PlayCircle, LogOut, Calendar, Repeat, User, CalendarClock } from 'lucide-react';
 import { ThemeToggle } from '../../components/ThemeToggle';
 import NotificationBell from '../../components/NotificationBell';
 import { useToast } from '../../contexts/ToastContext';
@@ -37,7 +37,10 @@ interface Session {
 
 export default function DashboardPage() {
     const [quizzes, setQuizzes] = useState<Quiz[]>([]);
+    const [upcomingQuizzes, setUpcomingQuizzes] = useState<Quiz[]>([]);
     const [pastSessions, setPastSessions] = useState<Session[]>([]);
+    const [loadingQuizzes, setLoadingQuizzes] = useState(true);
+    const [loadingResults, setLoadingResults] = useState(true);
     const [isLoading, setIsLoading] = useState(true);
     const [user, setUser] = useState<any>(null);
     const router = useRouter();
@@ -89,10 +92,11 @@ export default function DashboardPage() {
 
         const fetchData = async () => {
             const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
+            const now = new Date();
             try {
-                // Fetch Quizzes and Past Sessions in parallel
+                // Fetch all quizzes (including upcoming) and sessions in parallel
                 const [quizRes, sessionRes] = await Promise.all([
-                    fetch(`${apiUrl}/quizzes?activeOnly=true`, {
+                    fetch(`${apiUrl}/quizzes`, {
                         headers: { 'Authorization': `Bearer ${token}` }
                     }),
                     fetch(`${apiUrl}/quiz/my-sessions`, {
@@ -101,18 +105,28 @@ export default function DashboardPage() {
                 ]);
 
                 if (quizRes.ok && sessionRes.ok) {
-                    const quizzesData = await quizRes.json();
-                    const sessionsData = await sessionRes.json();
+                    const quizzesData: Quiz[] = await quizRes.json();
+                    const sessionsData: Session[] = await sessionRes.json();
 
                     // Count completed attempts for each quiz
-                    const quizzesWithAttempts = quizzesData.map((quiz: Quiz) => {
-                        const completedAttempts = sessionsData.filter((session: Session) =>
-                            session.quiz.id === quiz.id && session.endTime !== null
-                        ).length;
-                        return { ...quiz, completedAttempts };
-                    });
+                    const withAttempts = quizzesData.map((quiz) => ({
+                        ...quiz,
+                        completedAttempts: sessionsData.filter(
+                            (s) => s.quiz.id === quiz.id && s.endTime !== null
+                        ).length,
+                    }));
 
-                    setQuizzes(quizzesWithAttempts);
+                    // Active: isActive=true AND (no startDate OR startDate <= now)
+                    const active = withAttempts.filter(
+                        (q) => q.isActive && (!q.startDate || new Date(q.startDate) <= now)
+                    );
+                    // Upcoming: has a future startDate (regardless of isActive)
+                    const upcoming = withAttempts.filter(
+                        (q) => q.startDate && new Date(q.startDate) > now
+                    );
+
+                    setQuizzes(active);
+                    setUpcomingQuizzes(upcoming);
                     setPastSessions(sessionsData);
                 } else {
                     toast('Failed to load dashboard data. Please refresh.', 'error');
@@ -121,6 +135,8 @@ export default function DashboardPage() {
                 console.error('Failed to fetch data', err);
                 toast('Network error. Could not load dashboard.', 'error');
             } finally {
+                setLoadingQuizzes(false);
+                setLoadingResults(false);
                 setIsLoading(false);
             }
         };
@@ -134,7 +150,7 @@ export default function DashboardPage() {
         router.push('/login');
     };
 
-    if (isLoading) {
+    if (isLoading && !user) {
         return (
             <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-900 transition-colors duration-200">
                 <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
@@ -186,7 +202,22 @@ export default function DashboardPage() {
                                 <PlayCircle className="text-primary" size={24} />
                                 Available Exams
                             </h2>
-                            {quizzes.length === 0 ? (
+                            {loadingQuizzes ? (
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                    {[0, 1].map((i) => (
+                                        <div key={i} className="bg-white dark:bg-slate-800 rounded-[2.5rem] p-8 shadow-xl border border-slate-100 dark:border-slate-700 animate-pulse">
+                                            <div className="w-14 h-14 rounded-2xl bg-slate-200 dark:bg-slate-700 mb-6" />
+                                            <div className="h-6 bg-slate-200 dark:bg-slate-700 rounded-xl mb-4 w-3/4" />
+                                            <div className="space-y-3 mb-8">
+                                                {[0, 1, 2, 3].map((j) => (
+                                                    <div key={j} className="h-4 bg-slate-100 dark:bg-slate-700/50 rounded-lg w-1/2" />
+                                                ))}
+                                            </div>
+                                            <div className="h-12 bg-slate-200 dark:bg-slate-700 rounded-2xl" />
+                                        </div>
+                                    ))}
+                                </div>
+                            ) : quizzes.length === 0 && upcomingQuizzes.length === 0 ? (
                                 <div className="bg-white dark:bg-slate-800 rounded-[2.5rem] p-12 text-center shadow-xl border border-slate-100 dark:border-slate-700 animate-slide-up">
                                     <div className="bg-slate-50 dark:bg-slate-900 w-20 h-20 rounded-3xl flex items-center justify-center mx-auto mb-6 text-slate-400">
                                         <BookOpen size={40} />
@@ -195,62 +226,98 @@ export default function DashboardPage() {
                                     <p className="text-slate-500 dark:text-slate-400">There are currently no exams available for you to take.</p>
                                 </div>
                             ) : (
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                                    {quizzes.map((quiz, index) => (
-                                        <div
-                                            key={quiz.id}
-                                            className="bg-white dark:bg-slate-800 rounded-[2.5rem] p-8 shadow-xl border border-slate-100 dark:border-slate-700 hover:shadow-2xl hover:-translate-y-2 transition-all group animate-scale-in"
-                                            style={{ animationDelay: `${index * 100}ms` }}
-                                        >
-                                            <div className="bg-primary/10 w-14 h-14 rounded-2xl flex items-center justify-center text-primary mb-6 transition-transform group-hover:scale-110">
-                                                <BookOpen size={28} />
-                                            </div>
-                                            <h3 className="text-2xl font-bold text-slate-900 dark:text-slate-50 mb-4">{quiz.title}</h3>
+                                <div className="space-y-8">
+                                    {quizzes.length > 0 && (
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                            {quizzes.map((quiz, index) => (
+                                                <div
+                                                    key={quiz.id}
+                                                    className="bg-white dark:bg-slate-800 rounded-[2.5rem] p-8 shadow-xl border border-slate-100 dark:border-slate-700 hover:shadow-2xl hover:-translate-y-2 transition-all group animate-scale-in"
+                                                    style={{ animationDelay: `${index * 100}ms` }}
+                                                >
+                                                    <div className="bg-primary/10 w-14 h-14 rounded-2xl flex items-center justify-center text-primary mb-6 transition-transform group-hover:scale-110">
+                                                        <BookOpen size={28} />
+                                                    </div>
+                                                    <h3 className="text-2xl font-bold text-slate-900 dark:text-slate-50 mb-4">{quiz.title}</h3>
 
-                                            <div className="space-y-3 mb-8">
-                                                <div className="flex items-center gap-3 text-slate-500 dark:text-slate-400">
-                                                    <Clock size={18} />
-                                                    <span className="font-medium">{quiz.duration} Minutes</span>
-                                                </div>
-                                                <div className="flex items-center gap-3 text-slate-500 dark:text-slate-400">
-                                                    <Calendar size={18} />
-                                                    <span className="font-medium">{getScheduleLabel(quiz)}</span>
-                                                </div>
-                                                <div className="flex items-center gap-3 text-slate-500 dark:text-slate-400">
-                                                    <Repeat size={18} />
-                                                    <span className="font-medium">{getTriesLabel(quiz)}</span>
-                                                </div>
-                                                <div className="flex items-center gap-3 text-slate-500 dark:text-slate-400">
-                                                    <PlayCircle size={18} />
-                                                    <span className="font-medium">{quiz._count.questions} Questions</span>
-                                                </div>
-                                            </div>
+                                                    <div className="space-y-3 mb-8">
+                                                        <div className="flex items-center gap-3 text-slate-500 dark:text-slate-400">
+                                                            <Clock size={18} />
+                                                            <span className="font-medium">{quiz.duration} Minutes</span>
+                                                        </div>
+                                                        <div className="flex items-center gap-3 text-slate-500 dark:text-slate-400">
+                                                            <Calendar size={18} />
+                                                            <span className="font-medium">{getScheduleLabel(quiz)}</span>
+                                                        </div>
+                                                        <div className="flex items-center gap-3 text-slate-500 dark:text-slate-400">
+                                                            <Repeat size={18} />
+                                                            <span className="font-medium">{getTriesLabel(quiz)}</span>
+                                                        </div>
+                                                        <div className="flex items-center gap-3 text-slate-500 dark:text-slate-400">
+                                                            <PlayCircle size={18} />
+                                                            <span className="font-medium">{quiz._count.questions} Questions</span>
+                                                        </div>
+                                                    </div>
 
-                                            {(() => {
-                                                const remainingTries = quiz.retakeLimit && quiz.retakeLimit > 0
-                                                    ? Math.max(0, quiz.retakeLimit - (quiz.completedAttempts || 0))
-                                                    : Infinity;
+                                                    {(() => {
+                                                        const remainingTries = quiz.retakeLimit && quiz.retakeLimit > 0
+                                                            ? Math.max(0, quiz.retakeLimit - (quiz.completedAttempts || 0))
+                                                            : Infinity;
 
-                                                return (
-                                                    <Link
-                                                        href={remainingTries > 0 ? `/quiz/${quiz.id}/instructions` : '#'}
-                                                        className={`block w-full text-center py-4 rounded-2xl font-bold shadow-lg transition-all active:scale-95 ${remainingTries > 0
-                                                            ? 'bg-primary hover:bg-primary/90 text-white shadow-primary/20'
-                                                            : 'bg-slate-300 dark:bg-slate-700 text-slate-500 dark:text-slate-400 cursor-not-allowed'
-                                                            }`}
-                                                        onClick={(e) => {
-                                                            if (remainingTries === 0) {
-                                                                e.preventDefault();
-                                                                toast('You have no attempts left for this exam.', 'warning');
-                                                            }
-                                                        }}
-                                                    >
-                                                        {remainingTries > 0 ? 'Take Exam' : 'No Attempts Left'}
-                                                    </Link>
-                                                );
-                                            })()}
+                                                        return (
+                                                            <Link
+                                                                href={remainingTries > 0 ? `/quiz/${quiz.id}/instructions` : '#'}
+                                                                className={`block w-full text-center py-4 rounded-2xl font-bold shadow-lg transition-all active:scale-95 ${remainingTries > 0
+                                                                    ? 'bg-primary hover:bg-primary/90 text-white shadow-primary/20'
+                                                                    : 'bg-slate-300 dark:bg-slate-700 text-slate-500 dark:text-slate-400 cursor-not-allowed'
+                                                                    }`}
+                                                                onClick={(e) => {
+                                                                    if (remainingTries === 0) {
+                                                                        e.preventDefault();
+                                                                        toast('You have no attempts left for this exam.', 'warning');
+                                                                    }
+                                                                }}
+                                                            >
+                                                                {remainingTries > 0 ? 'Take Exam' : 'No Attempts Left'}
+                                                            </Link>
+                                                        );
+                                                    })()}
+                                                </div>
+                                            ))}
                                         </div>
-                                    ))}
+                                    )}
+
+                                    {/* Upcoming exams */}
+                                    {upcomingQuizzes.length > 0 && (
+                                        <div>
+                                            <h3 className="text-sm font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-4 flex items-center gap-2">
+                                                <CalendarClock size={16} />
+                                                Opening Soon
+                                            </h3>
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                                {upcomingQuizzes.map((quiz) => (
+                                                    <div
+                                                        key={quiz.id}
+                                                        className="bg-white dark:bg-slate-800 rounded-3xl p-6 border-2 border-dashed border-slate-200 dark:border-slate-700 flex items-center gap-5"
+                                                    >
+                                                        <div className="w-12 h-12 rounded-2xl bg-amber-100 dark:bg-amber-900/20 flex items-center justify-center text-amber-600 dark:text-amber-400 flex-shrink-0">
+                                                            <CalendarClock size={22} />
+                                                        </div>
+                                                        <div className="min-w-0">
+                                                            <p className="font-bold text-slate-900 dark:text-slate-100 truncate">{quiz.title}</p>
+                                                            <p className="text-sm text-amber-600 dark:text-amber-400 font-semibold mt-0.5">
+                                                                Opens {new Date(quiz.startDate!).toLocaleString(undefined, {
+                                                                    month: 'short', day: 'numeric',
+                                                                    hour: '2-digit', minute: '2-digit'
+                                                                })}
+                                                            </p>
+                                                            <p className="text-xs text-slate-400 mt-0.5">{quiz.duration} min · {quiz._count.questions} questions</p>
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
                             )}
                         </section>
@@ -263,18 +330,35 @@ export default function DashboardPage() {
                                 My Results
                             </h2>
                             <div className="space-y-4">
-                                {pastSessions.length === 0 ? (
+                                {loadingResults ? (
+                                    <>
+                                        {[0, 1, 2].map((i) => (
+                                            <div key={i} className="p-5 rounded-2xl bg-slate-50 dark:bg-slate-900/50 border border-slate-100 dark:border-slate-700 animate-pulse">
+                                                <div className="h-4 bg-slate-200 dark:bg-slate-700 rounded-lg w-3/4 mb-3" />
+                                                <div className="flex justify-between">
+                                                    <div className="h-3 bg-slate-100 dark:bg-slate-700/50 rounded w-1/3" />
+                                                    <div className="h-5 bg-slate-200 dark:bg-slate-700 rounded-full w-16" />
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </>
+                                ) : pastSessions.length === 0 ? (
                                     <p className="text-slate-400 dark:text-slate-500 text-center py-8 italic font-medium">No previous attempts recorded.</p>
                                 ) : (
                                     pastSessions.map((session) => {
                                         const now = new Date();
                                         const isReleased = !session.resultReleasesAt || now >= new Date(session.resultReleasesAt);
                                         const isRunning = !session.endTime;
-                                        
-                                        // Check if session might be abandoned (older than 2 hours without endTime)
                                         const sessionAge = now.getTime() - new Date(session.startTime).getTime();
                                         const twoHours = 2 * 60 * 60 * 1000;
                                         const likelyAbandoned = isRunning && sessionAge > twoHours;
+
+                                        const lockedLabel = session.resultReleasesAt
+                                            ? `Locked until ${new Date(session.resultReleasesAt).toLocaleString(undefined, {
+                                                month: 'short', day: 'numeric',
+                                                hour: '2-digit', minute: '2-digit'
+                                              })}`
+                                            : 'Pending release';
 
                                         return (
                                             <div
@@ -313,7 +397,7 @@ export default function DashboardPage() {
                                                                 ? 'Running'
                                                                 : isReleased
                                                                     ? `${session.score?.toFixed(1)}%`
-                                                                    : 'Locked until 8 PM'}
+                                                                    : lockedLabel}
                                                     </span>
                                                 </div>
                                             </div>
