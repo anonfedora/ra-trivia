@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from 'react';
-import { BookOpen, Clock, PlayCircle, Plus, Upload, Trash2, Power, PowerOff, FileDown, MoreVertical, CheckCircle, BarChart3 } from 'lucide-react';
+import { BookOpen, Clock, PlayCircle, Plus, Upload, Trash2, Power, PowerOff, FileDown, MoreVertical, CheckCircle, BarChart3, Users } from 'lucide-react';
 import Link from 'next/link';
 import { ThemeToggle } from '../../../components/ThemeToggle';
 import NotificationBell from '../../../components/NotificationBell';
@@ -354,6 +354,10 @@ export default function AdminDashboard() {
                         <Link href="/admin/analytics" className="flex items-center gap-2 bg-slate-600 dark:bg-slate-700 text-white px-6 py-3 rounded-2xl font-bold shadow-lg hover:bg-slate-700 dark:hover:bg-slate-800 transition-all">
                             <BarChart3 size={18} />
                             Analytics
+                        </Link>
+                        <Link href="/admin/candidates" className="flex items-center gap-2 bg-slate-600 dark:bg-slate-700 text-white px-6 py-3 rounded-2xl font-bold shadow-lg hover:bg-slate-700 dark:hover:bg-slate-800 transition-all">
+                            <Users size={18} />
+                            Candidates
                         </Link>
                     </div>
                 </header>

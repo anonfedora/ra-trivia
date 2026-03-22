@@ -371,6 +371,93 @@ router.get('/export/excel', authenticate, authorizeAdmin, async (req: AuthReques
     }
 });
 
+// Admin: Get all candidates (paginated)
+router.get('/candidates', authenticate, authorizeAdmin, async (req: AuthRequest, res) => {
+    try {
+        const page = Math.max(1, parseInt(String(req.query.page ?? '1'), 10) || 1);
+        const pageSizeRaw = parseInt(String(req.query.pageSize ?? '25'), 10) || 25;
+        const pageSize = Math.min(100, Math.max(1, pageSizeRaw));
+        const q = typeof req.query.q === 'string' ? req.query.q.trim() : '';
+
+        const where: any = { role: 'CANDIDATE' };
+
+        if (q) {
+            where.OR = [
+                { name: { contains: q, mode: 'insensitive' } },
+                { email: { contains: q, mode: 'insensitive' } },
+                { church: { contains: q, mode: 'insensitive' } },
+            ];
+        }
+
+        const [total, candidates] = await prisma.$transaction([
+            prisma.user.count({ where }),
+            prisma.user.findMany({
+                where,
+                select: {
+                    id: true,
+                    name: true,
+                    email: true,
+                    church: true,
+                    association: true,
+                    userType: true,
+                    createdAt: true,
+                    _count: { select: { sessions: true } },
+                },
+                orderBy: { createdAt: 'desc' },
+                skip: (page - 1) * pageSize,
+                take: pageSize,
+            }),
+        ]);
+
+        res.json({ items: candidates, total, page, pageSize });
+    } catch (error) {
+        console.error('Candidates fetch error:', error);
+        res.status(500).json({ message: 'Failed to fetch candidates' });
+    }
+});
+
+// Admin: Get single candidate profile + exam history
+router.get('/candidates/:userId', authenticate, authorizeAdmin, async (req: AuthRequest, res) => {
+    try {
+        const userId = req.params.userId as string;
+
+        const candidate = await prisma.user.findUnique({
+            where: { id: userId, role: 'CANDIDATE' },
+            select: {
+                id: true,
+                name: true,
+                email: true,
+                church: true,
+                association: true,
+                userType: true,
+                emailVerified: true,
+                createdAt: true,
+                sessions: {
+                    orderBy: { startTime: 'desc' },
+                    select: {
+                        id: true,
+                        startTime: true,
+                        endTime: true,
+                        score: true,
+                        manualStatus: true,
+                        resultReleasesAt: true,
+                        quiz: { select: { id: true, title: true, duration: true } },
+                    },
+                },
+            },
+        });
+
+        if (!candidate) {
+            return res.status(404).json({ message: 'Candidate not found' });
+        }
+
+        res.json(candidate);
+    } catch (error) {
+        console.error('Candidate detail fetch error:', error);
+        res.status(500).json({ message: 'Failed to fetch candidate' });
+    }
+});
+
 export default router;
 
 
