@@ -371,8 +371,12 @@ router.get('/export/excel', authenticate, authorizeAdmin, async (req: AuthReques
     }
 });
 
-// Admin: Get all candidates (paginated)
+// SUPER_ADMIN only: Get all candidates (paginated)
 router.get('/candidates', authenticate, authorizeAdmin, async (req: AuthRequest, res) => {
+    if (req.user?.role !== 'SUPER_ADMIN') {
+        return res.status(403).json({ message: 'Forbidden: Super admin access required' });
+    }
+
     try {
         const page = Math.max(1, parseInt(String(req.query.page ?? '1'), 10) || 1);
         const pageSizeRaw = parseInt(String(req.query.pageSize ?? '25'), 10) || 25;
@@ -416,10 +420,26 @@ router.get('/candidates', authenticate, authorizeAdmin, async (req: AuthRequest,
     }
 });
 
-// Admin: Get single candidate profile + exam history
+// SUPER_ADMIN: full profile. ADMIN: only if candidate attempted one of their quizzes.
 router.get('/candidates/:userId', authenticate, authorizeAdmin, async (req: AuthRequest, res) => {
     try {
         const userId = req.params.userId as string;
+        const requestingRole = req.user?.role;
+        const requestingAdminId = req.user?.userId;
+
+        // For regular ADMIN, verify this candidate attempted at least one of their quizzes
+        if (requestingRole === 'ADMIN') {
+            const hasAccess = await prisma.quizSession.findFirst({
+                where: {
+                    userId,
+                    quiz: { createdById: requestingAdminId },
+                },
+                select: { id: true },
+            });
+            if (!hasAccess) {
+                return res.status(403).json({ message: 'Forbidden: This candidate has not attempted any of your exams' });
+            }
+        }
 
         const candidate = await prisma.user.findUnique({
             where: { id: userId, role: 'CANDIDATE' },
@@ -433,6 +453,10 @@ router.get('/candidates/:userId', authenticate, authorizeAdmin, async (req: Auth
                 emailVerified: true,
                 createdAt: true,
                 sessions: {
+                    // ADMIN sees only sessions for their own quizzes; SUPER_ADMIN sees all
+                    where: requestingRole === 'ADMIN'
+                        ? { quiz: { createdById: requestingAdminId } }
+                        : {},
                     orderBy: { startTime: 'desc' },
                     select: {
                         id: true,
@@ -455,6 +479,78 @@ router.get('/candidates/:userId', authenticate, authorizeAdmin, async (req: Auth
     } catch (error) {
         console.error('Candidate detail fetch error:', error);
         res.status(500).json({ message: 'Failed to fetch candidate' });
+    }
+});
+
+// ADMIN only: Get candidates who attempted the admin's own quizzes (paginated)
+router.get('/my-exam-takers', authenticate, authorizeAdmin, async (req: AuthRequest, res) => {
+    if (req.user?.role !== 'ADMIN') {
+        return res.status(403).json({ message: 'Forbidden: Admin access only' });
+    }
+
+    try {
+        const adminId = req.user.userId;
+        const page = Math.max(1, parseInt(String(req.query.page ?? '1'), 10) || 1);
+        const pageSizeRaw = parseInt(String(req.query.pageSize ?? '25'), 10) || 25;
+        const pageSize = Math.min(100, Math.max(1, pageSizeRaw));
+        const q = typeof req.query.q === 'string' ? req.query.q.trim() : '';
+
+        // Find distinct users who have sessions on this admin's quizzes
+        const sessionWhere: any = {
+            quiz: { createdById: adminId },
+            user: { role: 'CANDIDATE' },
+        };
+
+        if (q) {
+            sessionWhere.user.OR = [
+                { name: { contains: q, mode: 'insensitive' } },
+                { email: { contains: q, mode: 'insensitive' } },
+                { church: { contains: q, mode: 'insensitive' } },
+            ];
+        }
+
+        // Get distinct userIds
+        const distinctUsers = await prisma.quizSession.findMany({
+            where: sessionWhere,
+            select: { userId: true },
+            distinct: ['userId'],
+        });
+
+        const userIds = distinctUsers.map((s: { userId: string }) => s.userId);
+        const total = userIds.length;
+
+        // Paginate
+        const pagedIds = userIds.slice((page - 1) * pageSize, page * pageSize);
+
+        const candidates = await prisma.user.findMany({
+            where: { id: { in: pagedIds } },
+            select: {
+                id: true,
+                name: true,
+                email: true,
+                church: true,
+                association: true,
+                userType: true,
+                createdAt: true,
+                sessions: {
+                    where: { quiz: { createdById: adminId } },
+                    select: { id: true },
+                },
+            },
+            orderBy: { name: 'asc' },
+        });
+
+        // Map session count
+        const items = candidates.map((c: any) => ({
+            ...c,
+            _count: { sessions: c.sessions.length },
+            sessions: undefined,
+        }));
+
+        res.json({ items, total, page, pageSize });
+    } catch (error) {
+        console.error('My exam takers fetch error:', error);
+        res.status(500).json({ message: 'Failed to fetch exam takers' });
     }
 });
 

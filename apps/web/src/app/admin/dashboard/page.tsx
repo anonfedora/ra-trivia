@@ -355,9 +355,11 @@ export default function AdminDashboard() {
                             <BarChart3 size={18} />
                             Analytics
                         </Link>
-                        <Link href="/admin/candidates" className="flex items-center gap-2 bg-slate-600 dark:bg-slate-700 text-white px-6 py-3 rounded-2xl font-bold shadow-lg hover:bg-slate-700 dark:hover:bg-slate-800 transition-all">
+                        <Link
+                            href={user?.role === 'SUPER_ADMIN' ? '/admin/candidates' : '/admin/my-exam-takers'}
+                            className="flex items-center gap-2 bg-slate-600 dark:bg-slate-700 text-white px-6 py-3 rounded-2xl font-bold shadow-lg hover:bg-slate-700 dark:hover:bg-slate-800 transition-all">
                             <Users size={18} />
-                            Candidates
+                            {user?.role === 'SUPER_ADMIN' ? 'Candidates' : 'My Exam Takers'}
                         </Link>
                     </div>
                 </header>

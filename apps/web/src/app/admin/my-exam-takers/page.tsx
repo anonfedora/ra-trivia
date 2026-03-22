@@ -9,7 +9,7 @@ import NotificationBell from '../../../components/NotificationBell';
 import { useToast } from '../../../contexts/ToastContext';
 import CandidateTable from '../../../components/CandidateTable';
 
-export default function CandidatesPage() {
+export default function MyExamTakersPage() {
     const router = useRouter();
     const [candidates, setCandidates] = useState<any[]>([]);
     const [isLoading, setIsLoading] = useState(true);
@@ -20,16 +20,16 @@ export default function CandidatesPage() {
     const { toast } = useToast();
     const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
 
-    // Redirect regular ADMIN to their scoped page
+    // SUPER_ADMIN should use the full candidates page
     useEffect(() => {
         const userRaw = localStorage.getItem('user');
         const user = userRaw ? JSON.parse(userRaw) : null;
-        if (user?.role === 'ADMIN') {
-            router.replace('/admin/my-exam-takers');
+        if (user?.role === 'SUPER_ADMIN') {
+            router.replace('/admin/candidates');
         }
     }, [router]);
 
-    const fetchCandidates = useCallback(async (overridePage?: number) => {
+    const fetchTakers = useCallback(async (overridePage?: number) => {
         const token = localStorage.getItem('token');
         const effectivePage = overridePage ?? page;
         try {
@@ -38,29 +38,27 @@ export default function CandidatesPage() {
                 pageSize: String(pageSize),
                 ...(searchTerm.trim() ? { q: searchTerm.trim() } : {}),
             });
-            const res = await fetch(`${apiUrl}/admin/candidates?${params}`, {
+            const res = await fetch(`${apiUrl}/admin/my-exam-takers?${params}`, {
                 headers: { Authorization: `Bearer ${token}` },
             });
             if (res.ok) {
                 const data = await res.json();
                 setCandidates(data.items);
                 setTotal(data.total);
-            } else if (res.status === 403) {
-                router.replace('/admin/my-exam-takers');
             } else {
-                toast('Failed to load candidates', 'error');
+                toast('Failed to load exam takers', 'error');
             }
         } catch {
-            toast('Failed to load candidates', 'error');
+            toast('Failed to load exam takers', 'error');
         } finally {
             setIsLoading(false);
         }
-    }, [apiUrl, page, pageSize, searchTerm, toast, router]);
+    }, [apiUrl, page, pageSize, searchTerm, toast]);
 
-    useEffect(() => { fetchCandidates(); }, [fetchCandidates]);
+    useEffect(() => { fetchTakers(); }, [fetchTakers]);
 
     useEffect(() => {
-        const t = setTimeout(() => { setPage(1); fetchCandidates(1); }, 300);
+        const t = setTimeout(() => { setPage(1); fetchTakers(1); }, 300);
         return () => clearTimeout(t);
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [searchTerm]);
@@ -75,8 +73,8 @@ export default function CandidatesPage() {
                         <Link href="/admin/dashboard" className="flex items-center gap-2 text-primary font-bold mb-4 hover:gap-3 transition-all">
                             <ArrowLeft size={18} /> Back to Dashboard
                         </Link>
-                        <h1 className="text-4xl font-extrabold text-slate-900 dark:text-slate-50 tracking-tight">All Candidates</h1>
-                        <p className="text-slate-500 dark:text-slate-400 mt-2 font-medium">All registered candidates across the platform.</p>
+                        <h1 className="text-4xl font-extrabold text-slate-900 dark:text-slate-50 tracking-tight">My Exam Takers</h1>
+                        <p className="text-slate-500 dark:text-slate-400 mt-2 font-medium">Candidates who have attempted your exams.</p>
                     </div>
                     <div className="flex gap-3 items-center">
                         <NotificationBell />
