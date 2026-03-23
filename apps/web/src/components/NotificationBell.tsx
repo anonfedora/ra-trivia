@@ -111,18 +111,6 @@ export default function NotificationBell() {
         };
     }, [isOpen]);
 
-    const markAllUnreadAsRead = async () => {
-        if (unreadCount === 0) return;
-        const token = localStorage.getItem('token');
-        try {
-            await fetch(`${apiUrl}/notifications/mark-all-read`, {
-                method: 'POST',
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-            fetchNotifications();
-        } catch {}
-    };
-
     const getNotificationHref = (n: Notification): string | null => {
         if (n.type === 'NEW_EXAM_AVAILABLE' && n.quizId) {
             return `/quiz/${n.quizId}/instructions`;
@@ -140,8 +128,6 @@ export default function NotificationBell() {
                 top: rect.bottom + window.scrollY + 8,
                 right: Math.max(8, clampedRight),
             });
-            // Mark all unread as read when opening
-            markAllUnreadAsRead();
         }
         setIsOpen(!isOpen);
     };
