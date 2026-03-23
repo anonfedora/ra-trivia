@@ -47,6 +47,7 @@ function AdminResultsContent() {
     const [pageSize] = useState(25);
     const [total, setTotal] = useState(0);
     const [summary, setSummary] = useState<any>(null);
+    const [isExporting, setIsExporting] = useState<string | null>(null); // 'excel' | 'formatted-excel' | 'pdf'
     const [releaseModal, setReleaseModal] = useState<string[] | null>(null);
 
     const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
@@ -149,6 +150,7 @@ function AdminResultsContent() {
 
     const handleExport = async (format: 'excel' | 'formatted-excel' | 'pdf') => {
         const token = localStorage.getItem('token');
+        setIsExporting(format);
         try {
             const params = new URLSearchParams();
             if (userTypeFilter !== 'all') {
@@ -225,6 +227,8 @@ function AdminResultsContent() {
             }
         } catch (err) {
             toast('Export failed', 'error');
+        } finally {
+            setIsExporting(null);
         }
     };
 
@@ -253,24 +257,27 @@ function AdminResultsContent() {
                         <div className="flex gap-2">
                             <button
                                 onClick={() => handleExport('excel')}
-                                className="flex items-center gap-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 px-4 py-3 rounded-2xl font-bold shadow-sm hover:shadow-md transition-all active:scale-95"
+                                disabled={!!isExporting}
+                                className="flex items-center gap-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 px-4 py-3 rounded-2xl font-bold shadow-sm hover:shadow-md transition-all active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed"
                             >
-                                <FileDown size={18} />
-                                Excel
+                                {isExporting === 'excel' ? <span className="w-4 h-4 border-2 border-slate-400 border-t-transparent rounded-full animate-spin" /> : <FileDown size={18} />}
+                                {isExporting === 'excel' ? 'Generating…' : 'Excel'}
                             </button>
                             <button
                                 onClick={() => handleExport('formatted-excel')}
-                                className="flex items-center gap-2 bg-emerald-600 text-white px-4 py-3 rounded-2xl font-bold shadow-sm hover:shadow-md transition-all active:scale-95"
+                                disabled={!!isExporting}
+                                className="flex items-center gap-2 bg-emerald-600 text-white px-4 py-3 rounded-2xl font-bold shadow-sm hover:shadow-md transition-all active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed"
                             >
-                                <FileDown size={18} />
-                                Formatted Excel
+                                {isExporting === 'formatted-excel' ? <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : <FileDown size={18} />}
+                                {isExporting === 'formatted-excel' ? 'Generating…' : 'Formatted Excel'}
                             </button>
                             <button
                                 onClick={() => handleExport('pdf')}
-                                className="flex items-center gap-2 bg-red-600 text-white px-4 py-3 rounded-2xl font-bold shadow-sm hover:shadow-md transition-all active:scale-95"
+                                disabled={!!isExporting}
+                                className="flex items-center gap-2 bg-red-600 text-white px-4 py-3 rounded-2xl font-bold shadow-sm hover:shadow-md transition-all active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed"
                             >
-                                <FileDown size={18} />
-                                PDF Report
+                                {isExporting === 'pdf' ? <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : <FileDown size={18} />}
+                                {isExporting === 'pdf' ? 'Generating…' : 'PDF Report'}
                             </button>
                         </div>
                     </div>

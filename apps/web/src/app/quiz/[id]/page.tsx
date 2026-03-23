@@ -25,6 +25,7 @@ export default function QuizPage() {
     const [showSubmitConfirm, setShowSubmitConfirm] = useState(false);
     const [leaveCount, setLeaveCount] = useState(0);
     const [savedFlash, setSavedFlash] = useState<string | null>(null); // questionId that just saved
+    const [screenshotWarning, setScreenshotWarning] = useState(false);
     const leaveCountRef = useRef(0);
     const { toast } = useToast();
 
@@ -287,6 +288,36 @@ export default function QuizPage() {
         };
     }, [session]);
 
+    // Block screenshot attempts (PrintScreen, macOS Cmd+Shift+3/4/5)
+    useEffect(() => {
+        if (!session) return;
+        const handleKeyDown = (e: KeyboardEvent) => {
+            const isPrintScreen = e.key === 'PrintScreen';
+            const isMacScreenshot = e.metaKey && e.shiftKey && ['3', '4', '5', 's'].includes(e.key);
+            if (isPrintScreen || isMacScreenshot) {
+                e.preventDefault();
+                setScreenshotWarning(true);
+                setTimeout(() => setScreenshotWarning(false), 2500);
+                // Count as a violation
+                leaveCountRef.current += 1;
+                const newCount = leaveCountRef.current;
+                setLeaveCount(newCount);
+                if (newCount === 1) {
+                    setShowWarning('⚠️ Warning 1/2: Screenshots are not allowed during the exam!');
+                    setTimeout(() => setShowWarning(null), 5000);
+                } else if (newCount === 2) {
+                    setShowWarning('⚠️ Warning 2/2: Final warning! Screenshots are not allowed.');
+                    setTimeout(() => setShowWarning(null), 5000);
+                } else if (newCount >= 3) {
+                    setShowWarning('🚨 Auto-submitting due to repeated violations!');
+                    setTimeout(() => handleSubmit(), 2000);
+                }
+            }
+        };
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [session, handleSubmit]);
+
     useEffect(() => {
         if (!quiz || !session) return;
 
@@ -400,6 +431,7 @@ export default function QuizPage() {
     if (showReview) {
         return (
             <main className="min-h-screen bg-slate-50 dark:bg-slate-900 p-6 md:p-12 flex flex-col items-center transition-colors duration-200">
+                <style>{`@media print { body { visibility: hidden !important; } }`}</style>
                 <div className="max-w-4xl w-full">
                     <div className="bg-white dark:bg-slate-800 rounded-[2.5rem] shadow-xl p-10 border border-slate-100 dark:border-slate-700 mb-8">
                         <h1 className="text-3xl font-bold text-slate-900 dark:text-slate-50 mb-6">Review Your Answers</h1>
@@ -490,6 +522,20 @@ export default function QuizPage() {
 
     return (
         <main className="min-h-screen bg-slate-50 dark:bg-slate-900 p-6 md:p-12 flex flex-col items-center transition-colors duration-200">
+            {/* Print/screenshot blackout — hides content in print media */}
+            <style>{`@media print { body { visibility: hidden !important; } }`}</style>
+
+            {/* Screenshot attempt overlay */}
+            {screenshotWarning && (
+                <div className="fixed inset-0 z-[99999] bg-black flex items-center justify-center pointer-events-none">
+                    <div className="text-white text-center px-8">
+                        <div className="text-5xl mb-4">🚫</div>
+                        <p className="text-2xl font-black">Screenshots are not allowed</p>
+                        <p className="text-white/60 mt-2">This violation has been recorded.</p>
+                    </div>
+                </div>
+            )}
+
             {/* Timer Warning */}
             {showWarning && (
                 <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 animate-bounce pointer-events-none px-3 max-w-[92vw] sm:max-w-md">

@@ -344,22 +344,22 @@ export default function AdminDashboard() {
                         <h1 className="text-4xl font-extrabold text-slate-900 dark:text-slate-50 tracking-tight">Admin Dashboard</h1>
                         <p className="text-slate-500 dark:text-slate-400 mt-2 font-medium">Manage your exam sessions and candidate records.</p>
                     </div>
-                    <div className="flex gap-3 items-center">
+                    <div className="flex flex-wrap gap-2 items-center">
                         <NotificationBell />
                         <ThemeToggle />
-                        <Link href="/admin/results" className="flex items-center gap-2 bg-primary text-white px-6 py-3 rounded-2xl font-bold shadow-lg shadow-primary/20 hover:shadow-xl transition-all">
-                            <BookOpen size={18} />
-                            Detailed Results
+                        <Link href="/admin/results" className="flex items-center gap-2 bg-primary text-white px-4 py-2.5 rounded-2xl font-bold shadow-lg shadow-primary/20 hover:shadow-xl transition-all text-sm">
+                            <BookOpen size={16} />
+                            Results
                         </Link>
-                        <Link href="/admin/analytics" className="flex items-center gap-2 bg-slate-600 dark:bg-slate-700 text-white px-6 py-3 rounded-2xl font-bold shadow-lg hover:bg-slate-700 dark:hover:bg-slate-800 transition-all">
-                            <BarChart3 size={18} />
+                        <Link href="/admin/analytics" className="flex items-center gap-2 bg-slate-600 dark:bg-slate-700 text-white px-4 py-2.5 rounded-2xl font-bold shadow-lg hover:bg-slate-700 dark:hover:bg-slate-800 transition-all text-sm">
+                            <BarChart3 size={16} />
                             Analytics
                         </Link>
                         <Link
                             href={user?.role === 'SUPER_ADMIN' ? '/admin/candidates' : '/admin/my-exam-takers'}
-                            className="flex items-center gap-2 bg-slate-600 dark:bg-slate-700 text-white px-6 py-3 rounded-2xl font-bold shadow-lg hover:bg-slate-700 dark:hover:bg-slate-800 transition-all">
-                            <Users size={18} />
-                            {user?.role === 'SUPER_ADMIN' ? 'Candidates' : 'My Exam Takers'}
+                            className="flex items-center gap-2 bg-slate-600 dark:bg-slate-700 text-white px-4 py-2.5 rounded-2xl font-bold shadow-lg hover:bg-slate-700 dark:hover:bg-slate-800 transition-all text-sm">
+                            <Users size={16} />
+                            {user?.role === 'SUPER_ADMIN' ? 'Candidates' : 'Exam Takers'}
                         </Link>
                     </div>
                 </header>
