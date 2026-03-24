@@ -7,7 +7,7 @@ import Image from 'next/image';
 import { apiJson } from '../../lib/api';
 import { ThemeToggle } from '../../components/ThemeToggle';
 import PasswordInput from '../../components/PasswordInput';
-import PasswordStrength from '../../components/PasswordStrength';
+import PasswordStrength, { getPasswordStrength } from '../../components/PasswordStrength';
 import UserTypeSelector, { UserType } from '../../components/UserTypeSelector';
 
 export default function RegisterPage() {
@@ -21,6 +21,8 @@ export default function RegisterPage() {
     const [success, setSuccess] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const router = useRouter();
+
+    const isPasswordStrong = getPasswordStrength(password).score === 4;
 
     const handleRegister = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -155,8 +157,8 @@ export default function RegisterPage() {
 
                     <button
                         type="submit"
-                        disabled={isLoading}
-                        className="w-full bg-primary hover:bg-primary/90 text-white py-5 rounded-2xl font-bold shadow-lg shadow-primary/20 transform transition-all hover:-translate-y-1 active:scale-95 mt-4 disabled:opacity-50"
+                        disabled={isLoading || !isPasswordStrong}
+                        className="w-full bg-primary hover:bg-primary/90 text-white py-5 rounded-2xl font-bold shadow-lg shadow-primary/20 transform transition-all hover:-translate-y-1 active:scale-95 mt-4 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0"
                     >
                         {isLoading ? 'Creating Account...' : 'Register Now'}
                     </button>
