@@ -115,6 +115,9 @@ export default function NotificationBell() {
         if (n.type === 'NEW_EXAM_AVAILABLE' && n.quizId) {
             return `/quiz/${n.quizId}/instructions`;
         }
+        if (n.type === 'SUPPORT_REQUEST') {
+            return `/admin/support`;
+        }
         return null;
     };
 

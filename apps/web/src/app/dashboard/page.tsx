@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
 import { BookOpen, Clock, PlayCircle, LogOut, Calendar, Repeat, User, CalendarClock } from 'lucide-react';
-import { ThemeToggle } from '../../components/ThemeToggle';
+import { ThemeToggle, SupportButton } from '../../components';
 import NotificationBell from '../../components/NotificationBell';
 import { useToast } from '../../contexts/ToastContext';
 
@@ -425,6 +425,7 @@ export default function DashboardPage() {
                     </div>
                 </div>
             </div>
+            <SupportButton />
         </main>
     );
 }

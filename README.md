@@ -100,6 +100,7 @@ pnpm --filter web dev
 - Import questions from Excel by user type
 - Set retake limits, start/end scheduling
 - View all candidate results with search and pagination
+- Support Center: Real-time chat with candidates, thread management, and resolution tracking
 - Manually release results per-session or bulk per-quiz
 - Set manual pass/fail status override
 - Export results as formatted Excel or PDF
@@ -168,6 +169,15 @@ POST  /api/admin/quizzes/:id/release-all
 PATCH /api/admin/sessions/:id/status       # Manual pass/fail
 GET   /api/admin/export/formatted-excel
 GET   /api/admin/export/pdf
+GET   /api/support/admin                   # List threads (admin)
+GET   /api/support/admin/:userId           # History for user
+POST  /api/support/admin/:userId           # Reply to user
+PATCH /api/support/admin/:userId/resolve   # Close thread
+
+### Support (Candidate)
+```
+GET   /api/support                         # History + relevant notifications
+POST  /api/support                         # Submit new message
 ```
 
 ### Notifications
@@ -205,7 +215,14 @@ pnpm --filter server test -- --run
 
 ## Version History
 
-### v1.4.0 (Current)
+### v1.5.0 (Current)
+- **Support Chat System**: Real-time two-way communication between candidates and admins.
+- **Admin Support Center**: Dedicated dashboard for thread management, candidate search, and resolution tracking.
+- **Candidate Chat UI**: Floating support button with full message history and relevant notifications integration.
+- **Socket.IO Integration**: Immediate message delivery with private user rooms and admin support rooms.
+- **CI Fixes**: ESLint unescaped entity cleanup and verified production build pipeline.
+
+### v1.4.0
 - **Password Reset**: Forgot password flow with 15-min expiry token, email link, confirm password page
 - **WebSocket Notifications**: Socket.IO real-time delivery; falls back to polling on error
 - **Toast System**: Global `useToast()` hook + `<Toaster />` portal — replaces all `alert()` calls across pages

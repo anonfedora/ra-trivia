@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from 'react';
-import { BookOpen, Clock, PlayCircle, Plus, Upload, Trash2, Power, PowerOff, FileDown, MoreVertical, CheckCircle, BarChart3, Users } from 'lucide-react';
+import { BookOpen, Clock, PlayCircle, Plus, Upload, Trash2, Power, PowerOff, FileDown, MoreVertical, CheckCircle, BarChart3, Users, MessageCircle } from 'lucide-react';
 import Link from 'next/link';
 import { ThemeToggle } from '../../../components/ThemeToggle';
 import NotificationBell from '../../../components/NotificationBell';
@@ -345,6 +345,14 @@ export default function AdminDashboard() {
                         <p className="text-slate-500 dark:text-slate-400 mt-2 font-medium">Manage your exam sessions and candidate records.</p>
                     </div>
                     <div className="flex flex-wrap gap-2 items-center">
+                        <Link 
+                            href="/admin/support"
+                            className="p-3 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-2xl border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 transition-all shadow-sm flex items-center gap-2 font-semibold"
+                            title="Support Center"
+                        >
+                            <MessageCircle size={20} className="text-primary" />
+                            <span className="hidden sm:inline">Support</span>
+                        </Link>
                         <NotificationBell />
                         <ThemeToggle />
                         <Link href="/admin/results" className="flex items-center gap-2 bg-primary text-white px-4 py-2.5 rounded-2xl font-bold shadow-lg shadow-primary/20 hover:shadow-xl transition-all text-sm">

@@ -152,6 +152,17 @@ pnpm --filter server test:coverage
 | POST | `/mark-all-read` | Any | Mark all as read |
 | DELETE | `/:id` | Any | Delete notification |
 
+### Support — `/api/support`
+
+| Method | Path | Auth | Description |
+|---|---|---|---|
+| GET | `/` | Candidate | Own history + relevant notifications |
+| POST | `/` | Candidate | Submit new message |
+| GET | `/admin` | Admin | List all support threads |
+| GET | `/admin/:userId` | Admin | History for specific user |
+| POST | `/admin/:userId` | Admin | Reply to user |
+| PATCH | `/admin/:userId/resolve` | Admin | Close thread |
+
 ### Notification Scoping
 
 - **SUPER_ADMIN**: `EXAM_SUBMITTED`, `NEW_USER_REGISTERED`, `NEW_ADMIN_REGISTERED`
@@ -169,6 +180,14 @@ emitNotification(userId, notificationPayload);
 ```
 
 The frontend `NotificationBell` listens on the `notification` event and refreshes the list. Falls back to 30s polling if the socket fails to connect.
+
+### Socket.IO Events
+
+| Event | Direction | Description |
+|---|---|---|
+| `notification` | Server → Client | General notification (all users) |
+| `support_message` | Server → Admin | New candidate message in support thread |
+| `support_reply` | Server → Candidate | New admin reply to support thread |
 
 ## Scheduler
 

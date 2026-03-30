@@ -22,9 +22,17 @@ export const initSocketIO = (socketServer: SocketIOServer) => {
 
     io.on('connection', (socket: Socket) => {
         const userId = (socket as any).userId as string;
+        const role = (socket as any).role as string;
+        
         // Each user joins their own private room
         socket.join(`user:${userId}`);
-        console.log(`[SOCKET] User ${userId} connected (${socket.id})`);
+        
+        // Admins join the admin room
+        if (role === 'SUPER_ADMIN' || role === 'ADMIN') {
+            socket.join('admin');
+        }
+        
+        console.log(`[SOCKET] User ${userId} connected (${socket.id}) as ${role}`);
 
         socket.on('disconnect', () => {
             console.log(`[SOCKET] User ${userId} disconnected (${socket.id})`);
