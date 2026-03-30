@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { CheckCircle2, XCircle } from 'lucide-react';
-import { ThemeToggle } from '../../../components/ThemeToggle';
+import { ThemeToggle, SupportButton } from '../../../components';
 import { useToast } from '../../../contexts/ToastContext';
 import ConfirmModal from '../../../components/ConfirmModal';
 
@@ -516,6 +516,7 @@ export default function QuizPage() {
                     onConfirm={handleSubmit}
                     onCancel={() => setShowSubmitConfirm(false)}
                 />
+                <SupportButton quizId={quizId} />
             </main>
         );
     }
@@ -691,6 +692,7 @@ export default function QuizPage() {
                     <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded bg-slate-200 dark:bg-slate-700 inline-block" />Unanswered</span>
                 </div>
             </div>
+            <SupportButton quizId={quizId} />
         </main>
     );
 }

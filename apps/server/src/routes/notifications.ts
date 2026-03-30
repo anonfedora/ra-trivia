@@ -18,7 +18,7 @@ router.get('/', authenticate, async (req: AuthRequest, res) => {
         // Candidate-only notification types — never shown to admins
         const CANDIDATE_TYPES = ['NEW_EXAM_AVAILABLE', 'RESULT_RELEASED'];
         // Admin-only notification types — never shown to candidates
-        const ADMIN_TYPES = ['EXAM_SUBMITTED', 'NEW_USER_REGISTERED', 'NEW_ADMIN_REGISTERED'];
+        const ADMIN_TYPES = ['EXAM_SUBMITTED', 'NEW_USER_REGISTERED', 'NEW_ADMIN_REGISTERED', 'SUPPORT_REQUEST'];
 
         if (userRole === 'SUPER_ADMIN') {
             // SUPER_ADMIN only sees admin-relevant notifications, not candidate-scoped ones
@@ -96,7 +96,7 @@ router.post('/mark-all-read', authenticate, async (req: AuthRequest, res) => {
         const userRole = req.user?.role;
 
         const CANDIDATE_TYPES = ['NEW_EXAM_AVAILABLE', 'RESULT_RELEASED'];
-        const ADMIN_TYPES = ['EXAM_SUBMITTED', 'NEW_USER_REGISTERED', 'NEW_ADMIN_REGISTERED'];
+        const ADMIN_TYPES = ['EXAM_SUBMITTED', 'NEW_USER_REGISTERED', 'NEW_ADMIN_REGISTERED', 'SUPPORT_REQUEST'];
 
         const where: any = { isRead: false };
 

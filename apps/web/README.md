@@ -104,7 +104,8 @@ pnpm --filter web lint
 | `/quiz/:id/instructions` | Pre-exam instructions with anti-cheat rules |
 | `/quiz/:id` | Active exam — timer, questions, auto-save |
 | `/results` | Result detail (locked until released) |
-| `/notifications` | All notifications with New Exams / Results filter tabs |
+| `/admin/notifications` | All notifications with New Exams / Results filter tabs |
+| `/admin/support` | Support Center dashboard with real-time candidate chat |
 | `/profile` | View and update profile |
 
 ### Admin (requires auth, role = ADMIN or SUPER_ADMIN)

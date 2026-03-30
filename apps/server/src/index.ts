@@ -16,6 +16,7 @@ import quizRoutes from './routes/quiz';
 import adminRoutes from './routes/admin';
 import quizzesRoutes from './routes/quizzes';
 import notificationRoutes from './routes/notifications';
+import supportRoutes from './routes/support';
 import passwordRequirementsRoutes from './routes/password-requirements';
 import { initScheduler } from './services/scheduler';
 import { initSocketIO } from './services/socketService';
@@ -107,12 +108,13 @@ app.use('/api/auth/', authLimiter); // Strict rate limit for auth endpoints
 
 // Routes
 app.use('/api/auth', authRoutes);
-app.use('/api/password', passwordRequirementsRoutes);
 app.use('/api/questions', questionRoutes);
 app.use('/api/quiz', quizRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/quizzes', quizzesRoutes);
 app.use('/api/notifications', notificationRoutes);
+app.use('/api/support', supportRoutes);
+app.use('/api/password-requirements', passwordRequirementsRoutes);
 
 app.get('/health', (req, res) => {
     res.json({ status: 'ok', timestamp: new Date().toISOString() });

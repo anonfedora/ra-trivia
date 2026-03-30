@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { Bell, Check, CheckCheck, Trash2, ArrowLeft, ClipboardList, UserPlus, ShieldCheck, Users } from 'lucide-react';
+import { Bell, Check, CheckCheck, Trash2, ArrowLeft, ClipboardList, UserPlus, ShieldCheck, Users, LifeBuoy } from 'lucide-react';
 import Link from 'next/link';
 import { formatDistanceToNow } from 'date-fns';
 import { ThemeToggle } from '../../../components/ThemeToggle';
@@ -16,13 +16,14 @@ interface Notification {
     createdAt: string;
 }
 
-type FilterType = 'ALL' | 'EXAM_SUBMITTED' | 'NEW_CANDIDATE' | 'NEW_ADMIN';
+type FilterType = 'ALL' | 'EXAM_SUBMITTED' | 'NEW_CANDIDATE' | 'NEW_ADMIN' | 'SUPPORT_REQUEST';
 
 const FILTERS: { key: FilterType; label: string; icon: React.ReactNode }[] = [
     { key: 'ALL',           label: 'All',          icon: <Bell size={14} /> },
     { key: 'EXAM_SUBMITTED',label: 'Exams',        icon: <ClipboardList size={14} /> },
     { key: 'NEW_CANDIDATE', label: 'Candidates',   icon: <UserPlus size={14} /> },
     { key: 'NEW_ADMIN',     label: 'Admins',       icon: <ShieldCheck size={14} /> },
+    { key: 'SUPPORT_REQUEST',label: 'Support',     icon: <LifeBuoy size={14} /> },
 ];
 
 function matchesFilter(type: string, filter: FilterType): boolean {
@@ -30,6 +31,7 @@ function matchesFilter(type: string, filter: FilterType): boolean {
     if (filter === 'EXAM_SUBMITTED') return type === 'EXAM_SUBMITTED';
     if (filter === 'NEW_CANDIDATE') return type === 'NEW_USER_REGISTERED';
     if (filter === 'NEW_ADMIN') return type === 'NEW_ADMIN_REGISTERED' || (type === 'NEW_USER_REGISTERED' && false);
+    if (filter === 'SUPPORT_REQUEST') return type === 'SUPPORT_REQUEST';
     return true;
 }
 
@@ -39,6 +41,7 @@ function getFilter(type: string): FilterType {
     if (type === 'EXAM_SUBMITTED') return 'EXAM_SUBMITTED';
     if (type === 'NEW_ADMIN_REGISTERED') return 'NEW_ADMIN';
     if (type === 'NEW_USER_REGISTERED') return 'NEW_CANDIDATE';
+    if (type === 'SUPPORT_REQUEST') return 'SUPPORT_REQUEST';
     return 'ALL';
 }
 
@@ -85,6 +88,7 @@ export default function NotificationsPage() {
         EXAM_SUBMITTED: notifications.filter(n => n.type === 'EXAM_SUBMITTED').length,
         NEW_CANDIDATE: notifications.filter(n => n.type === 'NEW_USER_REGISTERED').length,
         NEW_ADMIN: notifications.filter(n => n.type === 'NEW_ADMIN_REGISTERED').length,
+        SUPPORT_REQUEST: notifications.filter(n => n.type === 'SUPPORT_REQUEST').length,
     }), [notifications]);
 
     const markAsRead = async (id: string) => {
