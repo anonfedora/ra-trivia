@@ -70,9 +70,13 @@ router.get('/admin/:userId', authenticate, authorizeAdmin, async (req: AuthReque
             }
         });
 
+        // Admins only see relevant context notifications (like results released) in the support thread
+        const SUPPORT_CONTEXT_NOTIFICATION_TYPES = ['RESULT_RELEASED'];
+
         const notifications = await prisma.notification.findMany({
             where: {
                 candidateEmail: user.email as string,
+                type: { in: SUPPORT_CONTEXT_NOTIFICATION_TYPES }
             },
             orderBy: { createdAt: 'asc' }
         });
