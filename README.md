@@ -217,6 +217,7 @@ pnpm --filter server test -- --run
 
 ### v1.5.0 (Current)
 - **Support Chat System**: Real-time two-way communication between candidates and admins.
+- **Read Receipts**: Double-check marks for read messages (Candidate and Admin sides).
 - **Admin Support Center**: Dedicated dashboard for thread management, candidate search, and resolution tracking.
 - **Candidate Chat UI**: Floating support button with full message history and relevant notifications integration.
 - **Socket.IO Integration**: Immediate message delivery with private user rooms and admin support rooms.

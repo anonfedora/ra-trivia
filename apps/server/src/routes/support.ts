@@ -21,9 +21,14 @@ router.get('/admin', authenticate, authorizeAdmin, async (req: AuthRequest, res)
             }
         });
 
-        // Group by userId and get the latest message for each user
+        // Group by userId and get the latest message and unread count for each user
         const threadsMap = new Map();
-        supportMessages.forEach(msg => {
+        
+        // We need all messages to calculate unread counts correctly, 
+        // or we could do a separate count query. Let's stick with grouping for now
+        // but fetch them in a way that we can count.
+        
+        for (const msg of supportMessages) {
             if (!threadsMap.has(msg.userId)) {
                 threadsMap.set(msg.userId, {
                     userId: msg.userId,
@@ -31,10 +36,16 @@ router.get('/admin', authenticate, authorizeAdmin, async (req: AuthRequest, res)
                     latestMessage: msg.message,
                     latestCreatedAt: msg.createdAt,
                     status: msg.status,
-                    unreadCount: 0 // We could implement unread count later
+                    unreadCount: 0
                 });
             }
-        });
+            
+            // Count unread messages from the candidate (isAdmin: false)
+            if (!msg.isAdmin && !msg.isRead) {
+                const thread = threadsMap.get(msg.userId);
+                thread.unreadCount++;
+            }
+        }
 
         res.json(Array.from(threadsMap.values()));
     } catch (error) {
@@ -136,6 +147,46 @@ router.post('/admin/:userId', authenticate, authorizeAdmin, async (req: AuthRequ
     }
 });
 
+// Admin: Get global unread support message count
+router.get('/admin/unread-count', authenticate, authorizeAdmin, async (req: AuthRequest, res) => {
+    try {
+        const unreadCount = await prisma.supportMessage.count({
+            where: {
+                isAdmin: false,
+                isRead: false
+            }
+        });
+        res.json({ unreadCount });
+    } catch (error) {
+        console.error('Admin unread count error:', error);
+        res.status(500).json({ message: 'Failed to fetch unread count' });
+    }
+});
+
+// Admin: Mark all messages from a user as read
+router.patch('/admin/:userId/read', authenticate, authorizeAdmin, async (req: AuthRequest, res) => {
+    try {
+        const userId = req.params.userId as string;
+
+        await prisma.supportMessage.updateMany({
+            where: {
+                userId,
+                isAdmin: false,
+                isRead: false
+            },
+            data: { isRead: true }
+        });
+
+        // Notify the candidate that their messages were read
+        emitToRoom(`user:${userId}`, 'messages_read', { userId, byAdmin: true });
+
+        res.json({ message: 'Messages marked as read' });
+    } catch (error) {
+        console.error('Admin mark as read error:', error);
+        res.status(500).json({ message: 'Failed to mark messages as read' });
+    }
+});
+
 // Admin: Mark support thread as resolved
 router.patch('/admin/:userId/resolve', authenticate, authorizeAdmin, async (req: AuthRequest, res) => {
     try {
@@ -206,6 +257,48 @@ router.get('/', authenticate, async (req: AuthRequest, res) => {
     } catch (error) {
         console.error('Fetch support history error:', error);
         res.status(500).json({ message: 'Failed to fetch support history' });
+    }
+});
+
+// Candidate: Get unread support message count
+router.get('/unread-count', authenticate, async (req: AuthRequest, res) => {
+    try {
+        const userId = req.user!.userId;
+        const unreadCount = await prisma.supportMessage.count({
+            where: {
+                userId,
+                isAdmin: true,
+                isRead: false
+            }
+        });
+        res.json({ unreadCount });
+    } catch (error) {
+        console.error('Candidate unread count error:', error);
+        res.status(500).json({ message: 'Failed to fetch unread count' });
+    }
+});
+
+// Candidate: Mark all messages from admins as read
+router.patch('/read', authenticate, async (req: AuthRequest, res) => {
+    try {
+        const userId = req.user!.userId;
+
+        await prisma.supportMessage.updateMany({
+            where: {
+                userId,
+                isAdmin: true,
+                isRead: false
+            },
+            data: { isRead: true }
+        });
+
+        // Notify admins that their messages were read
+        emitToRoom('admin', 'messages_read', { userId, byCandidate: true });
+
+        res.json({ message: 'Messages marked as read' });
+    } catch (error) {
+        console.error('Candidate mark as read error:', error);
+        res.status(500).json({ message: 'Failed to mark messages as read' });
     }
 });
 

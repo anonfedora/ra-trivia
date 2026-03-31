@@ -86,6 +86,7 @@ model SupportMessage {
   quizId    String?
   message   String
   isAdmin   Boolean  @default(false)
+  isRead    Boolean  @default(false)
   status    SupportStatus @default(PENDING)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

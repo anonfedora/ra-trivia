@@ -8,6 +8,7 @@ import NotificationBell from '../../../components/NotificationBell';
 import UserTypeSelector, { UserType } from '../../../components/UserTypeSelector';
 import { useToast } from '../../../contexts/ToastContext';
 import ConfirmModal from '../../../components/ConfirmModal';
+import { io, Socket } from 'socket.io-client';
 
 interface Quiz {
     id: string;
@@ -58,6 +59,7 @@ export default function AdminDashboard() {
     const [user, setUser] = useState<any>(null);
     const [questionType, setQuestionType] = useState<UserType | null>(null);
     const [questionTypeError, setQuestionTypeError] = useState<string>('');
+    const [supportUnreadCount, setSupportUnreadCount] = useState(0);
     const { toast } = useToast();
 
     // Edit Selected Quiz
@@ -74,6 +76,21 @@ export default function AdminDashboard() {
     const [isCreating, setIsCreating] = useState(false);
 
     const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
+
+    const fetchSupportUnreadCount = useCallback(async () => {
+        const token = localStorage.getItem('token');
+        try {
+            const res = await fetch(`${apiUrl}/support/admin/unread-count`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (res.ok) {
+                const data = await res.json();
+                setSupportUnreadCount(data.unreadCount);
+            }
+        } catch (err) {
+            console.error('Failed to fetch support unread count', err);
+        }
+    }, [apiUrl]);
 
     const fetchData = useCallback(async () => {
         const token = localStorage.getItem('token');
@@ -119,7 +136,24 @@ export default function AdminDashboard() {
             setUser(JSON.parse(userRaw));
         }
         fetchData();
-    }, [fetchData]);
+        fetchSupportUnreadCount();
+
+        if (token) {
+            const socketUrl = apiUrl.replace('/api', '');
+            const socket = io(socketUrl, {
+                auth: { token },
+                transports: ['websocket', 'polling'],
+            });
+
+            socket.on('support_message', () => {
+                fetchSupportUnreadCount();
+            });
+
+            return () => {
+                socket.disconnect();
+            };
+        }
+    }, [fetchData, fetchSupportUnreadCount, apiUrl]);
 
     useEffect(() => {
         const selected = quizzes.find(q => q.id === selectedQuizId);
@@ -347,11 +381,16 @@ export default function AdminDashboard() {
                     <div className="flex flex-wrap gap-2 items-center">
                         <Link 
                             href="/admin/support"
-                            className="p-3 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-2xl border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 transition-all shadow-sm flex items-center gap-2 font-semibold"
+                            className="p-3 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-2xl border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 transition-all shadow-sm flex items-center gap-2 font-semibold relative"
                             title="Support Center"
                         >
                             <MessageCircle size={20} className="text-primary" />
                             <span className="hidden sm:inline">Support</span>
+                            {supportUnreadCount > 0 && (
+                                <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold rounded-full w-5 h-5 flex items-center justify-center animate-bounce shadow-lg">
+                                    {supportUnreadCount > 9 ? '9+' : supportUnreadCount}
+                                </span>
+                            )}
                         </Link>
                         <NotificationBell />
                         <ThemeToggle />
