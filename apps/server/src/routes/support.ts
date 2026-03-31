@@ -5,49 +5,117 @@ import { emitToRoom } from '../services/socketService';
 
 const router = Router();
 
+// Admin: Get canned response templates
+router.get('/admin/templates', authenticate, authorizeAdmin, async (req: AuthRequest, res) => {
+    const templates = [
+        { id: '1', title: 'Greeting', content: 'Hello! How can we help you today?' },
+        { id: '2', title: 'Checking', content: 'We are looking into your request. Please give us a moment.' },
+        { id: '3', title: 'Resolved', content: 'The issue has been resolved. Is there anything else you need help with?' },
+        { id: '4', title: 'Exam Technical', content: 'If you are facing technical issues during the exam, please try refreshing the page or checking your internet connection.' },
+        { id: '5', title: 'Result Delay', content: 'Results are typically released within 24-48 hours after the exam completion. You will receive a notification once they are ready.' }
+    ];
+    res.json(templates);
+});
+
 // Admin: Get all support threads (grouped by user)
 router.get('/admin', authenticate, authorizeAdmin, async (req: AuthRequest, res) => {
     try {
-        const supportMessages = await prisma.supportMessage.findMany({
-            orderBy: { createdAt: 'desc' },
-            include: {
-                user: {
-                    select: {
-                        id: true,
-                        name: true,
-                        email: true
-                    }
-                }
-            }
-        });
+        const page = Math.max(1, parseInt(String(req.query.page ?? '1'), 10) || 1);
+        const pageSize = Math.min(100, Math.max(1, parseInt(String(req.query.pageSize ?? '20'), 10) || 20));
+        const unreadOnly = req.query.unreadOnly === 'true';
+        const userType = req.query.userType as string | undefined;
+        const search = req.query.search as string | undefined;
 
-        // Group by userId and get the latest message and unread count for each user
-        const threadsMap = new Map();
+        // Base where clause for support messages
+        const where: any = {};
         
-        // We need all messages to calculate unread counts correctly, 
-        // or we could do a separate count query. Let's stick with grouping for now
-        // but fetch them in a way that we can count.
-        
-        for (const msg of supportMessages) {
-            if (!threadsMap.has(msg.userId)) {
-                threadsMap.set(msg.userId, {
-                    userId: msg.userId,
-                    user: msg.user,
-                    latestMessage: msg.message,
-                    latestCreatedAt: msg.createdAt,
-                    status: msg.status,
-                    unreadCount: 0
-                });
-            }
-            
-            // Count unread messages from the candidate (isAdmin: false)
-            if (!msg.isAdmin && !msg.isRead) {
-                const thread = threadsMap.get(msg.userId);
-                thread.unreadCount++;
-            }
+        if (unreadOnly) {
+            where.isRead = false;
+            where.isAdmin = false;
         }
 
-        res.json(Array.from(threadsMap.values()));
+        // We need to fetch users first if we want to filter by userType or search
+        const userWhere: any = {};
+        if (userType) userWhere.userType = userType;
+        if (search) {
+            userWhere.OR = [
+                { name: { contains: search, mode: 'insensitive' } },
+                { email: { contains: search, mode: 'insensitive' } }
+            ];
+        }
+
+        // Get all unique user IDs who have support messages
+        const supportUserIds = await prisma.supportMessage.findMany({
+            where,
+            select: { userId: true },
+            distinct: ['userId']
+        });
+
+        const targetUserIds = supportUserIds.map(s => s.userId);
+
+        // Filter these user IDs by user criteria
+        const users = await prisma.user.findMany({
+            where: {
+                id: { in: targetUserIds },
+                ...userWhere
+            },
+            select: { id: true, name: true, email: true, userType: true }
+        });
+
+        const filteredUserIds = users.map(u => u.id);
+
+        // Get total count for pagination
+        const totalThreads = filteredUserIds.length;
+
+        // Fetch latest messages for these users with pagination
+        // Since Prisma doesn't easily support "distinct on" with pagination and ordering,
+        // we'll fetch all latest messages for the filtered users and paginate in memory
+        // OR we can fetch user by user. Let's do a more efficient query.
+        
+        const latestMessages = await Promise.all(
+            filteredUserIds.map(async (userId) => {
+                const latest = await prisma.supportMessage.findFirst({
+                    where: { userId },
+                    orderBy: { createdAt: 'desc' },
+                    include: {
+                        user: {
+                            select: { id: true, name: true, email: true, userType: true }
+                        }
+                    }
+                });
+                
+                const unreadCount = await prisma.supportMessage.count({
+                    where: { userId, isAdmin: false, isRead: false }
+                });
+
+                return {
+                    userId,
+                    user: latest?.user,
+                    latestMessage: latest?.message,
+                    latestCreatedAt: latest?.createdAt,
+                    status: latest?.status,
+                    unreadCount
+                };
+            })
+        );
+
+        // Sort by latest message date descending
+        const sortedThreads = latestMessages.sort((a, b) => 
+            new Date(b.latestCreatedAt!).getTime() - new Date(a.latestCreatedAt!).getTime()
+        );
+
+        // Paginate
+        const paginatedThreads = sortedThreads.slice((page - 1) * pageSize, page * pageSize);
+
+        res.json({
+            threads: paginatedThreads,
+            pagination: {
+                total: totalThreads,
+                page,
+                pageSize,
+                totalPages: Math.ceil(totalThreads / pageSize)
+            }
+        });
     } catch (error) {
         console.error('Admin support list error:', error);
         res.status(500).json({ message: 'Failed to fetch support threads' });

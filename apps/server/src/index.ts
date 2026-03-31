@@ -17,6 +17,7 @@ import adminRoutes from './routes/admin';
 import quizzesRoutes from './routes/quizzes';
 import notificationRoutes from './routes/notifications';
 import supportRoutes from './routes/support';
+import healthRoutes from './routes/health';
 import passwordRequirementsRoutes from './routes/password-requirements';
 import { initScheduler } from './services/scheduler';
 import { initSocketIO } from './services/socketService';
@@ -114,6 +115,7 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/quizzes', quizzesRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/support', supportRoutes);
+app.use('/api/health', healthRoutes);
 app.use('/api/password-requirements', passwordRequirementsRoutes);
 
 app.get('/health', (req, res) => {

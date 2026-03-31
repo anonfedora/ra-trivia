@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { Search, ArrowLeft, MessageCircle, User, Clock, CheckCircle2, AlertCircle, Send, Bell, Check, CheckCheck } from 'lucide-react';
+import { Search, ArrowLeft, MessageCircle, User, Clock, CheckCircle2, AlertCircle, Send, Bell, Check, CheckCheck, Book } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { ThemeToggle } from '../../../components/ThemeToggle';
@@ -16,6 +16,7 @@ interface SupportThread {
         id: string;
         name: string;
         email: string;
+        userType?: string;
     };
     latestMessage: string;
     latestCreatedAt: string;
@@ -44,29 +45,81 @@ export default function AdminSupportPage() {
     const [isSending, setIsSending] = useState(false);
     const [isResolving, setIsResolving] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
+    const [filterUnread, setFilterUnread] = useState(false);
+    const [filterUserType, setFilterUserType] = useState<string>('');
+    const [pagination, setPagination] = useState({ page: 1, totalPages: 1 });
+    const [templates, setTemplates] = useState<{ id: string, title: string, content: string }[]>([]);
+    const [showTemplates, setShowTemplates] = useState(false);
+    const [typingUsers, setTypingUsers] = useState<Set<string>>(new Set());
+    const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
     const { toast } = useToast();
     const scrollRef = useRef<HTMLDivElement>(null);
     const socketRef = useRef<Socket | null>(null);
 
     const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
 
-    const fetchThreads = useCallback(async () => {
+    const fetchThreads = useCallback(async (page = 1) => {
         setIsLoading(true);
         try {
             const token = localStorage.getItem('token');
-            const res = await fetch(`${apiUrl}/support/admin`, {
+            const params = new URLSearchParams({
+                page: String(page),
+                unreadOnly: String(filterUnread),
+                userType: filterUserType,
+                search: searchQuery
+            });
+            
+            const res = await fetch(`${apiUrl}/support/admin?${params}`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
             if (res.ok) {
                 const data = await res.json();
-                setThreads(data);
+                setThreads(data.threads);
+                setPagination({
+                    page: data.pagination.page,
+                    totalPages: data.pagination.totalPages
+                });
             }
         } catch (err) {
             toast('Failed to fetch support threads', 'error');
         } finally {
             setIsLoading(false);
         }
-    }, [apiUrl, toast]);
+    }, [apiUrl, toast, filterUnread, filterUserType, searchQuery]);
+
+    const fetchTemplates = useCallback(async () => {
+        try {
+            const token = localStorage.getItem('token');
+            const res = await fetch(`${apiUrl}/support/admin/templates`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (res.ok) {
+                const data = await res.json();
+                setTemplates(data);
+            }
+        } catch (err) {
+            console.error('Failed to fetch templates', err);
+        }
+    }, [apiUrl]);
+
+    const markAsRead = useCallback(async (userId: string) => {
+        try {
+            const token = localStorage.getItem('token');
+            await fetch(`${apiUrl}/support/admin/${userId}/read`, {
+                method: 'PATCH',
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            });
+            
+            // Update thread list unread count locally for immediate feedback
+            setThreads(prev => prev.map(t => 
+                t.userId === userId ? { ...t, unreadCount: 0 } : t
+            ));
+        } catch (err) {
+            console.error('Failed to mark messages as read', err);
+        }
+    }, [apiUrl]);
 
     const fetchChatHistory = useCallback(async (userId: string) => {
         setIsChatLoading(true);
@@ -91,26 +144,7 @@ export default function AdminSupportPage() {
         } finally {
             setIsChatLoading(false);
         }
-    }, [apiUrl, toast]);
-
-    const markAsRead = async (userId: string) => {
-        try {
-            const token = localStorage.getItem('token');
-            await fetch(`${apiUrl}/support/admin/${userId}/read`, {
-                method: 'PATCH',
-                headers: {
-                    'Authorization': `Bearer ${token}`
-                }
-            });
-            
-            // Update thread list unread count locally for immediate feedback
-            setThreads(prev => prev.map(t => 
-                t.userId === userId ? { ...t, unreadCount: 0 } : t
-            ));
-        } catch (err) {
-            console.error('Failed to mark messages as read', err);
-        }
-    };
+    }, [apiUrl, toast, markAsRead]);
 
     // Use a ref for the selectedUserId to access it inside socket callbacks
     const selectedUserIdRef = useRef<string | null>(null);
@@ -120,8 +154,22 @@ export default function AdminSupportPage() {
     }, [selectedUserId]);
 
     useEffect(() => {
-        fetchThreads();
+        fetchTemplates();
+    }, [fetchTemplates]);
 
+    useEffect(() => {
+        fetchThreads(1);
+    }, [filterUnread, filterUserType, fetchThreads]);
+
+    useEffect(() => {
+        const delayDebounceFn = setTimeout(() => {
+            fetchThreads(1);
+        }, 500);
+
+        return () => clearTimeout(delayDebounceFn);
+    }, [searchQuery, fetchThreads]);
+
+    useEffect(() => {
         // Socket for real-time updates from candidates
         const token = localStorage.getItem('token');
         if (token) {
@@ -143,6 +191,18 @@ export default function AdminSupportPage() {
                 if (selectedUserIdRef.current === msg.userId) {
                     fetchChatHistory(msg.userId);
                 }
+            });
+
+            socket.on('user_typing', (data: { userId: string, isTyping: boolean }) => {
+                setTypingUsers(prev => {
+                    const next = new Set(prev);
+                    if (data.isTyping) {
+                        next.add(data.userId);
+                    } else {
+                        next.delete(data.userId);
+                    }
+                    return next;
+                });
             });
 
             socket.on('messages_read', (data) => {
@@ -170,15 +230,53 @@ export default function AdminSupportPage() {
         }
     }, [selectedUserId, fetchChatHistory]);
 
-    useEffect(() => {
+    const scrollToBottom = (smooth = true) => {
         if (scrollRef.current) {
-            scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+            scrollRef.current.scrollTo({
+                top: scrollRef.current.scrollHeight,
+                behavior: smooth ? 'smooth' : 'auto'
+            });
         }
-    }, [chatHistory]);
+    };
+
+    useEffect(() => {
+        if (chatHistory.length > 0 || (selectedUserId && typingUsers.has(selectedUserId))) {
+            scrollToBottom();
+        }
+    }, [chatHistory, typingUsers, selectedUserId]);
+
+    const handleTyping = () => {
+        if (!socketRef.current || !selectedUserId) return;
+
+        // Emit typing_start with the target user ID
+        socketRef.current.emit('typing_start', { userId: selectedUserId });
+
+        // Clear existing timeout
+        if (typingTimeoutRef.current) {
+            clearTimeout(typingTimeoutRef.current);
+        }
+
+        // Set timeout to emit typing_stop after 2 seconds of inactivity
+        typingTimeoutRef.current = setTimeout(() => {
+            if (socketRef.current) {
+                socketRef.current.emit('typing_stop', { userId: selectedUserId });
+            }
+            typingTimeoutRef.current = null;
+        }, 2000);
+    };
 
     const handleSendReply = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!reply.trim() || !selectedUserId) return;
+
+        // Clear typing indicator immediately on send
+        if (typingTimeoutRef.current) {
+            clearTimeout(typingTimeoutRef.current);
+            typingTimeoutRef.current = null;
+            if (socketRef.current) {
+                socketRef.current.emit('typing_stop', { userId: selectedUserId });
+            }
+        }
 
         setIsSending(true);
         try {
@@ -258,7 +356,7 @@ export default function AdminSupportPage() {
             <div className="flex-1 flex overflow-hidden">
                 {/* Threads List */}
                 <aside className={`w-full md:w-80 lg:w-96 border-r border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 flex flex-col ${selectedUserId ? 'hidden md:flex' : 'flex'}`}>
-                    <div className="p-4 border-b border-slate-200 dark:border-slate-700">
+                    <div className="p-4 border-b border-slate-200 dark:border-slate-700 space-y-3">
                         <div className="relative">
                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
                             <input 
@@ -269,56 +367,124 @@ export default function AdminSupportPage() {
                                 className="w-full pl-10 pr-4 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none text-sm transition-all"
                             />
                         </div>
+                        
+                        <div className="flex flex-wrap gap-2">
+                            <button 
+                                onClick={() => setFilterUnread(!filterUnread)}
+                                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all border ${
+                                    filterUnread 
+                                        ? 'bg-primary text-white border-primary' 
+                                        : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-700 hover:border-primary'
+                                }`}
+                            >
+                                Unread Only
+                            </button>
+                            <select 
+                                value={filterUserType}
+                                onChange={(e) => setFilterUserType(e.target.value)}
+                                className="px-2 py-1.5 rounded-lg text-xs font-bold bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700 outline-none hover:border-primary"
+                            >
+                                <option value="">All Types</option>
+                                <option value="AMBASSADOR_RANK_EXAMS">Ambassador</option>
+                                <option value="EXTRAORDINARY_RANK_EXAMS">Extraordinary</option>
+                                <option value="PRE_PLENIPOTENTIARY_EXAMS">Pre-Plenipotentiary</option>
+                                <option value="PLENIPOTENTIARY_RANK_EXAMS">Plenipotentiary</option>
+                            </select>
+                        </div>
                     </div>
 
                     <div className="flex-1 overflow-y-auto">
-                        {isLoading ? (
+                        {isLoading && threads.length === 0 ? (
                             <div className="flex flex-col items-center justify-center h-40 space-y-3">
                                 <div className="animate-spin w-8 h-8 border-4 border-primary/30 border-t-primary rounded-full" />
                                 <p className="text-sm text-slate-500">Loading threads...</p>
                             </div>
-                        ) : filteredThreads.length === 0 ? (
+                        ) : threads.length === 0 ? (
                             <div className="flex flex-col items-center justify-center h-40 text-center p-6 text-slate-500">
                                 <AlertCircle size={40} className="mb-3 opacity-20" />
                                 <p className="text-sm font-medium">No support requests found</p>
                             </div>
                         ) : (
-                            filteredThreads.map((thread) => (
-                                <button
-                                    key={thread.userId}
-                                    onClick={() => setSelectedUserId(thread.userId)}
-                                    className={`w-full p-4 flex gap-3 border-b border-slate-100 dark:border-slate-700/50 hover:bg-slate-50 dark:hover:bg-slate-900/50 transition-all text-left ${selectedUserId === thread.userId ? 'bg-slate-100 dark:bg-slate-900 ring-2 ring-inset ring-primary' : ''}`}
-                                >
-                                    <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center text-primary shrink-0">
-                                        <User size={24} />
-                                    </div>
-                                    <div className="flex-1 min-w-0">
-                                        <div className="flex justify-between items-start mb-1">
-                                            <h3 className="font-bold text-slate-900 dark:text-white truncate text-sm">
-                                                {thread.user.name}
-                                            </h3>
-                                            <span className="text-[10px] text-slate-400 shrink-0">
-                                                {formatDistanceToNow(new Date(thread.latestCreatedAt), { addSuffix: true })}
-                                            </span>
-                                        </div>
-                                        <p className="text-xs text-slate-500 truncate italic">
-                                            &quot;{thread.latestMessage}&quot;
-                                        </p>
-                                        <div className="mt-2 flex items-center justify-between">
-                                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
-                                                thread.status === 'PENDING' ? 'bg-amber-100 text-amber-600' : 'bg-green-100 text-green-600'
-                                            }`}>
-                                                {thread.status}
-                                            </span>
-                                            {thread.unreadCount > 0 && (
-                                                <span className="bg-primary text-white text-[10px] font-bold rounded-full w-5 h-5 flex items-center justify-center">
-                                                    {thread.unreadCount}
+                            <>
+                                {threads.map((thread) => (
+                                    <button
+                                        key={thread.userId}
+                                        onClick={() => setSelectedUserId(thread.userId)}
+                                        className={`w-full p-4 flex gap-3 border-b border-slate-100 dark:border-slate-700/50 hover:bg-slate-50 dark:hover:bg-slate-900/50 transition-all text-left ${selectedUserId === thread.userId ? 'bg-slate-100 dark:bg-slate-900 ring-2 ring-inset ring-primary' : ''}`}
+                                    >
+                                        <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center text-primary shrink-0 relative">
+                                            <User size={24} />
+                                            {thread.user.userType && (
+                                                <span className="absolute -bottom-1 -right-1 w-4 h-4 bg-white dark:bg-slate-800 rounded-full border border-slate-200 dark:border-slate-700 flex items-center justify-center" title={thread.user.userType}>
+                                                    <div className={`w-2 h-2 rounded-full ${
+                                                        thread.user.userType === 'AMBASSADOR_RANK_EXAMS' ? 'bg-blue-500' :
+                                                        thread.user.userType === 'EXTRAORDINARY_RANK_EXAMS' ? 'bg-purple-500' :
+                                                        thread.user.userType === 'PRE_PLENIPOTENTIARY_EXAMS' ? 'bg-amber-500' : 'bg-red-500'
+                                                    }`} />
                                                 </span>
                                             )}
                                         </div>
+                                        <div className="flex-1 min-w-0">
+                                            <div className="flex justify-between items-start mb-1">
+                                                <h3 className="font-bold text-slate-900 dark:text-white truncate text-sm">
+                                                    {thread.user.name}
+                                                </h3>
+                                                <span className="text-[10px] text-slate-400 shrink-0 ml-2">
+                                                    {thread.latestCreatedAt ? formatDistanceToNow(new Date(thread.latestCreatedAt), { addSuffix: true }) : ''}
+                                                </span>
+                                            </div>
+                                            <p className="text-xs text-slate-500 truncate italic">
+                                                &quot;{thread.latestMessage}&quot;
+                                            </p>
+                                            <div className="mt-2 flex items-center justify-between">
+                                                <div className="flex items-center gap-2">
+                                                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
+                                                        thread.status === 'PENDING' ? 'bg-amber-100 text-amber-600' : 'bg-green-100 text-green-600'
+                                                    }`}>
+                                                        {thread.status}
+                                                    </span>
+                                                    {typingUsers.has(thread.userId) && (
+                                                        <span className="flex gap-0.5 items-center bg-primary/10 px-1.5 py-0.5 rounded-full">
+                                                            <span className="w-1 h-1 bg-primary rounded-full animate-bounce [animation-delay:-0.3s]"></span>
+                                                            <span className="w-1 h-1 bg-primary rounded-full animate-bounce [animation-delay:-0.15s]"></span>
+                                                            <span className="w-1 h-1 bg-primary rounded-full animate-bounce"></span>
+                                                            <span className="text-[8px] font-bold text-primary ml-1 uppercase">Typing</span>
+                                                        </span>
+                                                    )}
+                                                </div>
+                                                {thread.unreadCount > 0 && (
+                                                    <span className="bg-primary text-white text-[10px] font-bold rounded-full w-5 h-5 flex items-center justify-center">
+                                                        {thread.unreadCount}
+                                                    </span>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </button>
+                                ))}
+                                
+                                {/* Thread Pagination */}
+                                {pagination.totalPages > 1 && (
+                                    <div className="p-4 flex justify-center items-center gap-2 border-t border-slate-100 dark:border-slate-700/50">
+                                        <button 
+                                            disabled={pagination.page === 1}
+                                            onClick={() => fetchThreads(pagination.page - 1)}
+                                            className="p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-30"
+                                        >
+                                            <ArrowLeft size={16} />
+                                        </button>
+                                        <span className="text-xs font-bold text-slate-500">
+                                            {pagination.page} / {pagination.totalPages}
+                                        </span>
+                                        <button 
+                                            disabled={pagination.page === pagination.totalPages}
+                                            onClick={() => fetchThreads(pagination.page + 1)}
+                                            className="p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-30"
+                                        >
+                                            <ArrowLeft size={16} className="rotate-180" />
+                                        </button>
                                     </div>
-                                </button>
-                            ))
+                                )}
+                            </>
                         )}
                     </div>
                 </aside>
@@ -328,13 +494,20 @@ export default function AdminSupportPage() {
                     {selectedUserId ? (
                         <>
                             {/* Chat Header */}
-                            <div className="p-4 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center bg-white/80 dark:bg-slate-800/80 backdrop-blur-md sticky top-0 z-20">
+                            <div className="p-4 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center bg-white/80 dark:bg-slate-800/80 backdrop-blur-md sticky top-0 z-20 shrink-0">
                                 <div className="flex items-center gap-3">
                                     <button onClick={() => setSelectedUserId(null)} className="md:hidden p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-full">
                                         <ArrowLeft size={20} />
                                     </button>
-                                    <div className="w-10 h-10 rounded-xl bg-primary text-white flex items-center justify-center font-bold">
+                                    <div className="w-10 h-10 rounded-xl bg-primary text-white flex items-center justify-center font-bold relative">
                                         {selectedUser?.name.charAt(0)}
+                                        {currentThread?.user.userType && (
+                                            <div className={`absolute -bottom-1 -right-1 w-3.5 h-3.5 rounded-full border-2 border-white dark:border-slate-800 ${
+                                                currentThread.user.userType === 'AMBASSADOR_RANK_EXAMS' ? 'bg-blue-500' :
+                                                currentThread.user.userType === 'EXTRAORDINARY_RANK_EXAMS' ? 'bg-purple-500' :
+                                                currentThread.user.userType === 'PRE_PLENIPOTENTIARY_EXAMS' ? 'bg-amber-500' : 'bg-red-500'
+                                            }`} />
+                                        )}
                                     </div>
                                     <div>
                                         <div className="flex items-center gap-2">
@@ -345,7 +518,17 @@ export default function AdminSupportPage() {
                                                 </span>
                                             )}
                                         </div>
-                                        <p className="text-xs text-slate-500">{selectedUser?.email}</p>
+                                        <p className="text-xs text-slate-500 flex items-center gap-2">
+                                            {selectedUser?.email}
+                                            {currentThread?.user.userType && (
+                                                <>
+                                                    <span className="w-1 h-1 rounded-full bg-slate-300" />
+                                                    <span className="text-[10px] font-bold uppercase text-primary tracking-tighter">
+                                                        {currentThread.user.userType.replace(/_/g, ' ')}
+                                                    </span>
+                                                </>
+                                            )}
+                                        </p>
                                     </div>
                                 </div>
                                 <div className="flex items-center gap-2">
@@ -379,77 +562,139 @@ export default function AdminSupportPage() {
                                         <p className="text-sm">Loading history...</p>
                                     </div>
                                 ) : (
-                                    chatHistory.map((item) => (
-                                        <div 
-                                            key={item.id} 
-                                            className={`flex ${item.isAdmin ? 'justify-end' : 'justify-start'} animate-in fade-in slide-in-from-bottom-2 duration-300`}
-                                        >
-                                            <div className={`max-w-[70%] flex flex-col ${item.isAdmin ? 'items-end' : 'items-start'}`}>
-                                                <div className="flex items-center gap-2 mb-1 px-1">
-                                                    {!item.isAdmin ? (
-                                                        <>
-                                                            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">{selectedUser?.name}</span>
-                                                            <div className="w-5 h-5 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-slate-500">
-                                                                <User size={10} />
-                                                            </div>
-                                                        </>
-                                                    ) : (
-                                                        <>
-                                                            <div className="w-5 h-5 rounded-full bg-primary/10 flex items-center justify-center text-primary">
-                                                                {item.type === 'NOTIFICATION' ? <Bell size={10} /> : <CheckCircle2 size={10} />}
-                                                            </div>
-                                                            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
-                                                                {item.type === 'NOTIFICATION' ? 'System' : 'Support Team'}
-                                                            </span>
-                                                        </>
-                                                    )}
-                                                </div>
-                                                
-                                                <div className={`p-4 rounded-2xl text-sm shadow-sm relative ${
-                                                    item.isAdmin 
-                                                        ? 'bg-primary text-white rounded-tr-none' 
-                                                        : 'bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 rounded-tl-none border border-slate-100 dark:border-slate-700'
-                                                }`}>
-                                                    {item.title && <p className="font-bold mb-1 text-xs opacity-90">{item.title}</p>}
-                                                    <p className="whitespace-pre-wrap">{item.message}</p>
+                                    <>
+                                        {chatHistory.map((item) => (
+                                            <div 
+                                                key={item.id} 
+                                                className={`flex ${item.isAdmin ? 'justify-end' : 'justify-start'} animate-in fade-in slide-in-from-bottom-2 duration-300`}
+                                            >
+                                                <div className={`max-w-[70%] flex flex-col ${item.isAdmin ? 'items-end' : 'items-start'}`}>
+                                                    <div className="flex items-center gap-2 mb-1 px-1">
+                                                        {!item.isAdmin ? (
+                                                            <>
+                                                                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">{selectedUser?.name}</span>
+                                                                <div className="w-5 h-5 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-slate-500">
+                                                                    <User size={10} />
+                                                                </div>
+                                                            </>
+                                                        ) : (
+                                                            <>
+                                                                <div className="w-5 h-5 rounded-full bg-primary/10 flex items-center justify-center text-primary">
+                                                                    {item.type === 'NOTIFICATION' ? <Bell size={10} /> : <CheckCircle2 size={10} />}
+                                                                </div>
+                                                                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                                                                    {item.type === 'NOTIFICATION' ? 'System' : 'Support Team'}
+                                                                </span>
+                                                            </>
+                                                        )}
+                                                    </div>
                                                     
-                                                    {item.isAdmin && item.type === 'MESSAGE' && (
-                                                        <div className="flex justify-end mt-1 -mr-1">
-                                                            {item.isRead ? (
-                                                                <CheckCheck size={14} className="text-white/80" />
-                                                            ) : (
-                                                                <Check size={14} className="text-white/60" />
-                                                            )}
-                                                        </div>
-                                                    )}
+                                                    <div className={`p-4 rounded-2xl text-sm shadow-sm relative ${
+                                                        item.isAdmin 
+                                                            ? 'bg-primary text-white rounded-tr-none' 
+                                                            : 'bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 rounded-tl-none border border-slate-100 dark:border-slate-700'
+                                                    }`}>
+                                                        {item.title && <p className="font-bold mb-1 text-xs opacity-90">{item.title}</p>}
+                                                        <p className="whitespace-pre-wrap">{item.message}</p>
+                                                        
+                                                        {item.isAdmin && item.type === 'MESSAGE' && (
+                                                            <div className="flex justify-end mt-1 -mr-1">
+                                                                {item.isRead ? (
+                                                                    <CheckCheck size={14} className="text-white/80" />
+                                                                ) : (
+                                                                    <Check size={14} className="text-white/60" />
+                                                                )}
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                    
+                                                    <span className="text-[9px] text-slate-400 mt-1 px-1">
+                                                        {format(new Date(item.createdAt), 'MMM d, h:mm a')}
+                                                    </span>
                                                 </div>
-                                                
-                                                <span className="text-[9px] text-slate-400 mt-1 px-1">
-                                                    {format(new Date(item.createdAt), 'MMM d, h:mm a')}
-                                                </span>
                                             </div>
-                                        </div>
-                                    ))
-                                )}
-                            </div>
+                                        ))}
+                                        {selectedUserId && typingUsers.has(selectedUserId) && (
+                                            <div className="flex justify-start animate-in fade-in slide-in-from-bottom-2 duration-300">
+                                                <div className="max-w-[70%] flex flex-col items-start">
+                                                    <div className="flex items-center gap-2 mb-1 px-1">
+                                                        <div className="w-5 h-5 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-slate-500">
+                                                            <User size={10} />
+                                                        </div>
+                                                        <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">{selectedUser?.name}</span>
+                                                    </div>
+                                                    <div className="bg-white dark:bg-slate-800 p-3 rounded-2xl rounded-tl-none border border-slate-100 dark:border-slate-700 shadow-sm flex gap-1 items-center">
+                                                        <span className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce [animation-delay:-0.3s]"></span>
+                                                        <span className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce [animation-delay:-0.15s]"></span>
+                                                        <span className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce"></span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </>
+                            )}
+                        </div>
 
                             {/* Reply Input */}
-                            <div className="p-4 bg-white dark:bg-slate-800 border-t border-slate-200 dark:border-slate-700">
+                            <div className="p-4 bg-white dark:bg-slate-800 border-t border-slate-200 dark:border-slate-700 shrink-0 relative">
+                                {showTemplates && (
+                                    <div className="absolute bottom-full left-0 w-full p-4 bg-white dark:bg-slate-800 border-t border-slate-200 dark:border-slate-700 shadow-xl z-50 animate-in slide-in-from-bottom-2 duration-200">
+                                        <div className="flex justify-between items-center mb-3">
+                                            <h4 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                                                <Book size={16} className="text-primary" /> Response Templates
+                                            </h4>
+                                            <button 
+                                                onClick={() => setShowTemplates(false)}
+                                                className="text-xs text-slate-500 hover:text-slate-700"
+                                            >
+                                                Close
+                                            </button>
+                                        </div>
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                            {templates.map(t => (
+                                                <button
+                                                    key={t.id}
+                                                    onClick={() => {
+                                                        setReply(t.content);
+                                                        setShowTemplates(false);
+                                                    }}
+                                                    className="p-3 text-left border border-slate-100 dark:border-slate-700 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-900 transition-all group"
+                                                >
+                                                    <p className="text-xs font-bold text-slate-900 dark:text-white group-hover:text-primary transition-colors">{t.title}</p>
+                                                    <p className="text-[10px] text-slate-500 truncate">{t.content}</p>
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
                                 <form onSubmit={handleSendReply} className="flex gap-3">
                                     <div className="flex-1 relative">
                                         <textarea
                                             rows={2}
                                             placeholder="Type your reply..."
                                             value={reply}
-                                            onChange={(e) => setReply(e.target.value)}
+                                            onChange={(e) => {
+                                                setReply(e.target.value);
+                                                handleTyping();
+                                            }}
                                             onKeyDown={(e) => {
                                                 if (e.key === 'Enter' && !e.shiftKey) {
                                                     e.preventDefault();
                                                     handleSendReply(e);
                                                 }
                                             }}
-                                            className="w-full py-3 pl-4 pr-4 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all resize-none text-sm"
+                                            className="w-full py-3 pl-4 pr-10 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all resize-none text-sm"
                                         />
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowTemplates(!showTemplates)}
+                                            className={`absolute right-3 top-3 p-1 rounded-lg transition-all ${
+                                                showTemplates ? 'text-primary bg-primary/10' : 'text-slate-400 hover:text-primary'
+                                            }`}
+                                            title="Use Template"
+                                        >
+                                            <Book size={18} />
+                                        </button>
                                     </div>
                                     <button
                                         type="submit"

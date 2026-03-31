@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { HelpCircle, Send, X, AlertCircle, MessageCircle, User, Bell, Check, CheckCheck } from 'lucide-react';
 import { useToast } from '../contexts/ToastContext';
 import { format } from 'date-fns';
@@ -27,11 +27,13 @@ export default function SupportButton({ quizId }: SupportButtonProps) {
     const [history, setHistory] = useState<ChatItem[]>([]);
     const [isLoadingHistory, setIsLoadingHistory] = useState(false);
     const [unreadCount, setUnreadCount] = useState(0);
+    const [isAdminTyping, setIsAdminTyping] = useState(false);
+    const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
     const { toast } = useToast();
     const scrollRef = useRef<HTMLDivElement>(null);
     const socketRef = useRef<Socket | null>(null);
 
-    const fetchUnreadCount = async () => {
+    const fetchUnreadCount = useCallback(async () => {
         try {
             const token = localStorage.getItem('token');
             const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
@@ -45,9 +47,9 @@ export default function SupportButton({ quizId }: SupportButtonProps) {
         } catch (err) {
             console.error('Failed to fetch unread count', err);
         }
-    };
+    }, []);
 
-    const fetchHistory = async () => {
+    const fetchHistory = useCallback(async () => {
         setIsLoadingHistory(true);
         try {
             const token = localStorage.getItem('token');
@@ -77,9 +79,9 @@ export default function SupportButton({ quizId }: SupportButtonProps) {
         } finally {
             setIsLoadingHistory(false);
         }
-    };
+    }, []);
 
-    const markAsRead = async () => {
+    const markAsRead = useCallback(async () => {
         try {
             const token = localStorage.getItem('token');
             const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
@@ -93,7 +95,7 @@ export default function SupportButton({ quizId }: SupportButtonProps) {
         } catch (err) {
             console.error('Failed to mark messages as read', err);
         }
-    };
+    }, []);
 
     useEffect(() => {
         // Always fetch unread count on mount
@@ -126,6 +128,16 @@ export default function SupportButton({ quizId }: SupportButtonProps) {
                     }
                 });
 
+                socket.on('admin_typing', (data: { isTyping: boolean }) => {
+                    setIsAdminTyping(data.isTyping);
+                });
+
+                socket.on('maintenance_mode', (data: { enabled: boolean }) => {
+                    if (data.enabled) {
+                        toast('System is currently under maintenance. Some features may be limited.', 'warning');
+                    }
+                });
+
                 socketRef.current = socket;
             }
         } else {
@@ -141,17 +153,58 @@ export default function SupportButton({ quizId }: SupportButtonProps) {
                 socketRef.current = null;
             }
         };
-    }, [isOpen]);
+    }, [isOpen, fetchHistory, fetchUnreadCount, toast]);
+
+    const scrollToBottom = (smooth = true) => {
+        if (scrollRef.current) {
+            scrollRef.current.scrollTo({
+                top: scrollRef.current.scrollHeight,
+                behavior: smooth ? 'smooth' : 'auto'
+            });
+        }
+    };
 
     useEffect(() => {
-        if (scrollRef.current) {
-            scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+        if (history.length > 0 || isAdminTyping) {
+            // Use immediate scroll for initial load, smooth for subsequent updates
+            const isInitialLoad = history.length > 0 && history.length === (history.length === 0 ? 0 : 1); // simplistic check
+            // Better: just use smooth for now as it's more pleasant
+            scrollToBottom();
         }
-    }, [history]);
+    }, [history, isAdminTyping]);
+
+    const handleTyping = () => {
+        if (!socketRef.current) return;
+
+        // Emit typing_start
+        socketRef.current.emit('typing_start', {});
+
+        // Clear existing timeout
+        if (typingTimeoutRef.current) {
+            clearTimeout(typingTimeoutRef.current);
+        }
+
+        // Set timeout to emit typing_stop after 2 seconds of inactivity
+        typingTimeoutRef.current = setTimeout(() => {
+            if (socketRef.current) {
+                socketRef.current.emit('typing_stop', {});
+            }
+            typingTimeoutRef.current = null;
+        }, 2000);
+    };
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!message.trim()) return;
+
+        // Clear typing indicator immediately on send
+        if (typingTimeoutRef.current) {
+            clearTimeout(typingTimeoutRef.current);
+            typingTimeoutRef.current = null;
+            if (socketRef.current) {
+                socketRef.current.emit('typing_stop', {});
+            }
+        }
 
         setIsSubmitting(true);
         try {
@@ -288,17 +341,37 @@ export default function SupportButton({ quizId }: SupportButtonProps) {
                                         </div>
                                     </div>
                                 ))
-                            )}
-                        </div>
+                                )}
+                                {isAdminTyping && (
+                                    <div className="flex justify-start animate-in fade-in slide-in-from-bottom-2 duration-300">
+                                        <div className="max-w-[85%] flex flex-col items-start">
+                                            <div className="flex items-center gap-2 mb-1 px-1">
+                                                <div className="w-5 h-5 rounded-full bg-primary/10 flex items-center justify-center text-primary">
+                                                    <User size={10} />
+                                                </div>
+                                                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Support Admin</span>
+                                            </div>
+                                            <div className="bg-white dark:bg-slate-800 p-3 rounded-2xl rounded-tl-none border border-slate-100 dark:border-slate-700 shadow-sm flex gap-1 items-center">
+                                                <span className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce [animation-delay:-0.3s]"></span>
+                                                <span className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce [animation-delay:-0.15s]"></span>
+                                                <span className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce"></span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
 
-                        {/* Input Area */}
-                        <div className="p-4 bg-white dark:bg-slate-800 border-t border-slate-100 dark:border-slate-700">
-                            <form onSubmit={handleSubmit} className="relative">
-                                <textarea
-                                    required
-                                    rows={1}
-                                    value={message}
-                                    onChange={(e) => setMessage(e.target.value)}
+                            {/* Input Area */}
+                            <div className="p-4 bg-white dark:bg-slate-800 border-t border-slate-100 dark:border-slate-700">
+                                <form onSubmit={handleSubmit} className="relative">
+                                    <textarea
+                                        required
+                                        rows={1}
+                                        value={message}
+                                        onChange={(e) => {
+                                            setMessage(e.target.value);
+                                            handleTyping();
+                                        }}
                                     onKeyDown={(e) => {
                                         if (e.key === 'Enter' && !e.shiftKey) {
                                             e.preventDefault();

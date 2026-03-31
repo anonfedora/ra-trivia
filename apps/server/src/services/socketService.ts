@@ -34,6 +34,31 @@ export const initSocketIO = (socketServer: SocketIOServer) => {
         
         console.log(`[SOCKET] User ${userId} connected (${socket.id}) as ${role}`);
 
+        // Handle typing indicators
+        socket.on('typing_start', (data: { userId?: string }) => {
+            if (role === 'CANDIDATE') {
+                // Candidate is typing to admins
+                io?.to('admin').emit('user_typing', { userId, isTyping: true });
+            } else {
+                // Admin is typing to a specific user
+                const targetUserId = data.userId;
+                if (targetUserId) {
+                    io?.to(`user:${targetUserId}`).emit('admin_typing', { isTyping: true });
+                }
+            }
+        });
+
+        socket.on('typing_stop', (data: { userId?: string }) => {
+            if (role === 'CANDIDATE') {
+                io?.to('admin').emit('user_typing', { userId, isTyping: false });
+            } else {
+                const targetUserId = data.userId;
+                if (targetUserId) {
+                    io?.to(`user:${targetUserId}`).emit('admin_typing', { isTyping: false });
+                }
+            }
+        });
+
         socket.on('disconnect', () => {
             console.log(`[SOCKET] User ${userId} disconnected (${socket.id})`);
         });

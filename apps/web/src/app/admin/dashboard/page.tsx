@@ -60,6 +60,8 @@ export default function AdminDashboard() {
     const [questionType, setQuestionType] = useState<UserType | null>(null);
     const [questionTypeError, setQuestionTypeError] = useState<string>('');
     const [supportUnreadCount, setSupportUnreadCount] = useState(0);
+    const [isMaintenanceMode, setIsMaintenanceMode] = useState(false);
+    const [isTogglingMaintenance, setIsTogglingMaintenance] = useState(false);
     const { toast } = useToast();
 
     // Edit Selected Quiz
@@ -91,6 +93,50 @@ export default function AdminDashboard() {
             console.error('Failed to fetch support unread count', err);
         }
     }, [apiUrl]);
+
+    const fetchMaintenanceStatus = useCallback(async () => {
+        const token = localStorage.getItem('token');
+        try {
+            const res = await fetch(`${apiUrl}/quiz/maintenance/status`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (res.ok) {
+                const data = await res.json();
+                setIsMaintenanceMode(data.isMaintenanceMode);
+            }
+        } catch (err) {
+            console.error('Failed to fetch maintenance status', err);
+        }
+    }, [apiUrl]);
+
+    const handleToggleMaintenance = async () => {
+        const token = localStorage.getItem('token');
+        const nextState = !isMaintenanceMode;
+        
+        setIsTogglingMaintenance(true);
+        try {
+            const res = await fetch(`${apiUrl}/quiz/maintenance/toggle`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({ enabled: nextState })
+            });
+
+            if (res.ok) {
+                const data = await res.json();
+                setIsMaintenanceMode(data.isMaintenanceMode);
+                toast(`Maintenance mode ${data.isMaintenanceMode ? 'enabled' : 'disabled'}`, 'success');
+            } else {
+                toast('Failed to toggle maintenance mode', 'error');
+            }
+        } catch (err) {
+            toast('An error occurred while toggling maintenance mode', 'error');
+        } finally {
+            setIsTogglingMaintenance(false);
+        }
+    };
 
     const fetchData = useCallback(async () => {
         const token = localStorage.getItem('token');
@@ -137,6 +183,7 @@ export default function AdminDashboard() {
         }
         fetchData();
         fetchSupportUnreadCount();
+        fetchMaintenanceStatus();
 
         if (token) {
             const socketUrl = apiUrl.replace('/api', '');
@@ -149,11 +196,15 @@ export default function AdminDashboard() {
                 fetchSupportUnreadCount();
             });
 
+            socket.on('maintenance_mode', (data: { enabled: boolean }) => {
+                setIsMaintenanceMode(data.enabled);
+            });
+
             return () => {
                 socket.disconnect();
             };
         }
-    }, [fetchData, fetchSupportUnreadCount, apiUrl]);
+    }, [fetchData, fetchSupportUnreadCount, fetchMaintenanceStatus, apiUrl]);
 
     useEffect(() => {
         const selected = quizzes.find(q => q.id === selectedQuizId);
@@ -379,6 +430,25 @@ export default function AdminDashboard() {
                         <p className="text-slate-500 dark:text-slate-400 mt-2 font-medium">Manage your exam sessions and candidate records.</p>
                     </div>
                     <div className="flex flex-wrap gap-2 items-center">
+                        <button
+                            onClick={handleToggleMaintenance}
+                            disabled={isTogglingMaintenance}
+                            className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-bold transition-all border shadow-lg ${
+                                isMaintenanceMode 
+                                    ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 border-amber-200 dark:border-amber-800' 
+                                    : 'bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400 border-green-200 dark:border-green-800'
+                            } ${isTogglingMaintenance ? 'opacity-50 cursor-not-allowed' : 'hover:scale-105'}`}
+                            title={isMaintenanceMode ? 'Maintenance Mode is ON' : 'Maintenance Mode is OFF'}
+                        >
+                            {isTogglingMaintenance ? (
+                                <span className="animate-spin w-3 h-3 border-2 border-current border-t-transparent rounded-full" />
+                            ) : isMaintenanceMode ? (
+                                <Power size={16} />
+                            ) : (
+                                <PowerOff size={16} />
+                            )}
+                            <span className="hidden lg:inline">{isMaintenanceMode ? 'Maintenance ON' : 'Maintenance OFF'}</span>
+                        </button>
                         <Link 
                             href="/admin/support"
                             className="p-3 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-2xl border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 transition-all shadow-sm flex items-center gap-2 font-semibold relative"
