@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from 'react';
-import { HelpCircle, Send, X, AlertCircle, MessageCircle, User, Bell } from 'lucide-react';
+import { HelpCircle, Send, X, AlertCircle, MessageCircle, User, Bell, Check, CheckCheck } from 'lucide-react';
 import { useToast } from '../contexts/ToastContext';
 import { format } from 'date-fns';
 import { io, Socket } from 'socket.io-client';
@@ -14,6 +14,7 @@ interface ChatItem {
     id: string;
     message: string;
     isAdmin: boolean;
+    isRead: boolean;
     createdAt: string;
     type: 'MESSAGE' | 'NOTIFICATION';
     title?: string;
@@ -25,9 +26,26 @@ export default function SupportButton({ quizId }: SupportButtonProps) {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [history, setHistory] = useState<ChatItem[]>([]);
     const [isLoadingHistory, setIsLoadingHistory] = useState(false);
+    const [unreadCount, setUnreadCount] = useState(0);
     const { toast } = useToast();
     const scrollRef = useRef<HTMLDivElement>(null);
     const socketRef = useRef<Socket | null>(null);
+
+    const fetchUnreadCount = async () => {
+        try {
+            const token = localStorage.getItem('token');
+            const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
+            const res = await fetch(`${apiUrl}/support/unread-count`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (res.ok) {
+                const data = await res.json();
+                setUnreadCount(data.unreadCount);
+            }
+        } catch (err) {
+            console.error('Failed to fetch unread count', err);
+        }
+    };
 
     const fetchHistory = async () => {
         setIsLoadingHistory(true);
@@ -44,6 +62,15 @@ export default function SupportButton({ quizId }: SupportButtonProps) {
             if (res.ok) {
                 const data = await res.json();
                 setHistory(data);
+                
+                // If there are unread admin messages, mark them as read
+                const hasUnreadAdminMessages = data.some((m: ChatItem) => m.isAdmin && !m.isRead && m.type === 'MESSAGE');
+                if (hasUnreadAdminMessages) {
+                    markAsRead();
+                } else {
+                    // Update unread count locally if already read
+                    setUnreadCount(0);
+                }
             }
         } catch (err) {
             console.error('Failed to fetch support history', err);
@@ -52,7 +79,26 @@ export default function SupportButton({ quizId }: SupportButtonProps) {
         }
     };
 
+    const markAsRead = async () => {
+        try {
+            const token = localStorage.getItem('token');
+            const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
+            await fetch(`${apiUrl}/support/read`, {
+                method: 'PATCH',
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            });
+            setUnreadCount(0);
+        } catch (err) {
+            console.error('Failed to mark messages as read', err);
+        }
+    };
+
     useEffect(() => {
+        // Always fetch unread count on mount
+        fetchUnreadCount();
+        
         if (isOpen) {
             fetchHistory();
 
@@ -66,7 +112,18 @@ export default function SupportButton({ quizId }: SupportButtonProps) {
                 });
 
                 socket.on('support_reply', () => {
-                    fetchHistory();
+                    if (isOpen) {
+                        fetchHistory();
+                    } else {
+                        fetchUnreadCount();
+                    }
+                });
+
+                socket.on('messages_read', (data) => {
+                    if (data.byAdmin) {
+                        // Admin read candidate's messages, refresh history to show double checks
+                        if (isOpen) fetchHistory();
+                    }
                 });
 
                 socketRef.current = socket;
@@ -133,6 +190,11 @@ export default function SupportButton({ quizId }: SupportButtonProps) {
                 title="Report an issue / Support"
             >
                 <HelpCircle size={28} />
+                {unreadCount > 0 && (
+                    <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold rounded-full w-5 h-5 flex items-center justify-center animate-bounce shadow-lg">
+                        {unreadCount > 9 ? '9+' : unreadCount}
+                    </span>
+                )}
                 <span className="absolute right-full mr-3 top-1/2 -translate-y-1/2 bg-slate-800 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
                     Report an issue / Support
                 </span>
@@ -201,13 +263,23 @@ export default function SupportButton({ quizId }: SupportButtonProps) {
                                                 )}
                                             </div>
                                             
-                                            <div className={`p-3 rounded-2xl text-sm shadow-sm ${
+                                            <div className={`p-3 rounded-2xl text-sm shadow-sm relative ${
                                                 item.isAdmin 
                                                     ? 'bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 rounded-tl-none border border-slate-100 dark:border-slate-700' 
                                                     : 'bg-primary text-white rounded-tr-none'
                                             }`}>
                                                 {item.title && <p className="font-bold mb-1 text-xs opacity-90">{item.title}</p>}
                                                 <p className="whitespace-pre-wrap">{item.message}</p>
+                                                
+                                                {!item.isAdmin && item.type === 'MESSAGE' && (
+                                                    <div className="flex justify-end mt-1 -mr-1">
+                                                        {item.isRead ? (
+                                                            <CheckCheck size={14} className="text-white/80" />
+                                                        ) : (
+                                                            <Check size={14} className="text-white/60" />
+                                                        )}
+                                                    </div>
+                                                )}
                                             </div>
                                             
                                             <span className="text-[9px] text-slate-400 mt-1 px-1">

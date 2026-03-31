@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { Search, ArrowLeft, MessageCircle, User, Clock, CheckCircle2, AlertCircle, Send, Bell } from 'lucide-react';
+import { Search, ArrowLeft, MessageCircle, User, Clock, CheckCircle2, AlertCircle, Send, Bell, Check, CheckCheck } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { ThemeToggle } from '../../../components/ThemeToggle';
@@ -20,12 +20,14 @@ interface SupportThread {
     latestMessage: string;
     latestCreatedAt: string;
     status: string;
+    unreadCount: number;
 }
 
 interface ChatItem {
     id: string;
     message: string;
     isAdmin: boolean;
+    isRead: boolean;
     createdAt: string;
     type: 'MESSAGE' | 'NOTIFICATION';
     title?: string;
@@ -77,6 +79,12 @@ export default function AdminSupportPage() {
                 const data = await res.json();
                 setChatHistory(data.history);
                 setSelectedUser(data.user);
+                
+                // If there are unread candidate messages, mark them as read
+                const hasUnreadCandidateMessages = data.history.some((m: ChatItem) => !m.isAdmin && !m.isRead && m.type === 'MESSAGE');
+                if (hasUnreadCandidateMessages) {
+                    markAsRead(userId);
+                }
             }
         } catch (err) {
             toast('Failed to fetch chat history', 'error');
@@ -84,6 +92,25 @@ export default function AdminSupportPage() {
             setIsChatLoading(false);
         }
     }, [apiUrl, toast]);
+
+    const markAsRead = async (userId: string) => {
+        try {
+            const token = localStorage.getItem('token');
+            await fetch(`${apiUrl}/support/admin/${userId}/read`, {
+                method: 'PATCH',
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            });
+            
+            // Update thread list unread count locally for immediate feedback
+            setThreads(prev => prev.map(t => 
+                t.userId === userId ? { ...t, unreadCount: 0 } : t
+            ));
+        } catch (err) {
+            console.error('Failed to mark messages as read', err);
+        }
+    };
 
     // Use a ref for the selectedUserId to access it inside socket callbacks
     const selectedUserIdRef = useRef<string | null>(null);
@@ -115,6 +142,15 @@ export default function AdminSupportPage() {
                 // If the user is currently chatting with this user, refresh their chat too
                 if (selectedUserIdRef.current === msg.userId) {
                     fetchChatHistory(msg.userId);
+                }
+            });
+
+            socket.on('messages_read', (data) => {
+                if (data.byCandidate) {
+                    // Candidate read admin's messages, refresh history to show double checks
+                    if (selectedUserIdRef.current === data.userId) {
+                        fetchChatHistory(data.userId);
+                    }
                 }
             });
 
@@ -268,12 +304,17 @@ export default function AdminSupportPage() {
                                         <p className="text-xs text-slate-500 truncate italic">
                                             &quot;{thread.latestMessage}&quot;
                                         </p>
-                                        <div className="mt-2 flex items-center gap-2">
+                                        <div className="mt-2 flex items-center justify-between">
                                             <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
                                                 thread.status === 'PENDING' ? 'bg-amber-100 text-amber-600' : 'bg-green-100 text-green-600'
                                             }`}>
                                                 {thread.status}
                                             </span>
+                                            {thread.unreadCount > 0 && (
+                                                <span className="bg-primary text-white text-[10px] font-bold rounded-full w-5 h-5 flex items-center justify-center">
+                                                    {thread.unreadCount}
+                                                </span>
+                                            )}
                                         </div>
                                     </div>
                                 </button>
@@ -364,13 +405,23 @@ export default function AdminSupportPage() {
                                                     )}
                                                 </div>
                                                 
-                                                <div className={`p-4 rounded-2xl text-sm shadow-sm ${
+                                                <div className={`p-4 rounded-2xl text-sm shadow-sm relative ${
                                                     item.isAdmin 
                                                         ? 'bg-primary text-white rounded-tr-none' 
                                                         : 'bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 rounded-tl-none border border-slate-100 dark:border-slate-700'
                                                 }`}>
                                                     {item.title && <p className="font-bold mb-1 text-xs opacity-90">{item.title}</p>}
                                                     <p className="whitespace-pre-wrap">{item.message}</p>
+                                                    
+                                                    {item.isAdmin && item.type === 'MESSAGE' && (
+                                                        <div className="flex justify-end mt-1 -mr-1">
+                                                            {item.isRead ? (
+                                                                <CheckCheck size={14} className="text-white/80" />
+                                                            ) : (
+                                                                <Check size={14} className="text-white/60" />
+                                                            )}
+                                                        </div>
+                                                    )}
                                                 </div>
                                                 
                                                 <span className="text-[9px] text-slate-400 mt-1 px-1">
