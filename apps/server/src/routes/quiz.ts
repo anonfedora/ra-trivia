@@ -1,11 +1,32 @@
 import { Router } from 'express';
 import { prisma } from 'database';
-import { authenticate, AuthRequest } from '../middlewares/auth';
+import { authenticate, AuthRequest, authorizeAdmin } from '../middlewares/auth';
 import { validateUserTypeAccess, filterQuestionsByUserType } from '../middlewares/userTypeAccess';
 import { sendQuizResultEmail } from '../services/email';
-import { emitNotification } from '../services/socketService';
+import { emitNotification, emitToRoom } from '../services/socketService';
 
 const router = Router();
+
+let isMaintenanceMode = false;
+
+// Admin: Get maintenance mode status
+router.get('/maintenance/status', authenticate, authorizeAdmin, (req, res) => {
+    res.json({ isMaintenanceMode });
+});
+
+// Admin: Toggle maintenance mode
+router.post('/maintenance/toggle', authenticate, authorizeAdmin, (req: AuthRequest, res) => {
+    const { enabled } = req.body;
+    isMaintenanceMode = !!enabled;
+    
+    // Notify all connected clients about maintenance mode change
+    emitToRoom('all', 'maintenance_mode', { enabled: isMaintenanceMode });
+    
+    res.json({ 
+        message: `Maintenance mode ${isMaintenanceMode ? 'enabled' : 'disabled'}`,
+        isMaintenanceMode 
+    });
+});
 
 // Start a quiz session - with user type access control
 router.post('/start', authenticate, validateUserTypeAccess, async (req: AuthRequest, res) => {
@@ -13,6 +34,14 @@ router.post('/start', authenticate, validateUserTypeAccess, async (req: AuthRequ
         const { quizId } = req.body;
         const userId = req.user!.userId;
         const userRole = req.user!.role;
+
+        // Check maintenance mode
+        if (isMaintenanceMode && userRole === 'CANDIDATE') {
+            return res.status(503).json({
+                message: 'System is currently under maintenance. New exams cannot be started at this time. Please try again later.'
+            });
+        }
+
         const userType = req.user!.userType;
         const userAgent = req.get('User-Agent') || 'Unknown';
         const referer = req.get('Referer') || 'Unknown';

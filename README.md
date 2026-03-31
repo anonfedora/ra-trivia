@@ -177,7 +177,16 @@ PATCH /api/support/admin/:userId/resolve   # Close thread
 ### Support (Candidate)
 ```
 GET   /api/support                         # History + relevant notifications
+GET   /api/support/unread-count            # Get unread message count
+PATCH /api/support/read                    # Mark admin messages as read
 POST  /api/support                         # Submit new message
+```
+
+### System & Maintenance
+```
+GET   /api/health/detailed                 # Detailed system health status
+POST  /api/quiz/maintenance/toggle         # Toggle global maintenance mode
+GET   /api/quiz/maintenance/status         # Get maintenance status
 ```
 
 ### Notifications
@@ -215,15 +224,16 @@ pnpm --filter server test -- --run
 
 ## Version History
 
-### v1.5.0 (Current)
-- **Support Chat System**: Real-time two-way communication between candidates and admins.
-- **Read Receipts**: Double-check marks for read messages (Candidate and Admin sides).
-- **Admin Support Center**: Dedicated dashboard for thread management, candidate search, and resolution tracking.
-- **Candidate Chat UI**: Floating support button with full message history and relevant notifications integration.
-- **Socket.IO Integration**: Immediate message delivery with private user rooms and admin support rooms.
-- **CI Fixes**: ESLint unescaped entity cleanup and verified production build pipeline.
+### v1.6.0 (Current)
+- **Typing Indicators**: Real-time "Typing..." feedback in support chats for both admins and candidates.
+- **Admin Support Refinement**: Added advanced filtering (unread, user rank), candidate search, and pagination.
+- **Canned Responses**: Pre-defined response templates for admins to handle support requests faster.
+- **Global Maintenance Mode**: Centralized control to pause new exam starts during system updates.
+- **System Health API**: Detailed monitoring of database, memory, and platform vitals.
+- **Read Receipts**: Real-time single/double-check marks for message status.
+- **Unread Counters**: Dynamic badges on the admin dashboard and candidate floating support button.
 
-### v1.4.0
+### v1.5.0
 - **Password Reset**: Forgot password flow with 15-min expiry token, email link, confirm password page
 - **WebSocket Notifications**: Socket.IO real-time delivery; falls back to polling on error
 - **Toast System**: Global `useToast()` hook + `<Toaster />` portal — replaces all `alert()` calls across pages

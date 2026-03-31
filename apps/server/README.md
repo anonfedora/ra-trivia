@@ -162,6 +162,19 @@ pnpm --filter server test:coverage
 | GET | `/admin/:userId` | Admin | History for specific user |
 | POST | `/admin/:userId` | Admin | Reply to user |
 | PATCH | `/admin/:userId/resolve` | Admin | Close thread |
+| GET | `/admin/templates` | Admin | Get canned response templates |
+| GET | `/unread-count` | Candidate | Own unread message count |
+| GET | `/admin/unread-count` | Admin | Global unread message count |
+| PATCH | `/read` | Candidate | Mark admin messages as read |
+| PATCH | `/admin/:userId/read` | Admin | Mark candidate messages as read |
+
+### System & Maintenance — `/api/health` & `/api/quiz/maintenance`
+
+| Method | Path | Auth | Description |
+|---|---|---|---|
+| GET | `/api/health/detailed` | Any | Detailed monitoring (DB, Memory, Uptime) |
+| POST | `/api/quiz/maintenance/toggle` | Admin | Enable/Disable global maintenance |
+| GET | `/api/quiz/maintenance/status` | Admin | Current maintenance state |
 
 ### Notification Scoping
 
@@ -188,6 +201,10 @@ The frontend `NotificationBell` listens on the `notification` event and refreshe
 | `notification` | Server → Client | General notification (all users) |
 | `support_message` | Server → Admin | New candidate message in support thread |
 | `support_reply` | Server → Candidate | New admin reply to support thread |
+| `user_typing` | Candidate → Admin | Candidate is composing a message |
+| `admin_typing` | Admin → Candidate | Support team is composing a message |
+| `messages_read` | Server → All | Read receipts synchronization |
+| `maintenance_mode` | Server → All | System maintenance status change |
 
 ## Scheduler
 
