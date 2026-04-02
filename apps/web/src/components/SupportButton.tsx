@@ -48,6 +48,17 @@ export default function SupportButton({ quizId }: SupportButtonProps) {
         }
     }, []);
 
+    const markAsRead = useCallback(async () => {
+        try {
+            await apiFetch('support/read', {
+                method: 'PATCH'
+            });
+            setUnreadCount(0);
+        } catch (err) {
+            console.error('Failed to mark messages as read', err);
+        }
+    }, []);
+
     const fetchHistory = useCallback(async () => {
         setIsLoadingHistory(true);
         try {
@@ -71,18 +82,7 @@ export default function SupportButton({ quizId }: SupportButtonProps) {
         } finally {
             setIsLoadingHistory(false);
         }
-    }, []);
-
-    const markAsRead = useCallback(async () => {
-        try {
-            await apiFetch('support/read', {
-                method: 'PATCH'
-            });
-            setUnreadCount(0);
-        } catch (err) {
-            console.error('Failed to mark messages as read', err);
-        }
-    }, []);
+    }, [markAsRead]);
 
     useEffect(() => {
         // Add small delay to prevent request burst on login
