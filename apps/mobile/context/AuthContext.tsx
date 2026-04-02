@@ -1,6 +1,6 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import * as SecureStore from 'expo-secure-store';
-import axios from 'axios';
+import axios, { AxiosInstance } from 'axios';
 import { Platform } from 'react-native';
 
 // API Configuration from environment variables
@@ -16,42 +16,51 @@ interface User {
     email: string;
     role: string;
     userType?: string;
-    isVerified: boolean;
+    emailVerified: boolean;
 }
 
 interface AuthContextType {
     user: User | null;
-    token: string | null;
+    accessToken: string | null;
     isLoading: boolean;
-    signIn: (email: string, otp: string) => Promise<void>;
+    signIn: (email: string, password: string) => Promise<void>;
     signUp: (name: string, email: string, church: string, association: string, userType: string) => Promise<void>;
     signOut: () => Promise<void>;
     verifyOtp: (email: string, otp: string) => Promise<void>;
     apiUrl: string;
+    api: AxiosInstance;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
     const [user, setUser] = useState<User | null>(null);
-    const [token, setToken] = useState<string | null>(null);
+    const [accessToken, setAccessToken] = useState<string | null>(null);
+    const [refreshToken, setRefreshToken] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(true);
 
     const apiUrl = DEFAULT_API_URL;
+    
+    // Create a stable axios instance for the app
+    const api = useRef(axios.create({
+        baseURL: apiUrl,
+        headers: {
+            'Content-Type': 'application/json',
+        },
+    })).current;
 
     useEffect(() => {
         // Load persisted session
         async function loadSession() {
             try {
-                const savedToken = await SecureStore.getItemAsync('token');
+                const savedAccessToken = await SecureStore.getItemAsync('accessToken');
+                const savedRefreshToken = await SecureStore.getItemAsync('refreshToken');
                 const savedUser = await SecureStore.getItemAsync('user');
 
-                if (savedToken && savedUser) {
-                    setToken(savedToken);
+                if (savedAccessToken && savedUser) {
+                    setAccessToken(savedAccessToken);
+                    setRefreshToken(savedRefreshToken);
                     setUser(JSON.parse(savedUser));
-
-                    // Set default axios header
-                    axios.defaults.headers.common['Authorization'] = `Bearer ${savedToken}`;
                 }
             } catch (e) {
                 console.error('Failed to load session', e);
@@ -63,17 +72,71 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         loadSession();
     }, []);
 
-    const signIn = async (email: string, otp: string) => {
-        try {
-            const response = await axios.post(`${apiUrl}/auth/login`, { email, otp });
-            const { token, user } = response.data;
+    // Setup Axios interceptors
+    useEffect(() => {
+        const reqInterceptor = api.interceptors.request.use(
+            async (config) => {
+                const token = await SecureStore.getItemAsync('accessToken');
+                if (token) {
+                    config.headers.Authorization = `Bearer ${token}`;
+                }
+                return config;
+            },
+            (error) => Promise.reject(error)
+        );
 
-            setToken(token);
+        const resInterceptor = api.interceptors.response.use(
+            (response) => response,
+            async (error) => {
+                const originalRequest = error.config;
+                if (error.response?.status === 401 && !originalRequest._retry) {
+                    originalRequest._retry = true;
+                    try {
+                        const storedRefreshToken = await SecureStore.getItemAsync('refreshToken');
+                        if (!storedRefreshToken) throw new Error('No refresh token');
+
+                        const response = await axios.post(`${apiUrl}/auth/refresh-token`, {
+                            refreshToken: storedRefreshToken,
+                        });
+
+                        const { accessToken: newAccessToken, refreshToken: newRefreshToken } = response.data;
+                        
+                        await SecureStore.setItemAsync('accessToken', newAccessToken);
+                        if (newRefreshToken) {
+                            await SecureStore.setItemAsync('refreshToken', newRefreshToken);
+                        }
+                        
+                        setAccessToken(newAccessToken);
+                        
+                        originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
+                        return api(originalRequest);
+                    } catch (refreshErr) {
+                        // Refresh failed, log out
+                        signOut();
+                        return Promise.reject(refreshErr);
+                    }
+                }
+                return Promise.reject(error);
+            }
+        );
+
+        return () => {
+            api.interceptors.request.eject(reqInterceptor);
+            api.interceptors.response.eject(resInterceptor);
+        };
+    }, []);
+
+    const signIn = async (email: string, password: string) => {
+        try {
+            const response = await axios.post(`${apiUrl}/auth/login`, { email, password });
+            const { accessToken, refreshToken, user } = response.data;
+
+            setAccessToken(accessToken);
+            setRefreshToken(refreshToken);
             setUser(user);
 
-            axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-
-            await SecureStore.setItemAsync('token', token);
+            await SecureStore.setItemAsync('accessToken', accessToken);
+            await SecureStore.setItemAsync('refreshToken', refreshToken);
             await SecureStore.setItemAsync('user', JSON.stringify(user));
         } catch (error: any) {
             throw error.response?.data?.message || 'Login failed';
@@ -91,14 +154,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const verifyOtp = async (email: string, otp: string) => {
         try {
             const response = await axios.post(`${apiUrl}/auth/verify-otp`, { email, otp });
-            const { token, user } = response.data;
+            const { accessToken, refreshToken, user } = response.data;
 
-            setToken(token);
+            setAccessToken(accessToken);
+            setRefreshToken(refreshToken);
             setUser(user);
 
-            axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-
-            await SecureStore.setItemAsync('token', token);
+            await SecureStore.setItemAsync('accessToken', accessToken);
+            await SecureStore.setItemAsync('refreshToken', refreshToken);
             await SecureStore.setItemAsync('user', JSON.stringify(user));
         } catch (error: any) {
             throw error.response?.data?.message || 'Verification failed';
@@ -106,15 +169,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
 
     const signOut = async () => {
-        setToken(null);
+        setAccessToken(null);
+        setRefreshToken(null);
         setUser(null);
-        delete axios.defaults.headers.common['Authorization'];
-        await SecureStore.deleteItemAsync('token');
+        await SecureStore.deleteItemAsync('accessToken');
+        await SecureStore.deleteItemAsync('refreshToken');
         await SecureStore.deleteItemAsync('user');
     };
 
     return (
-        <AuthContext.Provider value={{ user, token, isLoading, signIn, signUp, signOut, verifyOtp, apiUrl }}>
+        <AuthContext.Provider value={{ 
+            user, 
+            accessToken, 
+            isLoading, 
+            signIn, 
+            signUp, 
+            signOut, 
+            verifyOtp, 
+            apiUrl,
+            api 
+        }}>
             {children}
         </AuthContext.Provider>
     );
@@ -127,3 +201,4 @@ export function useAuth() {
     }
     return context;
 }
+

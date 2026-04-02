@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { apiJson } from '../../lib/api';
+import { apiFetch } from '../../lib/api';
 import PasswordInput from '../../components/PasswordInput';
 
 export default function SetupAdminPage() {
@@ -23,22 +23,7 @@ export default function SetupAdminPage() {
         setIsLoading(true);
 
         try {
-            const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
-            
-            // Fix TypeScript type to match actual server response
-            const result = await apiJson<{ 
-                message: string; 
-                user?: {
-                    id: string;
-                    name: string;
-                    email: string;
-                    role: 'ADMIN' | 'SUPER_ADMIN' | 'CANDIDATE';
-                    userType: string;
-                    emailVerified: boolean;
-                };
-                isUnverified?: boolean;
-                email?: string;
-            }>(`${apiUrl}/auth/register`, {
+            const response = await apiFetch('auth/register', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ 
@@ -50,34 +35,35 @@ export default function SetupAdminPage() {
                 })
             });
 
+            const data = await response.json();
+
             // Debug logging for development
             if (process.env.NODE_ENV === 'development') {
                 console.log('Admin setup result:', {
-                    ok: result.ok,
-                    status: result.status,
-                    hasUser: !!result.data?.user,
-                    data: result.data
+                    ok: response.ok,
+                    status: response.status,
+                    data
                 });
             }
 
-            // Check for success with proper type safety
-            if (result.ok && result.data) {
-                if (result.data.user) {
+            // Check for success
+            if (response.ok && data) {
+                if (data.user) {
                     // New account created successfully
-                    const createdRole = result.data.user.role === 'SUPER_ADMIN' ? 'Super Admin' : 'Admin';
+                    const createdRole = data.user.role === 'SUPER_ADMIN' ? 'Super Admin' : 'Admin';
                     setSuccess(`${createdRole} account created successfully! Please check your email for verification code. Redirecting to verification...`);
                     
                     // Redirect to OTP verification page
                     setTimeout(() => {
                         router.push(`/verify-otp?email=${encodeURIComponent(email)}`);
                     }, 2000);
-                } else if (result.data.isUnverified) {
+                } else if (data.isUnverified) {
                     // Existing unverified account
-                    setSuccess(`Account already exists but needs verification. A new verification code has been sent to ${result.data.email}. Redirecting to verification...`);
+                    setSuccess(`Account already exists but needs verification. A new verification code has been sent to ${data.email}. Redirecting to verification...`);
                     
                     // Redirect to OTP verification page
                     setTimeout(() => {
-                        router.push(`/verify-otp?email=${encodeURIComponent(result.data.email || email)}`);
+                        router.push(`/verify-otp?email=${encodeURIComponent(data.email || email)}`);
                     }, 2000);
                 } else {
                     // Unexpected success response structure
@@ -89,17 +75,15 @@ export default function SetupAdminPage() {
                 }
             } else {
                 // Handle error cases properly
-                const errorMessage = !result.ok && 'error' in result 
-                    ? result.error 
-                    : 'Failed to create admin account. Please try again.';
+                const errorMessage = data?.message || data?.error || 'Failed to create admin account. Please try again.';
                 setError(errorMessage);
                 
                 // Debug logging for development
                 if (process.env.NODE_ENV === 'development') {
                     console.error('Admin setup failed:', {
-                        ok: result.ok,
-                        error: 'error' in result ? result.error : 'Unknown error',
-                        data: result.data
+                        ok: response.ok,
+                        error: data?.error || 'Unknown error',
+                        data
                     });
                 }
             }

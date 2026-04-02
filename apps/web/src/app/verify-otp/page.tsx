@@ -2,7 +2,8 @@
 
 import { useState, useEffect, Suspense, useRef, useCallback } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { apiJson } from '../../lib/api';
+import { apiFetch } from '../../lib/api';
+import { setAuthTokens } from '../../lib/auth';
 
 import { ThemeToggle } from '../../components/ThemeToggle';
 
@@ -111,12 +112,8 @@ function VerifyOTPContent() {
 
         setError('');
         setSuccess('');
-        setIsLoading(true);
-
-        const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
-
         try {
-            const response = await apiJson(`${apiUrl}/auth/verify-otp`, {
+            const response = await apiFetch('auth/verify-otp', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -124,11 +121,14 @@ function VerifyOTPContent() {
                 body: JSON.stringify({ email, otp: otpString }),
             });
 
-            if (response.ok && response.data) {
-                const data = response.data as any;
-                if (data.token) {
-                    localStorage.setItem('token', data.token);
-                    localStorage.setItem('user', JSON.stringify(data.user));
+            const data = await response.json();
+
+            if (response.ok && data) {
+                if (data.accessToken && data.refreshToken) {
+                    setAuthTokens({
+                        accessToken: data.accessToken,
+                        refreshToken: data.refreshToken
+                    }, data.user);
                     setSuccess('Email verified successfully! Redirecting...');
 
                     setTimeout(() => {
@@ -136,7 +136,7 @@ function VerifyOTPContent() {
                     }, 1500);
                 }
             } else {
-                setError(!response.ok ? (response as any).error : 'Verification failed. Please try again.');
+                setError(data?.message || data?.error || 'Verification failed. Please try again.');
                 isSubmitting.current = false; // Reset flag on error
             }
         } catch (err: any) {
@@ -171,18 +171,16 @@ function VerifyOTPContent() {
     const handleResendOTP = async () => {
         setError('');
         setSuccess('');
-        setIsLoading(true);
-
-        const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
-
         try {
-            const response = await apiJson(`${apiUrl}/auth/resend-verification`, {
+            const response = await apiFetch('auth/resend-verification', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
                 body: JSON.stringify({ email }),
             });
+
+            const data = await response.json();
 
             if (response.ok) {
                 setSuccess('New OTP sent to your email!');
@@ -191,7 +189,7 @@ function VerifyOTPContent() {
                 setOtp(['', '', '', '', '', '']);
                 inputRefs.current[0]?.focus();
             } else {
-                setError(!response.ok ? (response as any).error : 'Failed to resend OTP.');
+                setError(data?.message || data?.error || 'Failed to resend OTP.');
             }
         } catch (err: any) {
             setError('Failed to resend OTP.');

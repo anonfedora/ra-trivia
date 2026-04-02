@@ -6,6 +6,8 @@ import Link from 'next/link';
 import { formatDistanceToNow } from 'date-fns';
 import { ThemeToggle } from '../../../components/ThemeToggle';
 import { useToast } from '../../../contexts/ToastContext';
+import { apiFetch } from '../../../lib/api';
+import { getAccessToken } from '../../../lib/auth';
 
 interface Notification {
     id: string;
@@ -19,11 +21,11 @@ interface Notification {
 type FilterType = 'ALL' | 'EXAM_SUBMITTED' | 'NEW_CANDIDATE' | 'NEW_ADMIN' | 'SUPPORT_REQUEST';
 
 const FILTERS: { key: FilterType; label: string; icon: React.ReactNode }[] = [
-    { key: 'ALL',           label: 'All',          icon: <Bell size={14} /> },
-    { key: 'EXAM_SUBMITTED',label: 'Exams',        icon: <ClipboardList size={14} /> },
-    { key: 'NEW_CANDIDATE', label: 'Candidates',   icon: <UserPlus size={14} /> },
-    { key: 'NEW_ADMIN',     label: 'Admins',       icon: <ShieldCheck size={14} /> },
-    { key: 'SUPPORT_REQUEST',label: 'Support',     icon: <LifeBuoy size={14} /> },
+    { key: 'ALL', label: 'All', icon: <Bell size={14} /> },
+    { key: 'EXAM_SUBMITTED', label: 'Exams', icon: <ClipboardList size={14} /> },
+    { key: 'NEW_CANDIDATE', label: 'Candidates', icon: <UserPlus size={14} /> },
+    { key: 'NEW_ADMIN', label: 'Admins', icon: <ShieldCheck size={14} /> },
+    { key: 'SUPPORT_REQUEST', label: 'Support', icon: <LifeBuoy size={14} /> },
 ];
 
 function matchesFilter(type: string, filter: FilterType): boolean {
@@ -54,11 +56,8 @@ export default function NotificationsPage() {
     const { toast } = useToast();
 
     const fetchNotifications = useCallback(async () => {
-        const token = localStorage.getItem('token');
         try {
-            const res = await fetch(`${apiUrl}/notifications?pageSize=100`, {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
+            const res = await apiFetch('notifications?pageSize=100');
             if (res.ok) {
                 const data = await res.json();
                 setNotifications(data.notifications);
@@ -70,7 +69,7 @@ export default function NotificationsPage() {
         } finally {
             setIsLoading(false);
         }
-    }, [apiUrl, toast]);
+    }, [toast]);
 
     useEffect(() => { fetchNotifications(); }, [fetchNotifications]);
 
@@ -92,28 +91,22 @@ export default function NotificationsPage() {
     }), [notifications]);
 
     const markAsRead = async (id: string) => {
-        const token = localStorage.getItem('token');
-        await fetch(`${apiUrl}/notifications/${id}/read`, {
-            method: 'PATCH',
-            headers: { 'Authorization': `Bearer ${token}` }
+        await apiFetch(`notifications/${id}/read`, {
+            method: 'PATCH'
         });
         fetchNotifications();
     };
 
     const markAllAsRead = async () => {
-        const token = localStorage.getItem('token');
-        await fetch(`${apiUrl}/notifications/mark-all-read`, {
-            method: 'POST',
-            headers: { 'Authorization': `Bearer ${token}` }
+        await apiFetch('notifications/mark-all-read', {
+            method: 'POST'
         });
         fetchNotifications();
     };
 
     const deleteNotification = async (id: string) => {
-        const token = localStorage.getItem('token');
-        await fetch(`${apiUrl}/notifications/${id}`, {
-            method: 'DELETE',
-            headers: { 'Authorization': `Bearer ${token}` }
+        await apiFetch(`notifications/${id}`, {
+            method: 'DELETE'
         });
         fetchNotifications();
     };
@@ -160,18 +153,16 @@ export default function NotificationsPage() {
                         <button
                             key={f.key}
                             onClick={() => setActiveFilter(f.key)}
-                            className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all flex-shrink-0 ${
-                                activeFilter === f.key
+                            className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all flex-shrink-0 ${activeFilter === f.key
                                     ? 'bg-primary text-white shadow-md'
                                     : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700 hover:border-primary/50'
-                            }`}
+                                }`}
                         >
                             {f.icon}
                             {f.label}
                             {counts[f.key] > 0 && (
-                                <span className={`ml-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-bold ${
-                                    activeFilter === f.key ? 'bg-white/20 text-white' : 'bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400'
-                                }`}>
+                                <span className={`ml-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-bold ${activeFilter === f.key ? 'bg-white/20 text-white' : 'bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400'
+                                    }`}>
                                     {counts[f.key]}
                                 </span>
                             )}

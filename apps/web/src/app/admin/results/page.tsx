@@ -8,6 +8,8 @@ import { ThemeToggle } from '../../../components/ThemeToggle';
 import NotificationBell from '../../../components/NotificationBell';
 import { useToast } from '../../../contexts/ToastContext';
 import ConfirmModal from '../../../components/ConfirmModal';
+import { apiFetch } from '../../../lib/api';
+import { getAccessToken } from '../../../lib/auth';
 
 interface Result {
     id: string;
@@ -54,7 +56,6 @@ function AdminResultsContent() {
     const { toast } = useToast();
 
     const fetchResults = useCallback(async (overridePage?: number) => {
-        const token = localStorage.getItem('token');
         const effectivePage = overridePage ?? page;
         try {
             const params = new URLSearchParams({
@@ -63,9 +64,7 @@ function AdminResultsContent() {
                 status,
                 ...(searchTerm.trim() ? { q: searchTerm.trim() } : {})
             });
-            const res = await fetch(`${apiUrl}/admin/results?${params.toString()}`, {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
+            const res = await apiFetch(`admin/results?${params.toString()}`);
             if (res.ok) {
                 const data: any = await res.json();
                 setResults(data.items);
@@ -78,7 +77,7 @@ function AdminResultsContent() {
         } finally {
             setIsLoading(false);
         }
-    }, [apiUrl, page, pageSize, searchTerm, status, toast]);
+    }, [page, pageSize, searchTerm, status, toast]);
 
     useEffect(() => {
         fetchResults();
@@ -94,12 +93,10 @@ function AdminResultsContent() {
     }, [searchTerm, status]);
 
     const handleStatusChange = async (sessionId: string, newStatus: string | null) => {
-        const token = localStorage.getItem('token');
         try {
-            const res = await fetch(`${apiUrl}/admin/sessions/${sessionId}/status`, {
+            const res = await apiFetch(`admin/sessions/${sessionId}/status`, {
                 method: 'PATCH',
                 headers: {
-                    'Authorization': `Bearer ${token}`,
                     'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({ manualStatus: newStatus })
@@ -117,12 +114,10 @@ function AdminResultsContent() {
     };
 
     const handleReleaseResults = async (sessionIds: string[]) => {
-        const token = localStorage.getItem('token');
         try {
-            const res = await fetch(`${apiUrl}/admin/sessions/release`, {
+            const res = await apiFetch('admin/sessions/release', {
                 method: 'POST',
                 headers: {
-                    'Authorization': `Bearer ${token}`,
                     'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({ sessionIds })
@@ -149,7 +144,6 @@ function AdminResultsContent() {
     };
 
     const handleExport = async (format: 'excel' | 'formatted-excel' | 'pdf') => {
-        const token = localStorage.getItem('token');
         setIsExporting(format);
         try {
             const params = new URLSearchParams();
@@ -158,12 +152,10 @@ function AdminResultsContent() {
             }
             
             const endpoint = format === 'excel' 
-                ? `${apiUrl}/admin/export/excel`
-                : `${apiUrl}/admin/export/${format}?${params.toString()}`;
+                ? 'admin/export/excel'
+                : `admin/export/${format}?${params.toString()}`;
                 
-            const res = await fetch(endpoint, {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
+            const res = await apiFetch(endpoint);
             
             if (res.ok) {
                 const blob = await res.blob();

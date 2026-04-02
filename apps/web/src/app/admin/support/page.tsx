@@ -9,6 +9,8 @@ import NotificationBell from '../../../components/NotificationBell';
 import { useToast } from '../../../contexts/ToastContext';
 import { format, formatDistanceToNow } from 'date-fns';
 import { io, Socket } from 'socket.io-client';
+import { apiFetch } from '../../../lib/api';
+import { getAccessToken } from '../../../lib/auth';
 
 interface SupportThread {
     userId: string;
@@ -61,17 +63,14 @@ export default function AdminSupportPage() {
     const fetchThreads = useCallback(async (page = 1) => {
         setIsLoading(true);
         try {
-            const token = localStorage.getItem('token');
             const params = new URLSearchParams({
                 page: String(page),
                 unreadOnly: String(filterUnread),
                 userType: filterUserType,
                 search: searchQuery
             });
-            
-            const res = await fetch(`${apiUrl}/support/admin?${params}`, {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
+
+            const res = await apiFetch(`support/admin?${params}`);
             if (res.ok) {
                 const data = await res.json();
                 setThreads(data.threads);
@@ -85,14 +84,11 @@ export default function AdminSupportPage() {
         } finally {
             setIsLoading(false);
         }
-    }, [apiUrl, toast, filterUnread, filterUserType, searchQuery]);
+    }, [toast, filterUnread, filterUserType, searchQuery]);
 
     const fetchTemplates = useCallback(async () => {
         try {
-            const token = localStorage.getItem('token');
-            const res = await fetch(`${apiUrl}/support/admin/templates`, {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
+            const res = await apiFetch('support/admin/templates');
             if (res.ok) {
                 const data = await res.json();
                 setTemplates(data);
@@ -100,39 +96,32 @@ export default function AdminSupportPage() {
         } catch (err) {
             console.error('Failed to fetch templates', err);
         }
-    }, [apiUrl]);
+    }, []);
 
     const markAsRead = useCallback(async (userId: string) => {
         try {
-            const token = localStorage.getItem('token');
-            await fetch(`${apiUrl}/support/admin/${userId}/read`, {
-                method: 'PATCH',
-                headers: {
-                    'Authorization': `Bearer ${token}`
-                }
+            await apiFetch(`support/admin/${userId}/read`, {
+                method: 'PATCH'
             });
-            
+
             // Update thread list unread count locally for immediate feedback
-            setThreads(prev => prev.map(t => 
+            setThreads(prev => prev.map(t =>
                 t.userId === userId ? { ...t, unreadCount: 0 } : t
             ));
         } catch (err) {
             console.error('Failed to mark messages as read', err);
         }
-    }, [apiUrl]);
+    }, []);
 
     const fetchChatHistory = useCallback(async (userId: string) => {
         setIsChatLoading(true);
         try {
-            const token = localStorage.getItem('token');
-            const res = await fetch(`${apiUrl}/support/admin/${userId}`, {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
+            const res = await apiFetch(`support/admin/${userId}`);
             if (res.ok) {
                 const data = await res.json();
                 setChatHistory(data.history);
                 setSelectedUser(data.user);
-                
+
                 // If there are unread candidate messages, mark them as read
                 const hasUnreadCandidateMessages = data.history.some((m: ChatItem) => !m.isAdmin && !m.isRead && m.type === 'MESSAGE');
                 if (hasUnreadCandidateMessages) {
@@ -144,7 +133,7 @@ export default function AdminSupportPage() {
         } finally {
             setIsChatLoading(false);
         }
-    }, [apiUrl, toast, markAsRead]);
+    }, [toast, markAsRead]);
 
     // Use a ref for the selectedUserId to access it inside socket callbacks
     const selectedUserIdRef = useRef<string | null>(null);
@@ -171,9 +160,9 @@ export default function AdminSupportPage() {
 
     useEffect(() => {
         // Socket for real-time updates from candidates
-        const token = localStorage.getItem('token');
+        const token = getAccessToken();
         if (token) {
-            const socketUrl = apiUrl.replace('/api', '');
+            const socketUrl = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api').replace('/api', '');
             const socket = io(socketUrl, {
                 auth: { token },
                 transports: ['websocket', 'polling'],
@@ -222,7 +211,7 @@ export default function AdminSupportPage() {
                 socketRef.current.disconnect();
             }
         };
-    }, [apiUrl, fetchThreads, fetchChatHistory]);
+    }, [fetchThreads, fetchChatHistory]);
 
     useEffect(() => {
         if (selectedUserId) {
@@ -280,12 +269,10 @@ export default function AdminSupportPage() {
 
         setIsSending(true);
         try {
-            const token = localStorage.getItem('token');
-            const res = await fetch(`${apiUrl}/support/admin/${selectedUserId}`, {
+            const res = await apiFetch(`support/admin/${selectedUserId}`, {
                 method: 'POST',
                 headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
+                    'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({ message: reply }),
             });
@@ -309,10 +296,8 @@ export default function AdminSupportPage() {
 
         setIsResolving(true);
         try {
-            const token = localStorage.getItem('token');
-            const res = await fetch(`${apiUrl}/support/admin/${selectedUserId}/resolve`, {
-                method: 'PATCH',
-                headers: { 'Authorization': `Bearer ${token}` }
+            const res = await apiFetch(`support/admin/${selectedUserId}/resolve`, {
+                method: 'PATCH'
             });
 
             if (res.ok) {
@@ -328,8 +313,8 @@ export default function AdminSupportPage() {
         }
     };
 
-    const filteredThreads = threads.filter(t => 
-        t.user.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+    const filteredThreads = threads.filter(t =>
+        t.user.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         t.user.email.toLowerCase().includes(searchQuery.toLowerCase())
     );
 
@@ -359,7 +344,7 @@ export default function AdminSupportPage() {
                     <div className="p-4 border-b border-slate-200 dark:border-slate-700 space-y-3">
                         <div className="relative">
                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                            <input 
+                            <input
                                 type="text"
                                 placeholder="Search candidates..."
                                 value={searchQuery}
@@ -367,19 +352,18 @@ export default function AdminSupportPage() {
                                 className="w-full pl-10 pr-4 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none text-sm transition-all"
                             />
                         </div>
-                        
+
                         <div className="flex flex-wrap gap-2">
-                            <button 
+                            <button
                                 onClick={() => setFilterUnread(!filterUnread)}
-                                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all border ${
-                                    filterUnread 
-                                        ? 'bg-primary text-white border-primary' 
+                                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all border ${filterUnread
+                                        ? 'bg-primary text-white border-primary'
                                         : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-700 hover:border-primary'
-                                }`}
+                                    }`}
                             >
                                 Unread Only
                             </button>
-                            <select 
+                            <select
                                 value={filterUserType}
                                 onChange={(e) => setFilterUserType(e.target.value)}
                                 className="px-2 py-1.5 rounded-lg text-xs font-bold bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700 outline-none hover:border-primary"
@@ -416,11 +400,10 @@ export default function AdminSupportPage() {
                                             <User size={24} />
                                             {thread.user.userType && (
                                                 <span className="absolute -bottom-1 -right-1 w-4 h-4 bg-white dark:bg-slate-800 rounded-full border border-slate-200 dark:border-slate-700 flex items-center justify-center" title={thread.user.userType}>
-                                                    <div className={`w-2 h-2 rounded-full ${
-                                                        thread.user.userType === 'AMBASSADOR_RANK_EXAMS' ? 'bg-blue-500' :
-                                                        thread.user.userType === 'EXTRAORDINARY_RANK_EXAMS' ? 'bg-purple-500' :
-                                                        thread.user.userType === 'PRE_PLENIPOTENTIARY_EXAMS' ? 'bg-amber-500' : 'bg-red-500'
-                                                    }`} />
+                                                    <div className={`w-2 h-2 rounded-full ${thread.user.userType === 'AMBASSADOR_RANK_EXAMS' ? 'bg-blue-500' :
+                                                            thread.user.userType === 'EXTRAORDINARY_RANK_EXAMS' ? 'bg-purple-500' :
+                                                                thread.user.userType === 'PRE_PLENIPOTENTIARY_EXAMS' ? 'bg-amber-500' : 'bg-red-500'
+                                                        }`} />
                                                 </span>
                                             )}
                                         </div>
@@ -438,9 +421,8 @@ export default function AdminSupportPage() {
                                             </p>
                                             <div className="mt-2 flex items-center justify-between">
                                                 <div className="flex items-center gap-2">
-                                                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
-                                                        thread.status === 'PENDING' ? 'bg-amber-100 text-amber-600' : 'bg-green-100 text-green-600'
-                                                    }`}>
+                                                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${thread.status === 'PENDING' ? 'bg-amber-100 text-amber-600' : 'bg-green-100 text-green-600'
+                                                        }`}>
                                                         {thread.status}
                                                     </span>
                                                     {typingUsers.has(thread.userId) && (
@@ -461,11 +443,11 @@ export default function AdminSupportPage() {
                                         </div>
                                     </button>
                                 ))}
-                                
+
                                 {/* Thread Pagination */}
                                 {pagination.totalPages > 1 && (
                                     <div className="p-4 flex justify-center items-center gap-2 border-t border-slate-100 dark:border-slate-700/50">
-                                        <button 
+                                        <button
                                             disabled={pagination.page === 1}
                                             onClick={() => fetchThreads(pagination.page - 1)}
                                             className="p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-30"
@@ -475,7 +457,7 @@ export default function AdminSupportPage() {
                                         <span className="text-xs font-bold text-slate-500">
                                             {pagination.page} / {pagination.totalPages}
                                         </span>
-                                        <button 
+                                        <button
                                             disabled={pagination.page === pagination.totalPages}
                                             onClick={() => fetchThreads(pagination.page + 1)}
                                             className="p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-30"
@@ -502,11 +484,10 @@ export default function AdminSupportPage() {
                                     <div className="w-10 h-10 rounded-xl bg-primary text-white flex items-center justify-center font-bold relative">
                                         {selectedUser?.name.charAt(0)}
                                         {currentThread?.user.userType && (
-                                            <div className={`absolute -bottom-1 -right-1 w-3.5 h-3.5 rounded-full border-2 border-white dark:border-slate-800 ${
-                                                currentThread.user.userType === 'AMBASSADOR_RANK_EXAMS' ? 'bg-blue-500' :
-                                                currentThread.user.userType === 'EXTRAORDINARY_RANK_EXAMS' ? 'bg-purple-500' :
-                                                currentThread.user.userType === 'PRE_PLENIPOTENTIARY_EXAMS' ? 'bg-amber-500' : 'bg-red-500'
-                                            }`} />
+                                            <div className={`absolute -bottom-1 -right-1 w-3.5 h-3.5 rounded-full border-2 border-white dark:border-slate-800 ${currentThread.user.userType === 'AMBASSADOR_RANK_EXAMS' ? 'bg-blue-500' :
+                                                    currentThread.user.userType === 'EXTRAORDINARY_RANK_EXAMS' ? 'bg-purple-500' :
+                                                        currentThread.user.userType === 'PRE_PLENIPOTENTIARY_EXAMS' ? 'bg-amber-500' : 'bg-red-500'
+                                                }`} />
                                         )}
                                     </div>
                                     <div>
@@ -532,14 +513,13 @@ export default function AdminSupportPage() {
                                     </div>
                                 </div>
                                 <div className="flex items-center gap-2">
-                                    <button 
+                                    <button
                                         onClick={handleResolve}
                                         disabled={isResolving || currentThread?.status === 'RESOLVED'}
-                                        className={`p-2 transition-colors ${
-                                            currentThread?.status === 'RESOLVED' 
-                                                ? 'text-green-500 cursor-default' 
+                                        className={`p-2 transition-colors ${currentThread?.status === 'RESOLVED'
+                                                ? 'text-green-500 cursor-default'
                                                 : 'text-slate-400 hover:text-green-500'
-                                        }`} 
+                                            }`}
                                         title={currentThread?.status === 'RESOLVED' ? 'Thread Resolved' : 'Mark as resolved'}
                                     >
                                         {isResolving ? (
@@ -552,7 +532,7 @@ export default function AdminSupportPage() {
                             </div>
 
                             {/* Messages Container */}
-                            <div 
+                            <div
                                 ref={scrollRef}
                                 className="flex-1 overflow-y-auto p-6 space-y-6 bg-slate-50 dark:bg-slate-900/50"
                             >
@@ -564,8 +544,8 @@ export default function AdminSupportPage() {
                                 ) : (
                                     <>
                                         {chatHistory.map((item) => (
-                                            <div 
-                                                key={item.id} 
+                                            <div
+                                                key={item.id}
                                                 className={`flex ${item.isAdmin ? 'justify-end' : 'justify-start'} animate-in fade-in slide-in-from-bottom-2 duration-300`}
                                             >
                                                 <div className={`max-w-[70%] flex flex-col ${item.isAdmin ? 'items-end' : 'items-start'}`}>
@@ -588,15 +568,14 @@ export default function AdminSupportPage() {
                                                             </>
                                                         )}
                                                     </div>
-                                                    
-                                                    <div className={`p-4 rounded-2xl text-sm shadow-sm relative ${
-                                                        item.isAdmin 
-                                                            ? 'bg-primary text-white rounded-tr-none' 
+
+                                                    <div className={`p-4 rounded-2xl text-sm shadow-sm relative ${item.isAdmin
+                                                            ? 'bg-primary text-white rounded-tr-none'
                                                             : 'bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 rounded-tl-none border border-slate-100 dark:border-slate-700'
-                                                    }`}>
+                                                        }`}>
                                                         {item.title && <p className="font-bold mb-1 text-xs opacity-90">{item.title}</p>}
                                                         <p className="whitespace-pre-wrap">{item.message}</p>
-                                                        
+
                                                         {item.isAdmin && item.type === 'MESSAGE' && (
                                                             <div className="flex justify-end mt-1 -mr-1">
                                                                 {item.isRead ? (
@@ -607,7 +586,7 @@ export default function AdminSupportPage() {
                                                             </div>
                                                         )}
                                                     </div>
-                                                    
+
                                                     <span className="text-[9px] text-slate-400 mt-1 px-1">
                                                         {format(new Date(item.createdAt), 'MMM d, h:mm a')}
                                                     </span>
@@ -632,8 +611,8 @@ export default function AdminSupportPage() {
                                             </div>
                                         )}
                                     </>
-                            )}
-                        </div>
+                                )}
+                            </div>
 
                             {/* Reply Input */}
                             <div className="p-4 bg-white dark:bg-slate-800 border-t border-slate-200 dark:border-slate-700 shrink-0 relative">
@@ -643,7 +622,7 @@ export default function AdminSupportPage() {
                                             <h4 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
                                                 <Book size={16} className="text-primary" /> Response Templates
                                             </h4>
-                                            <button 
+                                            <button
                                                 onClick={() => setShowTemplates(false)}
                                                 className="text-xs text-slate-500 hover:text-slate-700"
                                             >
@@ -688,9 +667,8 @@ export default function AdminSupportPage() {
                                         <button
                                             type="button"
                                             onClick={() => setShowTemplates(!showTemplates)}
-                                            className={`absolute right-3 top-3 p-1 rounded-lg transition-all ${
-                                                showTemplates ? 'text-primary bg-primary/10' : 'text-slate-400 hover:text-primary'
-                                            }`}
+                                            className={`absolute right-3 top-3 p-1 rounded-lg transition-all ${showTemplates ? 'text-primary bg-primary/10' : 'text-slate-400 hover:text-primary'
+                                                }`}
                                             title="Use Template"
                                         >
                                             <Book size={18} />

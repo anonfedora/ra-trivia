@@ -4,8 +4,8 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
-import { apiJson } from '../../lib/api';
 import { ThemeToggle } from '../../components/ThemeToggle';
+import { apiFetch } from '../../lib/api';
 import PasswordInput from '../../components/PasswordInput';
 import PasswordStrength, { getPasswordStrength } from '../../components/PasswordStrength';
 import UserTypeSelector, { UserType } from '../../components/UserTypeSelector';
@@ -30,26 +30,24 @@ export default function RegisterPage() {
         setSuccess('');
         setIsLoading(true);
 
-        // Validate user type selection
-        if (!userType) {
-            setError('Please select an examination type');
-            setIsLoading(false);
-            return;
-        }
+        try {
+            const res = await apiFetch('auth/register', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email, name, password, church, association, userType })
+            });
 
-        const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
-        const result = await apiJson<{ user: any; message?: string; isUnverified?: boolean }>(`${apiUrl}/auth/register`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ email, name, password, church, association, userType })
-        });
+            const data = await res.json();
 
-        if (result.ok && (result.data?.user || result.data?.isUnverified)) {
-            // Redirect to OTP verification page
-            router.push(`/verify-otp?email=${encodeURIComponent(email)}`);
-            return;
-        } else {
-            setError('error' in result ? result.error : 'Registration failed');
+            if (res.ok && (data?.user || data?.isUnverified)) {
+                // Redirect to OTP verification page
+                router.push(`/verify-otp?email=${encodeURIComponent(email)}`);
+                return;
+            } else {
+                setError(data.message || 'Registration failed');
+            }
+        } catch (err) {
+            setError('Registration failed');
         }
 
         setIsLoading(false);

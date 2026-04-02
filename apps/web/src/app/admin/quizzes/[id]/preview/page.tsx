@@ -4,6 +4,8 @@ import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft, BookOpen, Clock, ListChecks } from 'lucide-react';
+import { apiFetch } from '../../../../../lib/api';
+import { getAccessToken, getUser } from '../../../../../lib/auth';
 
 interface PreviewQuestion {
     id: string;
@@ -37,25 +39,18 @@ export default function AdminQuizPreviewPage() {
     const [questionTypeStats, setQuestionTypeStats] = useState<any>(null);
 
     useEffect(() => {
-        const token = localStorage.getItem('token');
-        const userRaw = localStorage.getItem('user');
-        const user = userRaw ? JSON.parse(userRaw) : null;
+        const user = getUser();
 
-        if (!token || !user || (user.role !== 'ADMIN' && user.role !== 'SUPER_ADMIN')) {
+        if (!user || (user.role !== 'ADMIN' && user.role !== 'SUPER_ADMIN')) {
             router.push('/login');
             return;
         }
 
         const fetchPreview = async () => {
-            const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
             try {
                 const [quizRes, statsRes] = await Promise.all([
-                    fetch(`${apiUrl}/quizzes/${quizId}/preview`, {
-                        headers: { 'Authorization': `Bearer ${token}` }
-                    }),
-                    fetch(`${apiUrl}/questions/stats/${quizId}`, {
-                        headers: { 'Authorization': `Bearer ${token}` }
-                    })
+                    apiFetch(`quizzes/${quizId}/preview`),
+                    apiFetch(`questions/stats/${quizId}`)
                 ]);
 
                 if (!quizRes.ok) {

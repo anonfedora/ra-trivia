@@ -8,6 +8,8 @@ import { BookOpen, Clock, PlayCircle, LogOut, Calendar, Repeat, User, CalendarCl
 import { ThemeToggle, SupportButton } from '../../components';
 import NotificationBell from '../../components/NotificationBell';
 import { useToast } from '../../contexts/ToastContext';
+import { getUser, isAuthenticated, logout } from '../../lib/auth';
+import { apiFetch } from '../../lib/api';
 
 interface Quiz {
     id: string;
@@ -72,15 +74,16 @@ export default function DashboardPage() {
     };
 
     useEffect(() => {
-        const storedUser = localStorage.getItem('user');
-        const token = localStorage.getItem('token');
-
-        if (!storedUser || !token) {
+        if (!isAuthenticated()) {
             router.push('/login');
             return;
         }
 
-        const userData = JSON.parse(storedUser);
+        const userData = getUser();
+        if (!userData) {
+            router.push('/login');
+            return;
+        }
 
         // Redirect admins and super admins to admin dashboard
         if (userData.role === 'ADMIN' || userData.role === 'SUPER_ADMIN') {
@@ -91,38 +94,35 @@ export default function DashboardPage() {
         setUser(userData);
 
         const fetchData = async () => {
-            const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
             const now = new Date();
             try {
-                // Fetch all quizzes (including upcoming) and sessions in parallel
+                // Use apiFetch for automatic token handling and refresh
                 const [quizRes, sessionRes] = await Promise.all([
-                    fetch(`${apiUrl}/quizzes`, {
-                        headers: { 'Authorization': `Bearer ${token}` }
-                    }),
-                    fetch(`${apiUrl}/quiz/my-sessions`, {
-                        headers: { 'Authorization': `Bearer ${token}` }
-                    })
+                    apiFetch('quizzes'),
+                    apiFetch('quiz/my-sessions')
                 ]);
 
                 if (quizRes.ok && sessionRes.ok) {
-                    const quizzesData: Quiz[] = await quizRes.json();
-                    const sessionsData: Session[] = await sessionRes.json();
+                    const [quizzesData, sessionsData] = await Promise.all([
+                        quizRes.json(),
+                        sessionRes.json()
+                    ]);
 
                     // Count completed attempts for each quiz
-                    const withAttempts = quizzesData.map((quiz) => ({
+                    const withAttempts = quizzesData.map((quiz: any) => ({
                         ...quiz,
                         completedAttempts: sessionsData.filter(
-                            (s) => s.quiz.id === quiz.id && s.endTime !== null
+                            (s: any) => s.quiz.id === quiz.id && s.endTime !== null
                         ).length,
                     }));
 
                     // Active: isActive=true AND (no startDate OR startDate <= now)
                     const active = withAttempts.filter(
-                        (q) => q.isActive && (!q.startDate || new Date(q.startDate) <= now)
+                        (q: any) => q.isActive && (!q.startDate || new Date(q.startDate) <= now)
                     );
                     // Upcoming: has a future startDate (regardless of isActive)
                     const upcoming = withAttempts.filter(
-                        (q) => q.startDate && new Date(q.startDate) > now
+                        (q: any) => q.startDate && new Date(q.startDate) > now
                     );
 
                     setQuizzes(active);
@@ -144,9 +144,8 @@ export default function DashboardPage() {
         fetchData();
     }, [router, toast]);
 
-    const handleLogout = () => {
-        localStorage.removeItem('token');
-        localStorage.removeItem('user');
+    const handleLogout = async () => {
+        await logout();
         router.push('/login');
     };
 

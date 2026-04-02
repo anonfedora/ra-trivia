@@ -7,6 +7,8 @@ import { useParams } from 'next/navigation';
 import { ThemeToggle } from '../../../../components/ThemeToggle';
 import NotificationBell from '../../../../components/NotificationBell';
 import { useToast } from '../../../../contexts/ToastContext';
+import { apiFetch } from '../../../../lib/api';
+import { getAccessToken } from '../../../../lib/auth';
 
 interface Session {
     id: string;
@@ -56,11 +58,8 @@ export default function CandidateDetailPage() {
 
     useEffect(() => {
         const fetchCandidate = async () => {
-            const token = localStorage.getItem('token');
             try {
-                const res = await fetch(`${apiUrl}/admin/candidates/${candidateId}`, {
-                    headers: { Authorization: `Bearer ${token}` },
-                });
+                const res = await apiFetch(`admin/candidates/${candidateId}`);
                 if (res.ok) {
                     setCandidate(await res.json());
                 } else {
@@ -73,7 +72,7 @@ export default function CandidateDetailPage() {
             }
         };
         if (candidateId) fetchCandidate();
-    }, [apiUrl, candidateId, toast]);
+    }, [candidateId, toast]);
 
     if (isLoading) {
         return (

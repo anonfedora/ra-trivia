@@ -6,6 +6,8 @@ import Link from 'next/link';
 import { User, Mail, Church, Shield, Calendar, ArrowLeft, Save, AlertCircle } from 'lucide-react';
 import { ThemeToggle } from '../../components/ThemeToggle';
 import UserTypeSelector, { UserType } from '../../components/UserTypeSelector';
+import { getUser, getAccessToken, updateUser, updateAccessToken, updateRefreshToken } from '../../lib/auth';
+import { apiFetch } from '../../lib/api';
 
 interface UserProfile {
     id: string;
@@ -35,8 +37,8 @@ export default function ProfilePage() {
     const router = useRouter();
 
     useEffect(() => {
-        const storedUser = localStorage.getItem('user');
-        const token = localStorage.getItem('token');
+        const storedUser = getUser();
+        const token = getAccessToken();
 
         if (!storedUser || !token) {
             router.push('/login');
@@ -44,11 +46,8 @@ export default function ProfilePage() {
         }
 
         const fetchProfile = async () => {
-            const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
             try {
-                const response = await fetch(`${apiUrl}/auth/profile`, {
-                    headers: { 'Authorization': `Bearer ${token}` }
-                });
+                const response = await apiFetch('auth/profile');
 
                 if (response.ok) {
                     const data = await response.json();
@@ -59,10 +58,6 @@ export default function ProfilePage() {
                         association: data.user.association || '',
                         userType: data.user.userType
                     });
-                } else if (response.status === 401) {
-                    localStorage.removeItem('token');
-                    localStorage.removeItem('user');
-                    router.push('/login');
                 } else {
                     setError('Failed to load profile');
                 }
@@ -84,15 +79,14 @@ export default function ProfilePage() {
         setError(null);
         setSuccess(null);
 
-        const token = localStorage.getItem('token');
+        const token = getAccessToken();
         const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
 
         try {
-            const response = await fetch(`${apiUrl}/auth/profile`, {
+            const response = await apiFetch('auth/profile', {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
                 },
                 body: JSON.stringify(formData)
             });
@@ -103,12 +97,15 @@ export default function ProfilePage() {
                 setUser(data.user);
                 setSuccess('Profile updated successfully!');
                 
-                // Update localStorage with new user data
-                localStorage.setItem('user', JSON.stringify(data.user));
+                // Update utilities with new data
+                updateUser(data.user);
                 
-                // If a new token was provided (userType changed), update it
-                if (data.token) {
-                    localStorage.setItem('token', data.token);
+                // If new tokens were provided (userType changed), update them
+                if (data.accessToken) {
+                    updateAccessToken(data.accessToken);
+                }
+                if (data.refreshToken) {
+                    updateRefreshToken(data.refreshToken);
                 }
             } else {
                 setError(data.message || 'Failed to update profile');

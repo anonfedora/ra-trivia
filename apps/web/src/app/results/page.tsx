@@ -4,6 +4,7 @@ import { useEffect, useState, Suspense, useCallback } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { CheckCircle2, XCircle, Home, Award, BookOpen, TrendingUp } from 'lucide-react';
+import { apiFetch } from '@/lib/api';
 
 interface QuestionBreakdown {
     questionId: string;
@@ -33,12 +34,8 @@ function ResultsContent() {
 
     const fetchSession = useCallback(async () => {
         if (!sessionId) { setIsLoading(false); return; }
-        const token = localStorage.getItem('token');
-        const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
         try {
-            const res = await fetch(`${apiUrl}/quiz/session/${sessionId}`, {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
+            const res = await apiFetch(`quiz/session/${sessionId}`);
             if (res.status === 423) {
                 const data = await res.json();
                 setLockedAt(data.releaseAt);

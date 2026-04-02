@@ -4,7 +4,8 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
-import { apiJson } from '../../lib/api';
+import { apiFetch } from '../../lib/api';
+import { setAuthTokens } from '../../lib/auth';
 import { ThemeToggle } from '../../components/ThemeToggle';
 import PasswordInput from '../../components/PasswordInput';
 
@@ -28,26 +29,33 @@ export default function LoginPage() {
         setError('');
         setIsLoading(true);
 
-        const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
-        const result = await apiJson<{ token: string; user: any; message?: string }>(`${apiUrl}/auth/login`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ email, password })
-        });
+        try {
+            const res = await apiFetch('auth/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email, password })
+            });
 
-        if (result.ok) {
-            localStorage.setItem('token', result.data.token);
-            localStorage.setItem('user', JSON.stringify(result.data.user));
-            router.push(result.data.user.role === 'ADMIN' ? '/admin/dashboard' : '/dashboard');
-        } else {
-            // Handle unverified user redirect
-            const resultData = (result as any).data;
-            if (resultData?.isUnverified) {
-                router.push(`/verify-otp?email=${encodeURIComponent(resultData.email)}`);
-                return;
+            const data = await res.json();
+
+            if (res.ok) {
+                setAuthTokens({
+                    accessToken: data.accessToken,
+                    refreshToken: data.refreshToken
+                }, data.user);
+                router.push(data.user.role === 'ADMIN' ? '/admin/dashboard' : '/dashboard');
+            } else {
+                // Handle unverified user redirect
+                if (data?.isUnverified) {
+                    router.push(`/verify-otp?email=${encodeURIComponent(data.email)}`);
+                    return;
+                }
+
+                setError(data?.error || 'Login failed');
+                setIsLoading(false);
             }
-
-            setError(('error' in result && result.error) ? result.error : 'Login failed');
+        } catch (err) {
+            setError('Login failed');
             setIsLoading(false);
         }
     };
