@@ -5,6 +5,8 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { BarChart3, Users, TrendingUp, Activity, Eye, Download, ArrowLeft } from 'lucide-react';
 import { ThemeToggle } from '../../../components/ThemeToggle';
+import { apiFetch } from '../../../lib/api';
+import { getAccessToken, getUser } from '../../../lib/auth';
 
 interface QuizAnalytics {
     id: string;
@@ -29,28 +31,22 @@ export default function AnalyticsPage() {
 
     useEffect(() => {
         const fetchData = async () => {
-            const token = localStorage.getItem('token');
-            const user = localStorage.getItem('user');
+            const user = getUser();
 
-            if (!token || !user) {
+            if (!user) {
                 router.push('/login');
                 return;
             }
 
-            const userData = JSON.parse(user);
-            if (userData.role !== 'ADMIN' && userData.role !== 'SUPER_ADMIN') {
+            if (user.role !== 'ADMIN' && user.role !== 'SUPER_ADMIN') {
                 router.push('/dashboard');
                 return;
             }
 
             try {
                 const [analyticsRes, statsRes] = await Promise.all([
-                    fetch(`${apiUrl}/admin/analytics`, {
-                        headers: { 'Authorization': `Bearer ${token}` }
-                    }),
-                    fetch(`${apiUrl}/admin/global-stats`, {
-                        headers: { 'Authorization': `Bearer ${token}` }
-                    })
+                    apiFetch('admin/analytics'),
+                    apiFetch('admin/global-stats')
                 ]);
 
                 if (analyticsRes.ok && statsRes.ok) {
@@ -67,18 +63,15 @@ export default function AnalyticsPage() {
         };
 
         fetchData();
-    }, [apiUrl, router]);
+    }, [router]);
 
     const handleViewDetails = (quizTitle: string) => {
         router.push(`/admin/results?q=${encodeURIComponent(quizTitle)}`);
     };
 
     const handleExport = async (quizId: string) => {
-        const token = localStorage.getItem('token');
         try {
-            const res = await fetch(`${apiUrl}/admin/export/${quizId}`, {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
+            const res = await apiFetch(`admin/export/${quizId}`);
             if (res.ok) {
                 const blob = await res.blob();
                 const url = window.URL.createObjectURL(blob);

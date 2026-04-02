@@ -1,40 +1,178 @@
-export type ApiOk<T> = { ok: true; data: T; status: number };
-export type ApiErr = { ok: false; error: string; status: number; data?: any };
-export type ApiResult<T> = ApiOk<T> | ApiErr;
+import axios, { AxiosRequestConfig, AxiosError, AxiosResponse, InternalAxiosRequestConfig } from 'axios';
+import { getAccessToken, getRefreshToken, updateAccessToken, updateRefreshToken, clearAuth } from './auth';
 
-async function safeReadText(res: Response): Promise<string> {
-    try {
-        return await res.text();
-    } catch {
-        return '';
-    }
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
+
+/**
+ * Global Axios Instance
+ */
+export const axiosInstance = axios.create({
+  baseURL: API_URL,
+  headers: {
+    'Content-Type': 'application/json',
+  },
+});
+
+let isRefreshing = false;
+let refreshSubscribers: ((token: string) => void)[] = [];
+
+/**
+ * Process all subscribers after token update
+ */
+function onRefreshed(token: string) {
+  refreshSubscribers.map((cb) => cb(token));
 }
 
-export async function apiJson<T>(input: RequestInfo | URL, init?: RequestInit): Promise<ApiResult<T>> {
-    try {
-        const res = await fetch(input, init);
-        const status = res.status;
+/**
+ * Register a listener for token refresh events
+ */
+function addRefreshSubscriber(cb: (token: string) => void) {
+  refreshSubscribers.push(cb);
+}
 
-        // Fire a global event so ClientProviders can redirect to login
-        if (status === 401) {
-            if (typeof window !== 'undefined') {
-                window.dispatchEvent(new CustomEvent('auth:expired'));
+/**
+ * Interceptor: Add Authorization header to every request
+ */
+axiosInstance.interceptors.request.use(
+  (config: InternalAxiosRequestConfig) => {
+    const token = getAccessToken();
+    if (token && config.headers) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+  },
+  (error: AxiosError) => {
+    return Promise.reject(error);
+  }
+);
+
+/**
+ * Interceptor: Handle 401 errors and attempt Token Refresh
+ */
+axiosInstance.interceptors.response.use(
+  (response: AxiosResponse) => response,
+  async (error: AxiosError) => {
+    const originalRequest = error.config as AxiosRequestConfig & { _retry?: boolean };
+
+    // If 401 Unauthorized, specifically from an authenticated endpoint
+    if (error.response?.status === 401 && !originalRequest._retry) {
+      // If we are already refreshing, queue this request
+      if (isRefreshing) {
+        return new Promise((resolve) => {
+          addRefreshSubscriber((token: string) => {
+            if (originalRequest.headers) {
+                originalRequest.headers.Authorization = `Bearer ${token}`;
             }
+            resolve(axiosInstance(originalRequest));
+          });
+        });
+      }
+
+      originalRequest._retry = true;
+      isRefreshing = true;
+
+      const refreshToken = getRefreshToken();
+      if (!refreshToken) {
+        isRefreshing = false;
+        clearAuth();
+        if (typeof window !== 'undefined') {
+            window.location.href = '/login';
+        }
+        return Promise.reject(error);
+      }
+
+      try {
+        const response = await axios.post(`${API_URL}/auth/refresh-token`, { 
+            refreshToken 
+        });
+
+        const { accessToken, refreshToken: newRefreshToken } = response.data;
+        
+        // Update local store
+        updateAccessToken(accessToken);
+        if (newRefreshToken) {
+            updateRefreshToken(newRefreshToken);
         }
 
-        const raw = await safeReadText(res);
-        const parsed = raw ? (() => { try { return JSON.parse(raw); } catch { return null; } })() : null;
+        isRefreshing = false;
+        onRefreshed(accessToken);
+        refreshSubscribers = [];
 
-        if (res.ok) {
-            return { ok: true, data: (parsed as T) ?? (undefined as unknown as T), status };
+        // Retry the original request
+        if (originalRequest.headers) {
+            originalRequest.headers.Authorization = `Bearer ${accessToken}`;
         }
+        return axiosInstance(originalRequest);
+      } catch (refreshError) {
+        isRefreshing = false;
+        clearAuth();
+        if (typeof window !== 'undefined') {
+            window.location.href = '/login';
+        }
+        return Promise.reject(refreshError);
+      }
+    }
 
-        const msg = (parsed && typeof parsed === 'object' && 'message' in parsed && typeof (parsed as any).message === 'string')
-            ? (parsed as any).message
-            : (raw || `Request failed (${status})`);
+    return Promise.reject(error);
+  }
+);
 
-        return { ok: false, error: msg, status, data: parsed };
-    } catch {
-        return { ok: false, error: 'Network error. Please check your connection and try again.', status: 0 };
+/**
+ * Unified Fetch replacement
+ * Routes through Axios instance to handle:
+ * - Base URL prefixing
+ * - Global headers
+ * - Auto token refresh
+ * - Standardized error handling
+ */
+export async function apiFetch(
+    input: string | RequestInfo,
+    init?: RequestInit
+): Promise<Response> {
+    const url = typeof input === 'string' ? input : input.url;
+    const method = init?.method || 'GET';
+    const body = init?.body ? (typeof init.body === 'string' ? JSON.parse(init.body) : init.body) : undefined;
+    
+    // Extract headers (except Authorization as we add it globally)
+    const customHeaders: any = {};
+    if (init?.headers) {
+        new Headers(init.headers).forEach((value, key) => {
+            if (key.toLowerCase() !== 'authorization') {
+                customHeaders[key] = value;
+            }
+        });
+    }
+
+    try {
+        const response = await axiosInstance({
+            url,
+            method,
+            data: body,
+            headers: customHeaders,
+        });
+
+        // Wrap Axios response to look like Fetch response
+        return {
+            ok: true,
+            status: response.status,
+            statusText: response.statusText,
+            json: async () => response.data,
+            text: async () => JSON.stringify(response.data),
+            blob: async () => new Blob([JSON.stringify(response.data)]),
+            headers: new Headers(response.headers as any),
+            clone: () => { throw new Error('Clone not implemented for apiFetch'); }
+        } as unknown as Response;
+    } catch (error: any) {
+        const status = error.response?.status || 500;
+        const data = error.response?.data || { message: error.message };
+
+        return {
+            ok: false,
+            status,
+            statusText: error.message,
+            json: async () => data,
+            text: async () => JSON.stringify(data),
+            headers: new Headers(error.response?.headers as any),
+        } as unknown as Response;
     }
 }

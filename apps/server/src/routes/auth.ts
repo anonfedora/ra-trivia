@@ -1,12 +1,12 @@
 import { Router, Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
-import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
 import { prisma } from 'database';
 import { body } from 'express-validator';
 import { handleValidationErrors } from '../middlewares/errorHandler';
 import { sendVerificationEmail, generateOTP, sendPasswordResetEmail } from '../services/email';
 import { authenticate, AuthRequest } from '../middlewares/auth';
+import { generateTokenPair, verifyRefreshToken, blacklistToken, rotateRefreshToken, revokeAllRefreshTokens, generateAccessToken } from '../services/tokenService';
 import {
     passwordValidation,
     emailValidation,
@@ -15,7 +15,6 @@ import {
 import { emitNotification } from '../services/socketService';
 
 const router = Router();
-const JWT_SECRET = process.env.JWT_SECRET!; // Will be validated on startup
 const WEB_URL = process.env.WEB_URL || 'http://localhost:3000';
 
 // Registration validation rules
@@ -209,7 +208,8 @@ router.post('/resend-verification-link', [
         return res.json({ message: 'If an account exists for this email, a verification email has been sent.' });
     } catch (error) {
         console.error('Resend verification error:', error);
-        return res.status(500).json({ message: 'Internal server error' });
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        return res.status(500).json({ message: 'Internal server error', error: errorMessage });
     }
 });
 
@@ -294,9 +294,16 @@ router.post('/login', loginValidation, handleValidationErrors, async (req: Reque
             });
         }
 
-        const token = jwt.sign({ userId: user.id, role: user.role, userType: user.userType }, JWT_SECRET, { expiresIn: '24h' });
+        // Generate token pair (access + refresh)
+        const tokens = await generateTokenPair({ 
+            userId: user.id, 
+            role: user.role, 
+            userType: user.userType 
+        });
+        
         res.json({
-            token,
+            accessToken: tokens.accessToken,
+            refreshToken: tokens.refreshToken,
             user: {
                 id: user.id,
                 name: user.name,
@@ -308,7 +315,8 @@ router.post('/login', loginValidation, handleValidationErrors, async (req: Reque
         });
     } catch (error) {
         console.error('[AUTH] Login error:', error);
-        res.status(500).json({ message: 'Internal server error' });
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        res.status(500).json({ message: 'Internal server error', error: errorMessage });
     }
 });
 
@@ -372,11 +380,17 @@ router.post('/verify-otp', [
             }
         }
 
-        const token = jwt.sign({ userId: user.id, role: user.role, userType: user.userType }, JWT_SECRET, { expiresIn: '24h' });
+        // Generate token pair for verified user
+        const tokens = await generateTokenPair({ 
+            userId: user.id, 
+            role: user.role, 
+            userType: user.userType 
+        });
 
         res.json({
             message: 'Email verified successfully!',
-            token,
+            accessToken: tokens.accessToken,
+            refreshToken: tokens.refreshToken,
             user: {
                 id: user.id,
                 name: user.name,
@@ -388,19 +402,100 @@ router.post('/verify-otp', [
         });
     } catch (error) {
         console.error('[AUTH] OTP verification error:', error);
-        res.status(500).json({ message: 'Internal server error' });
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        res.status(500).json({ message: 'Internal server error', error: errorMessage });
     }
 });
 
 // Logout endpoint
 router.post('/logout', authenticate, async (req: AuthRequest, res: Response) => {
     try {
-        // In a real app, you might want to blacklist the token
-        // For now, we'll just return a success message
+        const token = req.headers.authorization?.split(' ')[1];
+        const { refreshToken } = req.body;
+
+        // Blacklist access token
+        if (token) {
+            await blacklistToken(token);
+        }
+
+        // Revoke refresh token if provided
+        if (refreshToken) {
+            await prisma.refreshToken.delete({
+                where: { 
+                    token: refreshToken,
+                    userId: req.user!.userId 
+                }
+            }).catch(() => {
+                // Silently fail if token already gone
+                console.log(`[AUTH] Refresh token already removed or invalid during logout`);
+            });
+        }
+
         res.json({ message: 'Logged out successfully' });
     } catch (error) {
         console.error('[AUTH] Logout error:', error);
-        res.status(500).json({ message: 'Internal server error' });
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        res.status(500).json({ message: 'Internal server error', error: errorMessage });
+    }
+});
+
+// Refresh token endpoint
+router.post('/refresh-token', [
+    body('refreshToken').notEmpty().withMessage('Refresh token is required')
+], handleValidationErrors, async (req: Request, res: Response) => {
+    try {
+        const { refreshToken } = req.body;
+
+        // 1. Verify and Rotate the refresh token
+        // rotateRefreshToken handles verification, deletion of old, and creation of new
+        const newRefreshToken = await rotateRefreshToken(refreshToken);
+
+        // 2. Get user info to generate new access token
+        // We know the rotation was successful, let's get the user ID from the new token
+        // (Or we can modify rotateRefreshToken to return info, but for now we'll just re-check or use separate logic)
+        const storedToken = await prisma.refreshToken.findUnique({
+            where: { token: newRefreshToken },
+            include: { user: true }
+        });
+
+        if (!storedToken) {
+            throw new Error('Rotation succeeded but token missing');
+        }
+
+        const accessToken = generateAccessToken({ 
+            userId: storedToken.userId, 
+            role: storedToken.user.role, 
+            userType: storedToken.user.userType 
+        });
+
+        res.json({
+            accessToken,
+            refreshToken: newRefreshToken
+        });
+    } catch (error: any) {
+        console.error('[AUTH] Refresh token error:', error.message);
+        res.status(401).json({ message: error.message || 'Invalid or expired refresh token' });
+    }
+});
+
+// Logout from all devices
+router.post('/logout-all', authenticate, async (req: AuthRequest, res: Response) => {
+    try {
+        const token = req.headers.authorization?.split(' ')[1];
+
+        // Blacklist current access token
+        if (token) {
+            await blacklistToken(token);
+        }
+
+        // Revoke all refresh tokens for this user
+        await revokeAllRefreshTokens(req.user!.userId);
+
+        res.json({ message: 'Logged out from all devices successfully' });
+    } catch (error) {
+        console.error('[AUTH] Logout all error:', error);
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        res.status(500).json({ message: 'Internal server error', error: errorMessage });
     }
 });
 
@@ -444,7 +539,8 @@ router.post('/resend-verification', [
         });
     } catch (error) {
         console.error('[AUTH] Resend OTP error:', error);
-        res.status(500).json({ message: 'Internal server error' });
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        res.status(500).json({ message: 'Internal server error', error: errorMessage });
     }
 });
 
@@ -473,7 +569,8 @@ router.get('/profile', authenticate, async (req: AuthRequest, res: Response) => 
         res.json({ user });
     } catch (error) {
         console.error('[AUTH] Get profile error:', error);
-        res.status(500).json({ message: 'Internal server error' });
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        res.status(500).json({ message: 'Internal server error', error: errorMessage });
     }
 });
 
@@ -551,24 +648,28 @@ router.put('/profile', authenticate, [
         //     });
         // }
 
-        // If userType was updated, generate a new JWT token with the updated userType
-        let newToken = null;
+        // If userType was updated, generate new token pair with the updated userType
+        let newTokens = null;
         if (userType !== undefined) {
-            newToken = jwt.sign({ 
+            newTokens = await generateTokenPair({ 
                 userId: updatedUser.id, 
                 role: updatedUser.role, 
                 userType: updatedUser.userType 
-            }, JWT_SECRET, { expiresIn: '24h' });
+            });
         }
 
         res.json({
             message: 'Profile updated successfully',
             user: updatedUser,
-            ...(newToken && { token: newToken })
+            ...(newTokens && { 
+                accessToken: newTokens.accessToken,
+                refreshToken: newTokens.refreshToken 
+            })
         });
     } catch (error) {
         console.error('[AUTH] Update profile error:', error);
-        res.status(500).json({ message: 'Internal server error' });
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        res.status(500).json({ message: 'Internal server error', error: errorMessage });
     }
 });
 
@@ -606,7 +707,8 @@ router.post('/forgot-password', [
         return res.json({ message: genericMsg });
     } catch (error) {
         console.error('[AUTH] Forgot password error:', error);
-        return res.status(500).json({ message: 'Internal server error' });
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        return res.status(500).json({ message: 'Internal server error', error: errorMessage });
     }
 });
 
@@ -644,7 +746,8 @@ router.post('/reset-password', [
         return res.json({ message: 'Password reset successfully. You can now log in.' });
     } catch (error) {
         console.error('[AUTH] Reset password error:', error);
-        return res.status(500).json({ message: 'Internal server error' });
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        return res.status(500).json({ message: 'Internal server error', error: errorMessage });
     }
 });
 

@@ -4,20 +4,20 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { ArrowLeft, Mail } from 'lucide-react';
 import { ThemeToggle } from '../../components/ThemeToggle';
+import { apiFetch } from '../../lib/api';
 
 export default function ForgotPasswordPage() {
     const [email, setEmail] = useState('');
     const [submitted, setSubmitted] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState('');
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setError('');
         setIsLoading(true);
         try {
-            const res = await fetch(`${apiUrl}/auth/forgot-password`, {
+            const res = await apiFetch('auth/forgot-password', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ email })

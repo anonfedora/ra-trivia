@@ -6,6 +6,10 @@ import { Bell, Check, CheckCheck, Trash2, X } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import Link from 'next/link';
 import { io, Socket } from 'socket.io-client';
+import { useToast } from '../contexts/ToastContext';
+import { getAccessToken } from '../lib/auth';
+import { requestCoordinator, coordinatedFetch } from '../lib/requestCoordinator';
+import { apiFetch } from '../lib/api';
 
 interface Notification {
     id: string;
@@ -44,26 +48,26 @@ export default function NotificationBell() {
     }, []);
 
     const fetchNotifications = async () => {
-        const token = localStorage.getItem('token');
         try {
-            const res = await fetch(`${apiUrl}/notifications?pageSize=10`, {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-            if (res.ok) {
-                const data = await res.json();
-                setNotifications(data.notifications);
-                setUnreadCount(data.unreadCount);
-            }
+            const data = await coordinatedFetch<any>(
+                'notifications-header',
+                'notifications?pageSize=10'
+            );
+            setNotifications(data.notifications);
+            setUnreadCount(data.unreadCount);
         } catch (err) {
             console.error('Failed to fetch notifications', err);
         }
     };
 
     useEffect(() => {
-        fetchNotifications();
+        // Add small delay to prevent request burst on login
+        const timer = setTimeout(() => {
+            fetchNotifications();
+        }, 200);
 
         // Connect to Socket.IO for real-time notifications
-        const token = localStorage.getItem('token');
+        const token = getAccessToken();
         if (!token) return;
 
         const socketUrl = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api').replace('/api', '');
@@ -86,10 +90,10 @@ export default function NotificationBell() {
         });
 
         return () => {
+            clearTimeout(timer);
             socket.disconnect();
         };
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []);
+    }, [apiUrl]);
 
     // Close dropdown when clicking outside
     useEffect(() => {
@@ -136,11 +140,9 @@ export default function NotificationBell() {
     };
 
     const markAsRead = async (notificationId: string) => {
-        const token = localStorage.getItem('token');
         try {
-            const res = await fetch(`${apiUrl}/notifications/${notificationId}/read`, {
-                method: 'PATCH',
-                headers: { 'Authorization': `Bearer ${token}` }
+            const res = await apiFetch(`notifications/${notificationId}/read`, {
+                method: 'PATCH'
             });
             if (res.ok) {
                 fetchNotifications();
@@ -151,12 +153,10 @@ export default function NotificationBell() {
     };
 
     const markAllAsRead = async () => {
-        const token = localStorage.getItem('token');
         setIsLoading(true);
         try {
-            const res = await fetch(`${apiUrl}/notifications/mark-all-read`, {
-                method: 'POST',
-                headers: { 'Authorization': `Bearer ${token}` }
+            const res = await apiFetch('notifications/mark-all-read', {
+                method: 'POST'
             });
             if (res.ok) {
                 fetchNotifications();
@@ -169,11 +169,9 @@ export default function NotificationBell() {
     };
 
     const deleteNotification = async (notificationId: string) => {
-        const token = localStorage.getItem('token');
         try {
-            const res = await fetch(`${apiUrl}/notifications/${notificationId}`, {
-                method: 'DELETE',
-                headers: { 'Authorization': `Bearer ${token}` }
+            const res = await apiFetch(`notifications/${notificationId}`, {
+                method: 'DELETE'
             });
             if (res.ok) {
                 fetchNotifications();

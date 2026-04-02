@@ -6,6 +6,7 @@ import { CheckCircle2, XCircle } from 'lucide-react';
 import { ThemeToggle, SupportButton } from '../../../components';
 import { useToast } from '../../../contexts/ToastContext';
 import ConfirmModal from '../../../components/ConfirmModal';
+import { apiFetch } from '../../../lib/api';
 
 export const dynamic = 'force-dynamic';
 
@@ -34,125 +35,56 @@ export default function QuizPage() {
         setIsSubmitting(true);
 
         try {
-            const token = localStorage.getItem('token');
-            const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
-            
-            console.log('Submitting quiz:', { 
-                sessionId: session?.id, 
-                hasToken: !!token, 
-                apiUrl,
-                tokenPreview: token ? `${token.substring(0, 20)}...` : 'none'
-            });
-            
-            if (!token) {
-                toast('Authentication token not found. Please log in again.', 'error');
-                router.push('/login');
-                return;
-            }
-            
             if (!session?.id) {
                 toast('Session not found. Please restart the quiz.', 'error');
                 router.push('/dashboard');
                 return;
             }
             
-            const requestBody = { sessionId: session.id };
-            console.log('Request details:', {
-                url: `${apiUrl}/quiz/submit`,
+            const res = await apiFetch('quiz/submit', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token.substring(0, 20)}...`
                 },
-                body: requestBody
-            });
-            
-            const res = await fetch(`${apiUrl}/quiz/submit`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
-                },
-                body: JSON.stringify(requestBody),
-            });
-
-            console.log('Response received:', {
-                ok: res.ok,
-                status: res.status,
-                statusText: res.statusText,
-                headers: Object.fromEntries(res.headers.entries())
+                body: JSON.stringify({ sessionId: session.id }),
             });
 
             if (res.ok) {
-                const responseData = await res.json();
-                console.log('Submission successful:', responseData);
-                
                 // Clean up localStorage backup
                 if (session?.id) {
                     localStorage.removeItem(`quiz_backup_${session.id}`);
                 }
                 
-                const redirectUrl = `/results?sessionId=${session.id}`;
-                console.log('Redirecting to:', redirectUrl);
-                router.push(redirectUrl);
+                router.push(`/results?sessionId=${session.id}`);
             } else {
-                const data = await res.json().catch(() => ({ message: 'Unknown error occurred' }));
-                console.error('Submission failed:', { status: res.status, statusText: res.statusText, data });
-                toast(data.message || `Submission failed (${res.status}: ${res.statusText})`, 'error');
+                const data = await res.json();
+                toast(data.message || 'Submission failed', 'error');
                 setIsSubmitting(false);
             }
         } catch (err) {
             console.error('Submission error:', err);
-            toast(`An error occurred during submission: ${err instanceof Error ? err.message : 'Unknown error'}`, 'error');
+            toast('An error occurred during submission', 'error');
             setIsSubmitting(false);
         }
     }, [isSubmitting, session?.id, router, toast]);
 
     const fetchQuiz = useCallback(async () => {
-        const token = localStorage.getItem('token');
-        if (!token) {
-            router.push('/login');
-            return;
-        }
-
         try {
-            console.log('Starting quiz fetch for quizId:', quizId);
-            
             // Clear any existing backup to force fresh randomization
             const backupKeys = Object.keys(localStorage).filter(key => key.startsWith('quiz_backup_'));
             backupKeys.forEach(key => localStorage.removeItem(key));
 
-            // For development, we assume there's a quiz with ID 'default'
-            const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
-            console.log('Making request to:', `${apiUrl}/quiz/start`);
-            
-            const res = await fetch(`${apiUrl}/quiz/start`, {
+            const res = await apiFetch('quiz/start', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
                 },
                 body: JSON.stringify({ quizId }),
             });
 
-            console.log('Response status:', res.status);
             const data = await res.json();
-            console.log('Response data:', data);
             
             if (res.ok) {
-                console.log('Quiz data received:', {
-                    quizTitle: data.quiz?.title,
-                    questionCount: data.quiz?.questions?.length,
-                    hasSession: !!data.session,
-                    sessionId: data.session?.id
-                });
-                
-                // Check if questions have randomizedOptions
-                const questionsWithoutOptions = data.quiz.questions.filter((q: any) => !q.randomizedOptions || q.randomizedOptions.length === 0);
-                if (questionsWithoutOptions.length > 0) {
-                    console.error('Questions without randomizedOptions:', questionsWithoutOptions.map((q: any) => ({ id: q.id, text: q.text.substring(0, 50) })));
-                }
-                
                 setQuiz(data.quiz);
                 setSession(data.session);
 
@@ -164,28 +96,18 @@ export default function QuizPage() {
                 const elapsedSeconds = Math.floor((new Date().getTime() - new Date(data.session.startTime).getTime()) / 1000);
                 const calculatedTimeLeft = durationSeconds - elapsedSeconds;
                 
-                console.log('Timer initialization:', {
-                    durationSeconds,
-                    elapsedSeconds,
-                    calculatedTimeLeft
-                });
-                
-                // Only set timeLeft if there's actually time remaining, otherwise set to full duration
-                // Add a 5-second buffer to prevent edge cases
                 if (calculatedTimeLeft > 5) {
                     setTimeLeft(calculatedTimeLeft);
                 } else {
-                    console.log('Setting to full duration due to insufficient time');
                     setTimeLeft(durationSeconds);
                 }
             } else {
-                console.error('Quiz fetch failed:', data);
                 toast(`Failed to start quiz: ${data.message || 'Unknown error'}`, 'error');
                 router.push('/dashboard');
             }
         } catch (err) {
             console.error('Quiz fetch error:', err);
-            toast(`An error occurred while starting the quiz: ${err instanceof Error ? err.message : 'Unknown error'}`, 'error');
+            toast('An error occurred while starting the quiz', 'error');
             router.push('/dashboard');
         }
     }, [quizId, router, toast]);
@@ -378,13 +300,10 @@ export default function QuizPage() {
 
         // Auto-save to server
         try {
-            const token = localStorage.getItem('token');
-            const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
-            await fetch(`${apiUrl}/quiz/update-answer`, {
+            await apiFetch('quiz/update-answer', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
                 },
                 body: JSON.stringify({
                     sessionId: session.id,
@@ -522,7 +441,7 @@ export default function QuizPage() {
     }
 
     return (
-        <main className="min-h-screen bg-slate-50 dark:bg-slate-900 p-6 md:p-12 flex flex-col items-center transition-colors duration-200">
+        <main className="min-h-screen bg-slate-50 dark:bg-slate-900 p-6 md:p-12 pb-24 md:pb-32 flex flex-col items-center transition-colors duration-200">
             {/* Print/screenshot blackout — hides content in print media */}
             <style>{`@media print { body { visibility: hidden !important; } }`}</style>
 

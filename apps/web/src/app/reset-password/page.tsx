@@ -7,6 +7,7 @@ import { ArrowLeft, CheckCircle } from 'lucide-react';
 import { ThemeToggle } from '../../components/ThemeToggle';
 import PasswordInput from '../../components/PasswordInput';
 import PasswordStrength from '../../components/PasswordStrength';
+import { apiFetch } from '../../lib/api';
 
 function ResetPasswordForm() {
     const [password, setPassword] = useState('');
@@ -17,7 +18,6 @@ function ResetPasswordForm() {
     const [token, setToken] = useState('');
     const router = useRouter();
     const searchParams = useSearchParams();
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
 
     useEffect(() => {
         const t = searchParams?.get('token') || '';
@@ -38,7 +38,7 @@ function ResetPasswordForm() {
 
         setIsLoading(true);
         try {
-            const res = await fetch(`${apiUrl}/auth/reset-password`, {
+            const res = await apiFetch('auth/reset-password', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ token, password })

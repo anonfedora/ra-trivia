@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { Clock, AlertCircle, CheckCircle, Info, ArrowLeft, Play, Calendar, Repeat } from 'lucide-react';
+import { apiFetch } from '@/lib/api';
 
 interface Quiz {
     id: string;
@@ -29,23 +30,12 @@ export default function InstructionsPage() {
     const { toast } = useToast();
 
     useEffect(() => {
-        const token = localStorage.getItem('token');
-        if (!token) {
-            router.push('/login');
-            return;
-        }
-
         const fetchQuizDetails = async () => {
-            const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
             try {
                 // Fetch quiz details and user sessions
                 const [quizRes, sessionRes] = await Promise.all([
-                    fetch(`${apiUrl}/quizzes/${quizId}`, {
-                        headers: { 'Authorization': `Bearer ${token}` }
-                    }),
-                    fetch(`${apiUrl}/quiz/my-sessions`, {
-                        headers: { 'Authorization': `Bearer ${token}` }
-                    })
+                    apiFetch(`quizzes/${quizId}`),
+                    apiFetch('quiz/my-sessions')
                 ]);
 
                 if (quizRes.ok && sessionRes.ok) {

@@ -8,6 +8,8 @@ import { ThemeToggle } from '../../../components/ThemeToggle';
 import NotificationBell from '../../../components/NotificationBell';
 import { useToast } from '../../../contexts/ToastContext';
 import CandidateTable from '../../../components/CandidateTable';
+import { apiFetch } from '../../../lib/api';
+import { getAccessToken, getUser } from '../../../lib/auth';
 
 export default function CandidatesPage() {
     const router = useRouter();
@@ -22,15 +24,13 @@ export default function CandidatesPage() {
 
     // Redirect regular ADMIN to their scoped page
     useEffect(() => {
-        const userRaw = localStorage.getItem('user');
-        const user = userRaw ? JSON.parse(userRaw) : null;
+        const user = getUser();
         if (user?.role === 'ADMIN') {
             router.replace('/admin/my-exam-takers');
         }
     }, [router]);
 
     const fetchCandidates = useCallback(async (overridePage?: number) => {
-        const token = localStorage.getItem('token');
         const effectivePage = overridePage ?? page;
         try {
             const params = new URLSearchParams({
@@ -38,9 +38,7 @@ export default function CandidatesPage() {
                 pageSize: String(pageSize),
                 ...(searchTerm.trim() ? { q: searchTerm.trim() } : {}),
             });
-            const res = await fetch(`${apiUrl}/admin/candidates?${params}`, {
-                headers: { Authorization: `Bearer ${token}` },
-            });
+            const res = await apiFetch(`admin/candidates?${params}`);
             if (res.ok) {
                 const data = await res.json();
                 setCandidates(data.items);
@@ -55,7 +53,7 @@ export default function CandidatesPage() {
         } finally {
             setIsLoading(false);
         }
-    }, [apiUrl, page, pageSize, searchTerm, toast, router]);
+    }, [page, pageSize, searchTerm, toast, router]);
 
     useEffect(() => { fetchCandidates(); }, [fetchCandidates]);
 

@@ -4,6 +4,8 @@ import { useEffect, useState, useCallback } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft, PlayCircle, Clock } from 'lucide-react';
+import { apiFetch } from '../../../../lib/api';
+import { getAccessToken, getUser } from '../../../../lib/auth';
 
 interface Question {
     id: string;
@@ -25,7 +27,7 @@ export default function AdminTestQuizPage() {
     const params = useParams();
     const router = useRouter();
     const quizId = params?.id as string;
-    
+
     const [quiz, setQuiz] = useState<Quiz | null>(null);
     const [session, setSession] = useState<any>(null);
     const [currentIndex, setCurrentIndex] = useState(0);
@@ -36,13 +38,11 @@ export default function AdminTestQuizPage() {
     const handleSubmit = useCallback(async () => {
         if (!session) return;
 
-        const token = localStorage.getItem('token');
         try {
-            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api'}/quiz/submit`, {
+            const res = await apiFetch('quiz/submit', {
                 method: 'POST',
                 headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
+                    'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({
                     sessionId: session.id,
@@ -59,11 +59,9 @@ export default function AdminTestQuizPage() {
     }, [session, answers, router]);
 
     useEffect(() => {
-        const token = localStorage.getItem('token');
-        const userRaw = localStorage.getItem('user');
-        const user = userRaw ? JSON.parse(userRaw) : null;
+        const user = getUser();
 
-        if (!token || !user || (user.role !== 'ADMIN' && user.role !== 'SUPER_ADMIN')) {
+        if (!user || (user.role !== 'ADMIN' && user.role !== 'SUPER_ADMIN')) {
             router.push('/login');
             return;
         }
@@ -75,21 +73,19 @@ export default function AdminTestQuizPage() {
                 'This should only be used for testing purposes.\n\n' +
                 'Do you want to continue?'
             );
-            
+
             if (!confirmed) {
                 router.push('/admin/dashboard');
                 return;
             }
 
             try {
-                const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
                 console.log('[ADMIN_TEST] Creating test session for quiz:', quizId);
-                
-                const res = await fetch(`${apiUrl}/quiz/start`, {
+
+                const res = await apiFetch('quiz/start', {
                     method: 'POST',
                     headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${token}`
+                        'Content-Type': 'application/json'
                     },
                     body: JSON.stringify({ quizId })
                 });
@@ -119,7 +115,7 @@ export default function AdminTestQuizPage() {
 
         fetchQuiz();
     }, [quizId, router]);
-    
+
     if (!quizId) {
         return <div>Loading...</div>;
     }
@@ -135,13 +131,11 @@ export default function AdminTestQuizPage() {
         setAnswers(newAnswers);
 
         // Sync with server
-        const token = localStorage.getItem('token');
-        if (token && session) {
-            fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api'}/quiz/update-answer`, {
+        if (session) {
+            apiFetch('quiz/update-answer', {
                 method: 'POST',
                 headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
+                    'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({
                     sessionId: session.id,
@@ -190,7 +184,7 @@ export default function AdminTestQuizPage() {
                             <span className="text-yellow-800 dark:text-yellow-200 font-semibold text-sm">🧪 ADMIN TEST MODE</span>
                         </div>
                     </div>
-                    
+
                     <div className="flex items-center justify-between">
                         <h1 className="text-3xl font-bold text-slate-900 dark:text-slate-50">{quiz.title}</h1>
                         <div className="flex items-center gap-4">
@@ -203,10 +197,10 @@ export default function AdminTestQuizPage() {
                             </div>
                         </div>
                     </div>
-                    
+
                     {/* Progress Bar */}
                     <div className="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-2">
-                        <div 
+                        <div
                             className="bg-primary h-2 rounded-full transition-all duration-300"
                             style={{ width: `${progress}%` }}
                         />
@@ -218,17 +212,16 @@ export default function AdminTestQuizPage() {
                     <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-50 mb-6">
                         {currentQuestion.text}
                     </h2>
-                    
+
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         {['optionA', 'optionB', 'optionC', 'optionD'].map((option, index) => (
                             <button
                                 key={option}
                                 onClick={() => handleAnswerSelect(currentQuestion.id, currentQuestion[option as keyof Question] || '')}
-                                className={`p-4 rounded-xl border-2 text-left transition-all ${
-                                    answers[currentQuestion.id] === currentQuestion[option as keyof Question]
+                                className={`p-4 rounded-xl border-2 text-left transition-all ${answers[currentQuestion.id] === currentQuestion[option as keyof Question]
                                         ? 'border-primary bg-primary/10 text-primary font-semibold'
                                         : 'border-slate-300 dark:border-slate-600 hover:border-primary hover:bg-primary/5 text-slate-700 dark:text-slate-300'
-                                }`}
+                                    }`}
                             >
                                 <span className="font-medium">
                                     {String.fromCharCode(65 + index)}. {currentQuestion[option as keyof Question]}
@@ -243,7 +236,7 @@ export default function AdminTestQuizPage() {
                     <div className="text-sm text-slate-600 dark:text-slate-400">
                         Progress: {currentIndex + 1} / {quiz.questions.length}
                     </div>
-                    
+
                     {currentIndex === quiz.questions.length - 1 && (
                         <button
                             onClick={handleSubmit}

@@ -5,6 +5,9 @@ import { HelpCircle, Send, X, AlertCircle, MessageCircle, User, Bell, Check, Che
 import { useToast } from '../contexts/ToastContext';
 import { format } from 'date-fns';
 import { io, Socket } from 'socket.io-client';
+import { getAccessToken } from '../lib/auth';
+import { requestCoordinator, coordinatedFetch } from '../lib/requestCoordinator';
+import { apiFetch } from '../lib/api';
 
 interface SupportButtonProps {
     quizId?: string;
@@ -35,15 +38,11 @@ export default function SupportButton({ quizId }: SupportButtonProps) {
 
     const fetchUnreadCount = useCallback(async () => {
         try {
-            const token = localStorage.getItem('token');
-            const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
-            const res = await fetch(`${apiUrl}/support/unread-count`, {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-            if (res.ok) {
-                const data = await res.json();
-                setUnreadCount(data.unreadCount);
-            }
+            const data = await coordinatedFetch<any>(
+                'support-unread-count',
+                'support/unread-count'
+            );
+            setUnreadCount(data.unreadCount);
         } catch (err) {
             console.error('Failed to fetch unread count', err);
         }
@@ -52,14 +51,7 @@ export default function SupportButton({ quizId }: SupportButtonProps) {
     const fetchHistory = useCallback(async () => {
         setIsLoadingHistory(true);
         try {
-            const token = localStorage.getItem('token');
-            const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
-            
-            const res = await fetch(`${apiUrl}/support`, {
-                headers: {
-                    'Authorization': `Bearer ${token}`
-                }
-            });
+            const res = await apiFetch('support');
 
             if (res.ok) {
                 const data = await res.json();
@@ -83,13 +75,8 @@ export default function SupportButton({ quizId }: SupportButtonProps) {
 
     const markAsRead = useCallback(async () => {
         try {
-            const token = localStorage.getItem('token');
-            const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
-            await fetch(`${apiUrl}/support/read`, {
-                method: 'PATCH',
-                headers: {
-                    'Authorization': `Bearer ${token}`
-                }
+            await apiFetch('support/read', {
+                method: 'PATCH'
             });
             setUnreadCount(0);
         } catch (err) {
@@ -98,19 +85,26 @@ export default function SupportButton({ quizId }: SupportButtonProps) {
     }, []);
 
     useEffect(() => {
-        // Always fetch unread count on mount
-        fetchUnreadCount();
-        
+        // Add small delay to prevent request burst on login
+        const timer = setTimeout(() => {
+            fetchUnreadCount();
+        }, 300);
+
+        return () => clearTimeout(timer);
+    }, [fetchUnreadCount]);
+
+    useEffect(() => {
         if (isOpen) {
             fetchHistory();
 
             // Connect to Socket.IO for real-time replies
-            const token = localStorage.getItem('token');
+            const token = getAccessToken();
             if (token) {
                 const socketUrl = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api').replace('/api', '');
                 const socket = io(socketUrl, {
                     auth: { token },
                     transports: ['websocket', 'polling'],
+                    reconnectionAttempts: 5,
                 });
 
                 socket.on('support_reply', () => {
@@ -208,14 +202,10 @@ export default function SupportButton({ quizId }: SupportButtonProps) {
 
         setIsSubmitting(true);
         try {
-            const token = localStorage.getItem('token');
-            const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
-            
-            const res = await fetch(`${apiUrl}/support`, {
+            const res = await apiFetch('support', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
                 },
                 body: JSON.stringify({ message, quizId }),
             });
@@ -228,6 +218,7 @@ export default function SupportButton({ quizId }: SupportButtonProps) {
                 toast(data.message || 'Failed to send support request', 'error');
             }
         } catch (err) {
+            console.error('Submit error:', err);
             toast('An error occurred. Please try again.', 'error');
         } finally {
             setIsSubmitting(false);

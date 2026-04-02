@@ -29,6 +29,7 @@ model User {
   quizzes   Quiz[]        @relation("QuizCreator")
   auditLogs UserTypeAuditLog[]
   supportMessages SupportMessage[]
+  refreshTokens RefreshToken[]
 }
 
 model Question {
@@ -139,4 +140,25 @@ enum UserType {
   EXTRAORDINARY_RANK_EXAMS
   PRE_PLENIPOTENTIARY_EXAMS
   PLENIPOTENTIARY_RANK_EXAMS
+}
+
+model RefreshToken {
+  id        String   @id @default(uuid())
+  token     String   @unique
+  userId    String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@index([userId])
+  @@index([token])
+}
+
+model BlacklistedToken {
+  id        String   @id @default(uuid())
+  token     String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  
+  @@index([token])
 }

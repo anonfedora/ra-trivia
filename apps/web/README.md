@@ -49,7 +49,7 @@ src/
 │   ├── ThemeContext.tsx
 │   └── ToastContext.tsx              # useToast() hook — success/error/warning/info
 └── lib/
-    └── api.ts                        # apiJson() fetch wrapper
+    └── api.ts                        # apiFetch() unified authenticated fetch
 ```
 
 ## Setup
@@ -139,6 +139,15 @@ Toasts auto-dismiss after 4 seconds. The `<Toaster />` component renders via a R
 `<NotificationBell />` connects to the backend Socket.IO server on mount using the stored JWT. It joins the user's private room and listens for `notification` events to refresh the list in real time. Falls back to 30-second polling if the socket fails to connect.
 
 The dropdown is rendered via `createPortal` into `document.body` so it floats above all content regardless of stacking context. Position is clamped to prevent overflow on narrow screens.
+
+## Networking & Session Maintenance
+
+The application uses a centralized **Axios-based networking layer** in `lib/api.ts`:
+
+- **apiFetch**: A unified helper that mimics the standard `fetch` API but routes requests through an authenticated Axios instance.
+- **Automatic Token Rotation**: A response interceptor detects `401 Unauthorized` errors and automatically attempts to refresh the access token using the stored refresh token.
+- **Retry Logic**: If a refresh is successful, the original failed request is retried transparently.
+- **Global Auth Handling**: If a refresh fails (session truly expired), the user is automatically redirected to the login page.
 
 ## Anti-Cheat (Exam Page)
 

@@ -9,6 +9,8 @@ import UserTypeSelector, { UserType } from '../../../components/UserTypeSelector
 import { useToast } from '../../../contexts/ToastContext';
 import ConfirmModal from '../../../components/ConfirmModal';
 import { io, Socket } from 'socket.io-client';
+import { apiFetch } from '../../../lib/api';
+import { getAccessToken, getUser } from '../../../lib/auth';
 
 interface Quiz {
     id: string;
@@ -80,11 +82,8 @@ export default function AdminDashboard() {
     const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
 
     const fetchSupportUnreadCount = useCallback(async () => {
-        const token = localStorage.getItem('token');
         try {
-            const res = await fetch(`${apiUrl}/support/admin/unread-count`, {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
+            const res = await apiFetch('support/admin/unread-count');
             if (res.ok) {
                 const data = await res.json();
                 setSupportUnreadCount(data.unreadCount);
@@ -92,14 +91,11 @@ export default function AdminDashboard() {
         } catch (err) {
             console.error('Failed to fetch support unread count', err);
         }
-    }, [apiUrl]);
+    }, []);
 
     const fetchMaintenanceStatus = useCallback(async () => {
-        const token = localStorage.getItem('token');
         try {
-            const res = await fetch(`${apiUrl}/quiz/maintenance/status`, {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
+            const res = await apiFetch('quiz/maintenance/status');
             if (res.ok) {
                 const data = await res.json();
                 setIsMaintenanceMode(data.isMaintenanceMode);
@@ -107,19 +103,17 @@ export default function AdminDashboard() {
         } catch (err) {
             console.error('Failed to fetch maintenance status', err);
         }
-    }, [apiUrl]);
+    }, []);
 
     const handleToggleMaintenance = async () => {
-        const token = localStorage.getItem('token');
         const nextState = !isMaintenanceMode;
         
         setIsTogglingMaintenance(true);
         try {
-            const res = await fetch(`${apiUrl}/quiz/maintenance/toggle`, {
+            const res = await apiFetch('quiz/maintenance/toggle', {
                 method: 'POST',
                 headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
+                    'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({ enabled: nextState })
             });
@@ -139,14 +133,12 @@ export default function AdminDashboard() {
     };
 
     const fetchData = useCallback(async () => {
-        const token = localStorage.getItem('token');
-        const userRaw = localStorage.getItem('user');
-        const currentUser = userRaw ? JSON.parse(userRaw) : null;
+        const currentUser = getUser();
         
         try {
             // Fetch Quizzes — cache-bust to always get fresh data
-            const quizRes = await fetch(`${apiUrl}/quizzes?t=${Date.now()}`, {
-                headers: { 'Authorization': `Bearer ${token}`, 'Cache-Control': 'no-cache' }
+            const quizRes = await apiFetch(`quizzes?t=${Date.now()}`, {
+                headers: { 'Cache-Control': 'no-cache' }
             });
             if (quizRes.ok) {
                 const data = await quizRes.json();
@@ -160,9 +152,7 @@ export default function AdminDashboard() {
             }
 
             // Fetch Recent Results
-            const resultRes = await fetch(`${apiUrl}/admin/results`, {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
+            const resultRes = await apiFetch('admin/results');
             if (resultRes.ok) {
                 const data: PagedResponse<Attempt> = await resultRes.json();
                 setRecentAttempts(data.items.slice(0, 5));
@@ -173,20 +163,20 @@ export default function AdminDashboard() {
         } finally {
             setIsLoading(false);
         }
-    }, [apiUrl, toast]);
+    }, [toast]);
 
     useEffect(() => {
-        const token = localStorage.getItem('token');
-        const userRaw = localStorage.getItem('user');
-        if (userRaw) {
-            setUser(JSON.parse(userRaw));
+        const token = getAccessToken();
+        const currentUser = getUser();
+        if (currentUser) {
+            setUser(currentUser);
         }
         fetchData();
         fetchSupportUnreadCount();
         fetchMaintenanceStatus();
 
         if (token) {
-            const socketUrl = apiUrl.replace('/api', '');
+            const socketUrl = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api').replace('/api', '');
             const socket = io(socketUrl, {
                 auth: { token },
                 transports: ['websocket', 'polling'],
@@ -204,7 +194,7 @@ export default function AdminDashboard() {
                 socket.disconnect();
             };
         }
-    }, [fetchData, fetchSupportUnreadCount, fetchMaintenanceStatus, apiUrl]);
+    }, [fetchData, fetchSupportUnreadCount, fetchMaintenanceStatus]);
 
     useEffect(() => {
         const selected = quizzes.find(q => q.id === selectedQuizId);
@@ -242,13 +232,11 @@ export default function AdminDashboard() {
     const handleSaveQuizMeta = async () => {
         if (!selectedQuizId) return;
         setIsSavingEdit(true);
-        const token = localStorage.getItem('token');
         try {
-            const res = await fetch(`${apiUrl}/quizzes/${selectedQuizId}`, {
+            const res = await apiFetch(`quizzes/${selectedQuizId}`, {
                 method: 'PATCH',
                 headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
+                    'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({
                     title: editTitle,
@@ -278,13 +266,11 @@ export default function AdminDashboard() {
     const handleCreateQuiz = async (e: React.FormEvent) => {
         e.preventDefault();
         setIsCreating(true);
-        const token = localStorage.getItem('token');
         try {
-            const res = await fetch(`${apiUrl}/quizzes`, {
+            const res = await apiFetch('quizzes', {
                 method: 'POST',
                 headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
+                    'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({ title: newTitle, duration: newDuration }),
             });
@@ -304,11 +290,9 @@ export default function AdminDashboard() {
     const handleToggle = async (e: React.MouseEvent, id: string) => {
         e.preventDefault();
         e.stopPropagation();
-        const token = localStorage.getItem('token');
         try {
-            const res = await fetch(`${apiUrl}/quizzes/${id}/toggle`, {
-                method: 'PATCH',
-                headers: { 'Authorization': `Bearer ${token}` }
+            const res = await apiFetch(`quizzes/${id}/toggle`, {
+                method: 'PATCH'
             });
             if (res.ok) fetchQuizzes();
         } catch (err) {
@@ -327,11 +311,9 @@ export default function AdminDashboard() {
         if (!deleteModal) return;
         const { id } = deleteModal;
         setDeleteModal(null);
-        const token = localStorage.getItem('token');
         try {
-            const res = await fetch(`${apiUrl}/quizzes/${id}`, {
-                method: 'DELETE',
-                headers: { 'Authorization': `Bearer ${token}` }
+            const res = await apiFetch(`quizzes/${id}`, {
+                method: 'DELETE'
             });
             if (res.ok) {
                 setQuizzes(prev => prev.filter(q => q.id !== id));
@@ -385,10 +367,8 @@ export default function AdminDashboard() {
         }
 
         try {
-            const token = localStorage.getItem('token');
-            const res = await fetch(`${apiUrl}/questions/import`, {
+            const res = await apiFetch('questions/import', {
                 method: 'POST',
-                headers: { 'Authorization': `Bearer ${token}` },
                 body: formData,
             });
 

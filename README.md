@@ -124,6 +124,13 @@ pnpm --filter web dev
 
 Real-time delivery via Socket.IO (falls back to 30s polling on connection failure). Bell dropdown rendered via React portal — floats above all content, mobile-safe.
 
+### Session Maintenance
+
+The platform implements a **Silent Token Refresh** mechanism:
+- **Axios Interceptors**: Global interceptors handle 401 Unauthorized errors by automatically requesting a new access token using the refresh token.
+- **Transparent Retry**: Failed requests due to expired sessions are retried automatically, ensuring uninterrupted user experience during exams.
+- **Auto-Logout Refinement**: The system only redirects to the login page if the refresh token itself has expired or been revoked.
+
 ### Password Reset
 `POST /api/auth/forgot-password` → sends email with 15-minute token link → `POST /api/auth/reset-password` validates token and updates password.
 
@@ -224,7 +231,14 @@ pnpm --filter server test -- --run
 
 ## Version History
 
-### v1.6.0 (Current)
+### v1.7.0 (Current)
+- **Networking Architecture Migration**: Migrated from manual `fetch`/`apiJson` to a centralized **Axios-based** networking layer.
+- **Silent Session Refreshes**: Implemented transparent token rotation via Axios interceptors, preventing session timeouts during active usage.
+- **Unified apiFetch Utility**: Replaced fragmented calling patterns with a consistent, authenticated fetch helper across all modules.
+- **Quiz UI Refinement**: Increased clearance for navigation buttons on mobile to prevent overlap with floating support buttons.
+- **Legacy Cleanup**: Removed over 500 lines of redundant networking logic (`apiHelpers.ts`, etc.).
+
+### v1.6.0
 - **Typing Indicators**: Real-time "Typing..." feedback in support chats for both admins and candidates.
 - **Admin Support Refinement**: Added advanced filtering (unread, user rank), candidate search, and pagination.
 - **Canned Responses**: Pre-defined response templates for admins to handle support requests faster.

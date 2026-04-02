@@ -8,6 +8,8 @@ import { ThemeToggle } from '../../../components/ThemeToggle';
 import NotificationBell from '../../../components/NotificationBell';
 import { useToast } from '../../../contexts/ToastContext';
 import CandidateTable from '../../../components/CandidateTable';
+import { apiFetch } from '../../../lib/api';
+import { getAccessToken, getUser } from '../../../lib/auth';
 
 export default function MyExamTakersPage() {
     const router = useRouter();
@@ -22,15 +24,13 @@ export default function MyExamTakersPage() {
 
     // SUPER_ADMIN should use the full candidates page
     useEffect(() => {
-        const userRaw = localStorage.getItem('user');
-        const user = userRaw ? JSON.parse(userRaw) : null;
+        const user = getUser();
         if (user?.role === 'SUPER_ADMIN') {
             router.replace('/admin/candidates');
         }
     }, [router]);
 
     const fetchTakers = useCallback(async (overridePage?: number) => {
-        const token = localStorage.getItem('token');
         const effectivePage = overridePage ?? page;
         try {
             const params = new URLSearchParams({
@@ -38,9 +38,7 @@ export default function MyExamTakersPage() {
                 pageSize: String(pageSize),
                 ...(searchTerm.trim() ? { q: searchTerm.trim() } : {}),
             });
-            const res = await fetch(`${apiUrl}/admin/my-exam-takers?${params}`, {
-                headers: { Authorization: `Bearer ${token}` },
-            });
+            const res = await apiFetch(`admin/my-exam-takers?${params}`);
             if (res.ok) {
                 const data = await res.json();
                 setCandidates(data.items);
@@ -53,7 +51,7 @@ export default function MyExamTakersPage() {
         } finally {
             setIsLoading(false);
         }
-    }, [apiUrl, page, pageSize, searchTerm, toast]);
+    }, [page, pageSize, searchTerm, toast]);
 
     useEffect(() => { fetchTakers(); }, [fetchTakers]);
 
