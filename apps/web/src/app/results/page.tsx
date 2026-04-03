@@ -3,7 +3,9 @@
 import { useEffect, useState, Suspense, useCallback } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
-import { CheckCircle2, XCircle, Home, Award, BookOpen, TrendingUp } from 'lucide-react';
+import { CheckCircle2, XCircle, Home, Award, BookOpen, TrendingUp, Share2, Copy, MessageCircle, ShieldCheck } from 'lucide-react';
+import { QRCodeCanvas } from 'qrcode.react';
+import { useToast } from '@/contexts/ToastContext';
 import { apiFetch } from '@/lib/api';
 
 interface QuestionBreakdown {
@@ -31,6 +33,14 @@ function ResultsContent() {
     const [result, setResult] = useState<SessionResult | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [lockedAt, setLockedAt] = useState<string | null>(null);
+    const { toast } = useToast();
+    const [baseUrl, setBaseUrl] = useState('');
+
+    useEffect(() => {
+        if (typeof window !== 'undefined') {
+            setBaseUrl(window.location.origin);
+        }
+    }, []);
 
     const fetchSession = useCallback(async () => {
         if (!sessionId) { setIsLoading(false); return; }
@@ -112,6 +122,35 @@ function ResultsContent() {
 
     const percentage = result.score ?? 0;
     const isPassed = percentage >= 50;
+    const verifyUrl = `${baseUrl}/verify/${sessionId}`;
+
+    const handleCopyLink = () => {
+        navigator.clipboard.writeText(verifyUrl);
+        toast('Verification link copied to clipboard!', 'success');
+    };
+
+    const handleShare = async () => {
+        const shareData = {
+            title: 'My Exam Result - RA Trivia',
+            text: `I just completed ${result.quiz.title} on RA Trivia with a score of ${percentage.toFixed(1)}%! 🏆 Verify my result here:`,
+            url: verifyUrl,
+        };
+
+        if (navigator.share) {
+            try {
+                await navigator.share(shareData);
+            } catch (err) {
+                console.error('Share failed:', err);
+            }
+        } else {
+            handleCopyLink();
+        }
+    };
+
+    const shareToWhatsApp = () => {
+        const text = encodeURIComponent(`I just completed ${result.quiz.title} on RA Trivia with a score of ${percentage.toFixed(1)}%! 🏆\n\nVerify my result here: ${verifyUrl}`);
+        window.open(`https://wa.me/?text=${text}`, '_blank');
+    };
 
     return (
         <main className="min-h-screen bg-slate-50 dark:bg-slate-900 p-6 md:p-12 transition-colors duration-200">
@@ -149,6 +188,58 @@ function ResultsContent() {
                                 <p className="text-2xl font-black text-slate-900 dark:text-slate-50">{stat.value}</p>
                             </div>
                         ))}
+                    </div>
+
+                    {/* Sharing & Verification Section */}
+                    <div className="mt-12 pt-12 border-t border-slate-100 dark:border-slate-700">
+                        <div className="flex flex-col lg:flex-row gap-8 items-center lg:items-start text-left">
+                            <div className="bg-white dark:bg-slate-900 p-4 rounded-3xl shadow-xl border border-slate-100 dark:border-slate-800 shrink-0">
+                                <QRCodeCanvas 
+                                    value={verifyUrl} 
+                                    size={160}
+                                    level="H"
+                                    includeMargin={false}
+                                    className="rounded-xl"
+                                    fgColor="currentColor"
+                                />
+                            </div>
+                            
+                            <div className="flex-1 space-y-6">
+                                <div>
+                                    <h3 className="text-xl font-black text-slate-900 dark:text-slate-50 flex items-center gap-2">
+                                        <ShieldCheck className="text-emerald-500" size={24} />
+                                        Official Achievement
+                                    </h3>
+                                    <p className="text-slate-500 dark:text-slate-400 font-medium text-sm mt-1">
+                                        Anyone can verify the authenticity of this result by scanning the QR code or using the verification link.
+                                    </p>
+                                </div>
+
+                                <div className="flex flex-wrap gap-3">
+                                    <button 
+                                        onClick={shareToWhatsApp}
+                                        className="flex items-center gap-2 bg-emerald-500 hover:bg-emerald-600 text-white px-5 py-3 rounded-2xl font-bold transition-all active:scale-95 shadow-lg shadow-emerald-500/20"
+                                    >
+                                        <MessageCircle size={18} />
+                                        Share to WhatsApp
+                                    </button>
+                                    <button 
+                                        onClick={handleShare}
+                                        className="flex items-center gap-2 bg-slate-900 dark:bg-primary text-white px-5 py-3 rounded-2xl font-bold transition-all active:scale-95 shadow-lg shadow-slate-900/20"
+                                    >
+                                        <Share2 size={18} />
+                                        Share Others
+                                    </button>
+                                    <button 
+                                        onClick={handleCopyLink}
+                                        className="flex items-center gap-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 px-5 py-3 rounded-2xl font-bold transition-all active:scale-95 hover:bg-slate-50"
+                                    >
+                                        <Copy size={18} />
+                                        Copy Link
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
 

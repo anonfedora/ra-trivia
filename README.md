@@ -231,7 +231,15 @@ pnpm --filter server test -- --run
 
 ## Version History
 
-### v1.7.0 (Current)
+### v1.8.0 (Current)
+- **Social Sharing & QR Verification**:
+    - **QR Code Generation**: Results pages now include a high-definition QR code for instant physical-to-digital validation.
+    - **Public Verification Page**: A new dedicated, unauthenticated landing page (`/verify/[id]`) for third-party result verification.
+    - **WhatsApp Integration**: One-click sharing of exam achievements with pre-filled templates and deep links.
+    - **Web Share API**: Native mobile sharing support for a seamless "Share Achievement" experience.
+- **Enhanced Verification Metadata**: Inclusion of Candidate Association and Exam Type (User Type) on official verification records.
+
+### v1.7.0
 - **Networking Architecture Migration**: Migrated from manual `fetch`/`apiJson` to a centralized **Axios-based** networking layer.
 - **Silent Session Refreshes**: Implemented transparent token rotation via Axios interceptors, preventing session timeouts during active usage.
 - **Unified apiFetch Utility**: Replaced fragmented calling patterns with a consistent, authenticated fetch helper across all modules.

@@ -683,4 +683,57 @@ router.get('/session/:id', authenticate, async (req: AuthRequest, res) => {
     }
 });
 
+/**
+ * @openapi
+ * /quiz/verify/{sessionId}:
+ *   get:
+ *     tags: [Quiz Session]
+ *     summary: Verify an exam result publicly
+ *     description: Returns public details of a completed exam session for verification purposes. No authentication required.
+ *     parameters:
+ *       - in: path
+ *         name: sessionId
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Result details
+ *       404:
+ *         description: Result not found
+ */
+router.get('/verify/:sessionId', async (req, res) => {
+    try {
+        const { sessionId } = req.params;
+        const session = await prisma.quizSession.findUnique({
+            where: { id: sessionId },
+            include: {
+                user: { select: { name: true, church: true, association: true, userType: true } },
+                quiz: { select: { title: true } }
+            }
+        });
+
+        if (!session || !session.endTime) {
+            return res.status(404).json({ message: 'Result not found or exam not completed' });
+        }
+
+        const score = session.score ?? 0;
+        const status = session.manualStatus || (score >= 50 ? 'Cleared' : 'Not Cleared');
+
+        res.json({
+            id: session.id,
+            candidateName: session.user.name,
+            church: session.user.church,
+            association: session.user.association,
+            userType: session.user.userType,
+            examTitle: session.quiz.title,
+            score: session.score,
+            completedAt: session.endTime,
+            status
+        });
+    } catch (err) {
+        res.status(500).json({ message: 'Internal server error' });
+    }
+});
+
 export default router;
