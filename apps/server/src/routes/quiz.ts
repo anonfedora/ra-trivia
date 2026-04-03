@@ -9,12 +9,43 @@ const router = Router();
 
 let isMaintenanceMode = false;
 
-// Admin: Get maintenance mode status
+/**
+ * @openapi
+ * /quiz/maintenance/status:
+ *   get:
+ *     tags: [Maintenance]
+ *     summary: Get maintenance mode status
+ *     security:
+ *       - BearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Current status
+ */
 router.get('/maintenance/status', authenticate, authorizeAdmin, (req, res) => {
     res.json({ isMaintenanceMode });
 });
 
-// Admin: Toggle maintenance mode
+/**
+ * @openapi
+ * /quiz/maintenance/toggle:
+ *   post:
+ *     tags: [Maintenance]
+ *     summary: Toggle maintenance mode
+ *     security:
+ *       - BearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               enabled:
+ *                 type: boolean
+ *     responses:
+ *       200:
+ *         description: Mode updated
+ */
 router.post('/maintenance/toggle', authenticate, authorizeAdmin, (req: AuthRequest, res) => {
     const { enabled } = req.body;
     isMaintenanceMode = !!enabled;
@@ -28,7 +59,35 @@ router.post('/maintenance/toggle', authenticate, authorizeAdmin, (req: AuthReque
     });
 });
 
-// Start a quiz session - with user type access control
+/**
+ * @openapi
+ * /quiz/start:
+ *   post:
+ *     tags: [Quiz Session]
+ *     summary: Start a new quiz session
+ *     description: Initializes an exam session, applies retake limits, and returns a randomized set of questions filtered by the user's exam type.
+ *     security:
+ *       - BearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [quizId]
+ *             properties:
+ *               quizId:
+ *                 type: string
+ *     responses:
+ *       201:
+ *         description: Session started
+ *       400:
+ *         description: Retake limit reached or quiz not active
+ *       403:
+ *         description: No questions matching user type
+ *       503:
+ *         description: Maintenance mode active
+ */
 router.post('/start', authenticate, validateUserTypeAccess, async (req: AuthRequest, res) => {
     try {
         const { quizId } = req.body;
@@ -273,7 +332,34 @@ router.post('/start', authenticate, validateUserTypeAccess, async (req: AuthRequ
     }
 });
 
-// Update answer (Auto-save)
+/**
+ * @openapi
+ * /quiz/update-answer:
+ *   post:
+ *     tags: [Quiz Session]
+ *     summary: Auto-save candidate answer
+ *     description: Persists a selected option for a specific question during an active session.
+ *     security:
+ *       - BearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [sessionId, questionId, selectedOption]
+ *             properties:
+ *               sessionId:
+ *                 type: string
+ *               questionId:
+ *                 type: string
+ *               selectedOption:
+ *                 type: string
+ *                 enum: [A, B, C, D]
+ *     responses:
+ *       200:
+ *         description: Answer saved
+ */
 router.post('/update-answer', authenticate, async (req: AuthRequest, res) => {
     try {
         const { sessionId, questionId, selectedOption } = req.body;
@@ -301,7 +387,29 @@ router.post('/update-answer', authenticate, async (req: AuthRequest, res) => {
     }
 });
 
-// Submit quiz
+/**
+ * @openapi
+ * /quiz/submit:
+ *   post:
+ *     tags: [Quiz Session]
+ *     summary: Submit completed quiz
+ *     description: Ends the session, calculates the score, and schedules the result release time.
+ *     security:
+ *       - BearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [sessionId]
+ *             properties:
+ *               sessionId:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Quiz submitted successfully
+ */
 router.post('/submit', authenticate, async (req: AuthRequest, res) => {
     try {
         const { sessionId } = req.body;
@@ -405,7 +513,19 @@ router.post('/submit', authenticate, async (req: AuthRequest, res) => {
     }
 });
 
-// Get candidate's own sessions - filtered by user type access
+/**
+ * @openapi
+ * /quiz/my-sessions:
+ *   get:
+ *     tags: [Results]
+ *     summary: List candidate's exam history
+ *     description: Returns past exam sessions. Scores are masked until the scheduled release time.
+ *     security:
+ *       - BearerAuth: []
+ *     responses:
+ *       200:
+ *         description: List of sessions
+ */
 router.get('/my-sessions', authenticate, async (req: AuthRequest, res) => {
     try {
         const userId = req.user!.userId;
@@ -461,7 +581,27 @@ router.get('/my-sessions', authenticate, async (req: AuthRequest, res) => {
     }
 });
 
-// Get specific session result (with per-question breakdown)
+/**
+ * @openapi
+ * /quiz/session/{id}:
+ *   get:
+ *     tags: [Results]
+ *     summary: Get detailed session results
+ *     description: Returns a per-question breakdown of the exam. Locked until the release time for candidates.
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Result breakdown
+ *       423:
+ *         description: Results not yet released
+ */
 router.get('/session/:id', authenticate, async (req: AuthRequest, res) => {
     try {
         const id = req.params.id as string;

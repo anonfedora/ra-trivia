@@ -58,6 +58,47 @@ const loginValidation = [
         .withMessage('Password is required')
 ];
 
+/**
+ * @openapi
+ * /auth/register:
+ *   post:
+ *     tags: [Auth]
+ *     summary: Register a new user
+ *     description: Create a new account. Candidates require a userType. Registration triggers a 6-digit OTP email.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [email, name, password]
+ *             properties:
+ *               email:
+ *                 type: string
+ *                 format: email
+ *               name:
+ *                 type: string
+ *                 minLength: 1
+ *               password:
+ *                 type: string
+ *                 minLength: 8
+ *               church:
+ *                 type: string
+ *               role:
+ *                 type: string
+ *                 enum: [CANDIDATE, ADMIN, SUPER_ADMIN]
+ *                 default: CANDIDATE
+ *               userType:
+ *                 type: string
+ *                 enum: [AMBASSADOR_RANK_EXAMS, EXTRAORDINARY_RANK_EXAMS, PRE_PLENIPOTENTIARY_EXAMS, PLENIPOTENTIARY_RANK_EXAMS]
+ *     responses:
+ *       201:
+ *         description: Registration successful
+ *       400:
+ *         description: User already exists or validation error
+ *       500:
+ *         description: Internal server error
+ */
 router.post('/register', registerValidation, handleValidationErrors, async (req: Request, res: Response) => {
     try {
         const { email, name, password, church, association, role, userType } = req.body;
@@ -248,6 +289,47 @@ router.get('/verify', async (req: Request, res: Response) => {
     }
 });
 
+/**
+ * @openapi
+ * /auth/login:
+ *   post:
+ *     tags: [Auth]
+ *     summary: Log in to the application
+ *     description: Authenticate with email and password to receive access and refresh tokens.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [email, password]
+ *             properties:
+ *               email:
+ *                 type: string
+ *                 format: email
+ *               password:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Login successful
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 accessToken:
+ *                   type: string
+ *                 refreshToken:
+ *                   type: string
+ *                 user:
+ *                   $ref: '#/components/schemas/User'
+ *       401:
+ *         description: Invalid credentials
+ *       403:
+ *         description: Email not verified (triggers new OTP)
+ *       500:
+ *         description: Internal server error
+ */
 router.post('/login', loginValidation, handleValidationErrors, async (req: Request, res: Response) => {
     try {
         const { email, password } = req.body;
@@ -321,6 +403,35 @@ router.post('/login', loginValidation, handleValidationErrors, async (req: Reque
 });
 
 // OTP verification endpoint
+/**
+ * @openapi
+ * /auth/verify-otp:
+ *   post:
+ *     tags: [Auth]
+ *     summary: Verify email with 6-digit OTP
+ *     description: Completes the registration or verification process using the code sent to the user's email.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [email, otp]
+ *             properties:
+ *               email:
+ *                 type: string
+ *                 format: email
+ *               otp:
+ *                 type: string
+ *                 pattern: '^[0-9]{6}$'
+ *     responses:
+ *       200:
+ *         description: Email verified successfully
+ *       400:
+ *         description: Invalid or expired code
+ *       404:
+ *         description: User not found
+ */
 router.post('/verify-otp', [
     body('email').isEmail().withMessage('Please provide a valid email address'),
     body('otp').isLength({ min: 6, max: 6 }).withMessage('OTP must be 6 digits')
@@ -440,6 +551,29 @@ router.post('/logout', authenticate, async (req: AuthRequest, res: Response) => 
 });
 
 // Refresh token endpoint
+/**
+ * @openapi
+ * /auth/refresh-token:
+ *   post:
+ *     tags: [Auth]
+ *     summary: Refresh access token
+ *     description: Rotates the refresh token and returns a new access token. Transparent session maintenance.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [refreshToken]
+ *             properties:
+ *               refreshToken:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Tokens refreshed successfully
+ *       401:
+ *         description: Invalid or expired refresh token
+ */
 router.post('/refresh-token', [
     body('refreshToken').notEmpty().withMessage('Refresh token is required')
 ], handleValidationErrors, async (req: Request, res: Response) => {
@@ -545,6 +679,22 @@ router.post('/resend-verification', [
 });
 
 // Get user profile endpoint
+/**
+ * @openapi
+ * /auth/profile:
+ *   get:
+ *     tags: [Profile]
+ *     summary: Get current user profile
+ *     security:
+ *       - BearerAuth: []
+ *     responses:
+ *       200:
+ *         description: User profile retrieved
+ *       401:
+ *         description: Unauthorized
+ *       404:
+ *         description: User not found
+ */
 router.get('/profile', authenticate, async (req: AuthRequest, res: Response) => {
     try {
         const user = await prisma.user.findUnique({
@@ -575,6 +725,35 @@ router.get('/profile', authenticate, async (req: AuthRequest, res: Response) => 
 });
 
 // Update user profile endpoint
+/**
+ * @openapi
+ * /auth/profile:
+ *   put:
+ *     tags: [Profile]
+ *     summary: Update user profile
+ *     security:
+ *       - BearerAuth: []
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               name:
+ *                 type: string
+ *               church:
+ *                 type: string
+ *               association:
+ *                 type: string
+ *               userType:
+ *                 type: string
+ *                 enum: [AMBASSADOR_RANK_EXAMS, EXTRAORDINARY_RANK_EXAMS, PRE_PLENIPOTENTIARY_EXAMS, PLENIPOTENTIARY_RANK_EXAMS]
+ *     responses:
+ *       200:
+ *         description: Profile updated
+ *       401:
+ *         description: Unauthorized
+ */
 router.put('/profile', authenticate, [
     body('name')
         .optional()
@@ -674,6 +853,28 @@ router.put('/profile', authenticate, [
 });
 
 // Forgot password — send reset link
+/**
+ * @openapi
+ * /auth/forgot-password:
+ *   post:
+ *     tags: [Auth]
+ *     summary: Request password reset
+ *     description: Sends a password reset link to the user's email if the account is verified.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [email]
+ *             properties:
+ *               email:
+ *                 type: string
+ *                 format: email
+ *     responses:
+ *       200:
+ *         description: Reset email sent (or generic success message)
+ */
 router.post('/forgot-password', [
     body('email').isEmail().withMessage('Please provide a valid email address').trim()
 ], handleValidationErrors, async (req: Request, res: Response) => {
@@ -713,6 +914,32 @@ router.post('/forgot-password', [
 });
 
 // Reset password — consume token and set new password
+/**
+ * @openapi
+ * /auth/reset-password:
+ *   post:
+ *     tags: [Auth]
+ *     summary: Reset password with token
+ *     description: Consumes a password reset token and sets a new password for the user.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [token, password]
+ *             properties:
+ *               token:
+ *                 type: string
+ *               password:
+ *                 type: string
+ *                 minLength: 8
+ *     responses:
+ *       200:
+ *         description: Password reset successfully
+ *       400:
+ *         description: Invalid or expired token
+ */
 router.post('/reset-password', [
     body('token').notEmpty().withMessage('Reset token is required'),
     passwordValidation()

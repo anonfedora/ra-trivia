@@ -5,7 +5,18 @@ import { emitToRoom } from '../services/socketService';
 
 const router = Router();
 
-// Admin: Get canned response templates
+/**
+ * @openapi
+ * /support/admin/templates:
+ *   get:
+ *     tags: [Support Admin]
+ *     summary: Get canned response templates
+ *     security:
+ *       - BearerAuth: []
+ *     responses:
+ *       200:
+ *         description: List of templates
+ */
 router.get('/admin/templates', authenticate, authorizeAdmin, async (req: AuthRequest, res) => {
     const templates = [
         { id: '1', title: 'Greeting', content: 'Hello! How can we help you today?' },
@@ -17,7 +28,32 @@ router.get('/admin/templates', authenticate, authorizeAdmin, async (req: AuthReq
     res.json(templates);
 });
 
-// Admin: Get all support threads (grouped by user)
+/**
+ * @openapi
+ * /support/admin:
+ *   get:
+ *     tags: [Support Admin]
+ *     summary: List all support threads
+ *     description: Grouped by user, showing latest message and unread counts.
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *       - in: query
+ *         name: unreadOnly
+ *         schema:
+ *           type: boolean
+ *       - in: query
+ *         name: search
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: List of threads
+ */
 router.get('/admin', authenticate, authorizeAdmin, async (req: AuthRequest, res) => {
     try {
         const page = Math.max(1, parseInt(String(req.query.page ?? '1'), 10) || 1);
@@ -122,7 +158,24 @@ router.get('/admin', authenticate, authorizeAdmin, async (req: AuthRequest, res)
     }
 });
 
-// Admin: Get support history for a specific user
+/**
+ * @openapi
+ * /support/admin/{userId}:
+ *   get:
+ *     tags: [Support Admin]
+ *     summary: Get user support history
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: userId
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Full message history
+ */
 router.get('/admin/:userId', authenticate, authorizeAdmin, async (req: AuthRequest, res) => {
     try {
         const userId = req.params.userId as string;
@@ -175,7 +228,34 @@ router.get('/admin/:userId', authenticate, authorizeAdmin, async (req: AuthReque
     }
 });
 
-// Admin: Reply to a support request
+/**
+ * @openapi
+ * /support/admin/{userId}:
+ *   post:
+ *     tags: [Support Admin]
+ *     summary: Reply to user support request
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: userId
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [message]
+ *             properties:
+ *               message:
+ *                 type: string
+ *     responses:
+ *       201:
+ *         description: Reply sent
+ */
 router.post('/admin/:userId', authenticate, authorizeAdmin, async (req: AuthRequest, res) => {
     try {
         const userId = req.params.userId as string;
@@ -231,7 +311,24 @@ router.get('/admin/unread-count', authenticate, authorizeAdmin, async (req: Auth
     }
 });
 
-// Admin: Mark all messages from a user as read
+/**
+ * @openapi
+ * /support/admin/{userId}/read:
+ *   patch:
+ *     tags: [Support Admin]
+ *     summary: Mark user messages as read
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: userId
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Messages marked as read
+ */
 router.patch('/admin/:userId/read', authenticate, authorizeAdmin, async (req: AuthRequest, res) => {
     try {
         const userId = req.params.userId as string;
@@ -275,7 +372,18 @@ router.patch('/admin/:userId/resolve', authenticate, authorizeAdmin, async (req:
     }
 });
 
-// Candidate: Get support history for the logged-in user
+/**
+ * @openapi
+ * /support:
+ *   get:
+ *     tags: [Support Candidate]
+ *     summary: Get my support history
+ *     security:
+ *       - BearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Message history
+ */
 router.get('/', authenticate, async (req: AuthRequest, res) => {
     try {
         const userId = req.user!.userId;
@@ -370,6 +478,30 @@ router.patch('/read', authenticate, async (req: AuthRequest, res) => {
     }
 });
 
+/**
+ * @openapi
+ * /support:
+ *   post:
+ *     tags: [Support Candidate]
+ *     summary: Submit a new support request
+ *     security:
+ *       - BearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [message]
+ *             properties:
+ *               message:
+ *                 type: string
+ *               quizId:
+ *                 type: string
+ *     responses:
+ *       201:
+ *         description: Request submitted
+ */
 router.post('/', authenticate, async (req: AuthRequest, res) => {
     try {
         const { message, quizId } = req.body;

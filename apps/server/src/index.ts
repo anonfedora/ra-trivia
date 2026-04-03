@@ -21,6 +21,8 @@ import healthRoutes from './routes/health';
 import passwordRequirementsRoutes from './routes/password-requirements';
 import { initScheduler } from './services/scheduler';
 import { initSocketIO } from './services/socketService';
+import swaggerUi from 'swagger-ui-express';
+import { swaggerSpec } from './config/swagger';
 
 // Validate environment variables on startup
 validateEnv();
@@ -106,6 +108,10 @@ app.use(sanitizeInput); // Prevent XSS attacks with custom sanitization
 // Apply rate limiting
 app.use('/api/', apiLimiter); // General API rate limit
 app.use('/api/auth/', authLimiter); // Strict rate limit for auth endpoints
+
+// Swagger Documentation
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
+app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec)); // Alias
 
 // Routes
 app.use('/api/auth', authRoutes);

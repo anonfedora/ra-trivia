@@ -4,7 +4,16 @@ import os from 'os';
 
 const router = Router();
 
-// Detailed Health Check
+/**
+ * @openapi
+ * /health/detailed:
+ *   get:
+ *     tags: [Monitoring]
+ *     summary: Get detailed system health information
+ *     responses:
+ *       200:
+ *         description: Detailed health status object
+ */
 router.get('/detailed', async (req, res) => {
     const health = {
         status: 'UP',

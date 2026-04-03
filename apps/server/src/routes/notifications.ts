@@ -4,7 +4,31 @@ import { authenticate, authorizeAdmin, AuthRequest } from '../middlewares/auth';
 
 const router = Router();
 
-// Get notifications for the logged-in user (any role)
+/**
+ * @openapi
+ * /notifications:
+ *   get:
+ *     tags: [Notifications]
+ *     summary: Get notifications for the logged-in user
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *       - in: query
+ *         name: pageSize
+ *         schema:
+ *           type: integer
+ *       - in: query
+ *         name: unreadOnly
+ *         schema:
+ *           type: boolean
+ *     responses:
+ *       200:
+ *         description: Paginated notifications
+ */
 router.get('/', authenticate, async (req: AuthRequest, res) => {
     try {
         const userId = req.user?.userId;
@@ -58,7 +82,24 @@ router.get('/', authenticate, async (req: AuthRequest, res) => {
     }
 });
 
-// Mark notification as read (any authenticated user, own notifications only)
+/**
+ * @openapi
+ * /notifications/{id}/read:
+ *   patch:
+ *     tags: [Notifications]
+ *     summary: Mark notification as read
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Notification updated
+ */
 router.patch('/:id/read', authenticate, async (req: AuthRequest, res) => {
     try {
         const notificationId = req.params.id as string;
@@ -89,7 +130,18 @@ router.patch('/:id/read', authenticate, async (req: AuthRequest, res) => {
     }
 });
 
-// Mark all notifications as read
+/**
+ * @openapi
+ * /notifications/mark-all-read:
+ *   post:
+ *     tags: [Notifications]
+ *     summary: Mark all notifications as read
+ *     security:
+ *       - BearerAuth: []
+ *     responses:
+ *       200:
+ *         description: All notifications updated
+ */
 router.post('/mark-all-read', authenticate, async (req: AuthRequest, res) => {
     try {
         const userId = req.user?.userId;
@@ -122,7 +174,24 @@ router.post('/mark-all-read', authenticate, async (req: AuthRequest, res) => {
     }
 });
 
-// Delete a notification
+/**
+ * @openapi
+ * /notifications/{id}:
+ *   delete:
+ *     tags: [Notifications]
+ *     summary: Delete a notification
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Notification deleted
+ */
 router.delete('/:id', authenticate, async (req: AuthRequest, res) => {
     try {
         const notificationId = req.params.id as string;

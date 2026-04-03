@@ -7,7 +7,19 @@ import { emitNotification } from '../services/socketService';
 
 const router = Router();
 
-// Admin: Get analytics data
+/**
+ * @openapi
+ * /admin/analytics:
+ *   get:
+ *     tags: [Admin Analytics]
+ *     summary: Get analytics data for quizzes
+ *     description: Returns performance metrics for all quizzes (Super Admin) or just created quizzes (Admin).
+ *     security:
+ *       - BearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Array of quiz metrics
+ */
 router.get('/analytics', authenticate, authorizeAdmin, async (req: AuthRequest, res) => {
     try {
         const userRole = req.user?.role;
@@ -79,7 +91,19 @@ router.get('/analytics', authenticate, authorizeAdmin, async (req: AuthRequest, 
     }
 });
 
-// Admin: Get global statistics
+/**
+ * @openapi
+ * /admin/global-stats:
+ *   get:
+ *     tags: [Admin Analytics]
+ *     summary: Get platform-wide global statistics
+ *     description: Aggregated counts and averages for quizzes, users, and sessions.
+ *     security:
+ *       - BearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Global stats object
+ */
 router.get('/global-stats', authenticate, authorizeAdmin, async (req: AuthRequest, res) => {
     try {
         const [totalQuizzes, totalUsers, totalSessions] = await Promise.all([
@@ -115,7 +139,27 @@ router.get('/global-stats', authenticate, authorizeAdmin, async (req: AuthReques
     }
 });
 
-// Admin: Export formatted exam report to Excel
+/**
+ * @openapi
+ * /admin/export/formatted-excel:
+ *   get:
+ *     tags: [Admin Export]
+ *     summary: Export formatted Excel report
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: userType
+ *         schema:
+ *           type: string
+ *       - in: query
+ *         name: quizId
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Excel file buffer
+ */
 router.get('/export/formatted-excel', authenticate, authorizeAdmin, async (req: AuthRequest, res) => {
     try {
         const userType = req.query.userType as UserType | undefined;
@@ -133,7 +177,27 @@ router.get('/export/formatted-excel', authenticate, authorizeAdmin, async (req: 
     }
 });
 
-// Admin: Export exam report to PDF
+/**
+ * @openapi
+ * /admin/export/pdf:
+ *   get:
+ *     tags: [Admin Export]
+ *     summary: Export PDF exam report
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: userType
+ *         schema:
+ *           type: string
+ *       - in: query
+ *         name: quizId
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: PDF file buffer
+ */
 router.get('/export/pdf', authenticate, authorizeAdmin, async (req: AuthRequest, res) => {
     try {
         const userType = req.query.userType as UserType | undefined;
@@ -213,7 +277,37 @@ router.get('/export/:quizId', authenticate, authorizeAdmin, async (req: AuthRequ
     }
 });
 
-// Admin: Get all candidate results
+/**
+ * @openapi
+ * /admin/results:
+ *   get:
+ *     tags: [Admin Results]
+ *     summary: Get all candidate results (paginated)
+ *     description: Search and filter through all exam sessions across the platform.
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *       - in: query
+ *         name: pageSize
+ *         schema:
+ *           type: integer
+ *       - in: query
+ *         name: q
+ *         schema:
+ *           type: string
+ *       - in: query
+ *         name: status
+ *         schema:
+ *           type: string
+ *           enum: [all, completed, running]
+ *     responses:
+ *       200:
+ *         description: Paginated results with summary data
+ */
 router.get('/results', authenticate, authorizeAdmin, async (req: AuthRequest, res) => {
     try {
         const page = Math.max(1, parseInt(String(req.query.page ?? '1'), 10) || 1);
@@ -371,7 +465,20 @@ router.get('/export/excel', authenticate, authorizeAdmin, async (req: AuthReques
     }
 });
 
-// SUPER_ADMIN only: Get all candidates (paginated)
+/**
+ * @openapi
+ * /admin/candidates:
+ *   get:
+ *     tags: [Admin Candidates]
+ *     summary: List all candidates (Super Admin only)
+ *     security:
+ *       - BearerAuth: []
+ *     responses:
+ *       200:
+ *         description: List of candidates
+ *       403:
+ *         description: Super admin access required
+ */
 router.get('/candidates', authenticate, authorizeAdmin, async (req: AuthRequest, res) => {
     if (req.user?.role !== 'SUPER_ADMIN') {
         return res.status(403).json({ message: 'Forbidden: Super admin access required' });
@@ -482,7 +589,18 @@ router.get('/candidates/:userId', authenticate, authorizeAdmin, async (req: Auth
     }
 });
 
-// ADMIN only: Get candidates who attempted the admin's own quizzes (paginated)
+/**
+ * @openapi
+ * /admin/my-exam-takers:
+ *   get:
+ *     tags: [Admin Candidates]
+ *     summary: List candidates who attempted admin's quizzes
+ *     security:
+ *       - BearerAuth: []
+ *     responses:
+ *       200:
+ *         description: List of candidates
+ */
 router.get('/my-exam-takers', authenticate, authorizeAdmin, async (req: AuthRequest, res) => {
     if (req.user?.role !== 'ADMIN') {
         return res.status(403).json({ message: 'Forbidden: Admin access only' });
@@ -557,7 +675,19 @@ router.get('/my-exam-takers', authenticate, authorizeAdmin, async (req: AuthRequ
 export default router;
 
 
-// Admin: Manually trigger email sending for pending results
+/**
+ * @openapi
+ * /admin/trigger-emails:
+ *   post:
+ *     tags: [Admin Results]
+ *     summary: Manually trigger result emails
+ *     description: Forces immediate delivery of pending result notification emails.
+ *     security:
+ *       - BearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Email processing results
+ */
 router.post('/trigger-emails', authenticate, authorizeAdmin, async (req: AuthRequest, res) => {
     try {
         const now = new Date();
@@ -668,7 +798,33 @@ router.post('/trigger-emails', authenticate, authorizeAdmin, async (req: AuthReq
     }
 });
 
-// Admin: Update manual status for a quiz session
+/**
+ * @openapi
+ * /admin/sessions/{sessionId}/status:
+ *   patch:
+ *     tags: [Admin Results]
+ *     summary: Update manual session status
+ *     parameters:
+ *       - in: path
+ *         name: sessionId
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               manualStatus:
+ *                 type: string
+ *                 nullable: true
+ *                 enum: [Cleared, Not Cleared - No Certificates]
+ *     responses:
+ *       200:
+ *         description: Status updated
+ */
 router.patch('/sessions/:sessionId/status', authenticate, authorizeAdmin, async (req: AuthRequest, res) => {
     try {
         const sessionId = req.params.sessionId as string;
@@ -691,7 +847,28 @@ router.patch('/sessions/:sessionId/status', authenticate, authorizeAdmin, async 
     }
 });
 
-// Admin: Manually release results for specific sessions
+/**
+ * @openapi
+ * /admin/sessions/release:
+ *   post:
+ *     tags: [Admin Results]
+ *     summary: Bulk release results
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [sessionIds]
+ *             properties:
+ *               sessionIds:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *     responses:
+ *       200:
+ *         description: Results released
+ */
 router.post('/sessions/release', authenticate, authorizeAdmin, async (req: AuthRequest, res) => {
     try {
         const { sessionIds } = req.body;
@@ -736,7 +913,22 @@ router.post('/sessions/release', authenticate, authorizeAdmin, async (req: AuthR
     }
 });
 
-// Admin: Manually release all results for a specific quiz
+/**
+ * @openapi
+ * /admin/quizzes/{quizId}/release-all:
+ *   post:
+ *     tags: [Admin Results]
+ *     summary: Release all results for a quiz
+ *     parameters:
+ *       - in: path
+ *         name: quizId
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: All results released
+ */
 router.post('/quizzes/:quizId/release-all', authenticate, authorizeAdmin, async (req: AuthRequest, res) => {
     try {
         const quizId = req.params.quizId as string;

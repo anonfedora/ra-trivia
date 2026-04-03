@@ -24,7 +24,38 @@ const upload = multer({
     }
 });
 
-// Admin: Import questions from Excel
+/**
+ * @openapi
+ * /questions/import:
+ *   post:
+ *     tags: [Admin Questions]
+ *     summary: Import questions from Excel
+ *     description: Upload an Excel file containing questions. Can create a new quiz or add to an existing one.
+ *     security:
+ *       - BearerAuth: []
+ *     requestBody:
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             required: [file, questionType]
+ *             properties:
+ *               file:
+ *                 type: string
+ *                 format: binary
+ *               quizId:
+ *                 type: string
+ *               title:
+ *                 type: string
+ *               duration:
+ *                 type: string
+ *               questionType:
+ *                 type: string
+ *                 enum: [AMBASSADOR_RANK_EXAMS, EXTRAORDINARY_RANK_EXAMS, PRE_PLENIPOTENTIARY_EXAMS, PLENIPOTENTIARY_RANK_EXAMS]
+ *     responses:
+ *       201:
+ *         description: Questions imported
+ */
 router.post('/import', authenticate, authorizeAdmin, upload.single('file'), async (req: any, res) => {
     try {
         if (!req.file) {
@@ -136,7 +167,24 @@ router.post('/import', authenticate, authorizeAdmin, upload.single('file'), asyn
     }
 });
 
-// Admin: Get all questions (for a quiz) - Protected endpoint
+/**
+ * @openapi
+ * /questions:
+ *   get:
+ *     tags: [Admin Questions]
+ *     summary: Get all questions for a quiz
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: quizId
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: List of questions
+ */
 router.get('/', authenticate, authorizeAdmin, async (req, res) => {
     try {
         const { quizId } = req.query;
@@ -168,7 +216,24 @@ router.get('/', authenticate, authorizeAdmin, async (req, res) => {
     }
 });
 
-// Admin: Get question type statistics for a quiz
+/**
+ * @openapi
+ * /questions/stats/{quizId}:
+ *   get:
+ *     tags: [Admin Questions]
+ *     summary: Get question type distribution for a quiz
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: quizId
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Distribution statistics
+ */
 router.get('/stats/:quizId', authenticate, authorizeAdmin, async (req, res) => {
     try {
         const { quizId } = req.params;

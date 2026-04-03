@@ -8,6 +8,24 @@ const router = Router();
 
 // Get all quizzes
 // Super Admin gets all, Admin gets only their created quizzes, Candidates get only active ones with matching question types
+/**
+ * @openapi
+ * /quizzes:
+ *   get:
+ *     tags: [Admin Quizzes]
+ *     summary: List all available quizzes
+ *     description: Returns quizzes filtered by role and exam type. Candidates only see active exams matching their type.
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: activeOnly
+ *         schema:
+ *           type: boolean
+ *     responses:
+ *       200:
+ *         description: List of quizzes
+ */
 router.get('/', authenticate, validateQuizListAccess, async (req: AuthRequest, res) => {
     try {
         const userRole = req.user?.role;
@@ -77,6 +95,24 @@ router.get('/', authenticate, validateQuizListAccess, async (req: AuthRequest, r
 });
 
 // Get quiz details (for instructions) - with user type access control
+/**
+ * @openapi
+ * /quizzes/{id}:
+ *   get:
+ *     tags: [Quiz Details]
+ *     summary: Get quiz instructions and metadata
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Quiz details
+ */
 router.get('/:id', authenticate, validateUserTypeAccess, async (req: AuthRequest, res) => {
     try {
         const id = req.params.id as string;
@@ -126,6 +162,24 @@ router.get('/:id', authenticate, validateUserTypeAccess, async (req: AuthRequest
 });
 
 // Admin: Preview quiz with questions (read-only)
+/**
+ * @openapi
+ * /quizzes/{id}/preview:
+ *   get:
+ *     tags: [Admin Quizzes]
+ *     summary: Preview quiz with questions (Admins only)
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Quiz with question list
+ */
 router.get('/:id/preview', authenticate, authorize(['ADMIN']), async (req: AuthRequest, res) => {
     try {
         const id = req.params.id as string;
@@ -162,6 +216,30 @@ router.get('/:id/preview', authenticate, authorize(['ADMIN']), async (req: AuthR
 });
 
 // Create quiz (Admin only)
+/**
+ * @openapi
+ * /quizzes:
+ *   post:
+ *     tags: [Admin Quizzes]
+ *     summary: Create a new quiz
+ *     security:
+ *       - BearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [title, duration]
+ *             properties:
+ *               title:
+ *                 type: string
+ *               duration:
+ *                 type: integer
+ *     responses:
+ *       201:
+ *         description: Quiz created
+ */
 router.post('/', authenticate, authorize(['ADMIN']), async (req: AuthRequest, res) => {
     try {
         const { title, duration } = req.body;
@@ -186,6 +264,43 @@ router.post('/', authenticate, authorize(['ADMIN']), async (req: AuthRequest, re
 });
 
 // Admin: Update quiz metadata
+/**
+ * @openapi
+ * /quizzes/{id}:
+ *   patch:
+ *     tags: [Admin Quizzes]
+ *     summary: Update quiz metadata
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               title:
+ *                 type: string
+ *               duration:
+ *                 type: integer
+ *               startDate:
+ *                 type: string
+ *                 format: date-time
+ *               endDate:
+ *                 type: string
+ *                 format: date-time
+ *               retakeLimit:
+ *                 type: integer
+ *     responses:
+ *       200:
+ *         description: Quiz updated
+ */
 router.patch('/:id', authenticate, authorize(['ADMIN', 'SUPER_ADMIN']), async (req: AuthRequest, res) => {
     try {
         const id = req.params.id as string;
@@ -251,6 +366,25 @@ router.patch('/:id', authenticate, authorize(['ADMIN', 'SUPER_ADMIN']), async (r
 });
 
 // Toggle quiz activity (Admin only)
+/**
+ * @openapi
+ * /quizzes/{id}/toggle:
+ *   patch:
+ *     tags: [Admin Quizzes]
+ *     summary: Toggle quiz activity status
+ *     description: Activates or deactivates an exam. Activation triggers notifications to eligible candidates.
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Status updated
+ */
 router.patch('/:id/toggle', authenticate, authorize(['ADMIN', 'SUPER_ADMIN']), async (req: AuthRequest, res) => {
     try {
         const id = req.params.id as string;
@@ -327,6 +461,25 @@ router.patch('/:id/toggle', authenticate, authorize(['ADMIN', 'SUPER_ADMIN']), a
 });
 
 // Delete quiz (Admin only)
+/**
+ * @openapi
+ * /quizzes/{id}:
+ *   delete:
+ *     tags: [Admin Quizzes]
+ *     summary: Delete a quiz and its data
+ *     description: PERMANENTLY removes the quiz, all its questions, and all attempt history. Cascade delete enabled.
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Quiz deleted
+ */
 router.delete('/:id', authenticate, authorize(['ADMIN', 'SUPER_ADMIN']), async (req: AuthRequest, res) => {
     try {
         const id = req.params.id as string;

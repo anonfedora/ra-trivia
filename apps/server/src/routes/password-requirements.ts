@@ -2,7 +2,16 @@ import { Router } from 'express';
 
 const router = Router();
 
-// Endpoint to get password requirements (useful for frontend validation)
+/**
+ * @openapi
+ * /password-requirements/requirements:
+ *   get:
+ *     tags: [Utility]
+ *     summary: Get required password complexity rules
+ *     responses:
+ *       200:
+ *         description: Password requirements object
+ */
 router.get('/requirements', (req, res) => {
     res.json({
         minLength: 8,
