@@ -8,9 +8,9 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
  */
 export const axiosInstance = axios.create({
   baseURL: API_URL,
-  headers: {
-    'Content-Type': 'application/json',
-  },
+  // We do NOT set a global Content-Type here. 
+  // Axios will automatically set 'application/json' when passing an object to 'data',
+  // and will correctly OMIT it when passing FormData (allowing the browser to set the boundary).
 });
 
 let isRefreshing = false;
@@ -131,7 +131,6 @@ export async function apiFetch(
 ): Promise<Response> {
     const url = typeof input === 'string' ? input : input.url;
     const method = init?.method || 'GET';
-    const body = init?.body ? (typeof init.body === 'string' ? JSON.parse(init.body) : init.body) : undefined;
     
     // Extract headers (except Authorization as we add it globally)
     const customHeaders: any = {};
@@ -143,28 +142,59 @@ export async function apiFetch(
         });
     }
 
+    // Handle body conversion: 
+    // If it's a string, parse it to an object so Axios can handle it.
+    // If it's FormData, pass it as-is.
+    let body = init?.body;
+    if (typeof body === 'string') {
+        try {
+            body = JSON.parse(body);
+        } catch (e) {
+            // Not JSON, leave as string
+        }
+    }
+
     try {
         const response = await axiosInstance({
             url,
             method,
             data: body,
             headers: customHeaders,
+            // Use arraybuffer to capture raw binary data (essential for PDF/Excel)
+            // and mimic Fetch's low-level behavior.
+            responseType: 'arraybuffer',
         });
+
+        const dataBuffer = response.data;
 
         // Wrap Axios response to look like Fetch response
         return {
             ok: true,
             status: response.status,
             statusText: response.statusText,
-            json: async () => response.data,
-            text: async () => JSON.stringify(response.data),
-            blob: async () => new Blob([JSON.stringify(response.data)]),
+            json: async () => {
+                const text = new TextDecoder().decode(dataBuffer);
+                return JSON.parse(text);
+            },
+            text: async () => new TextDecoder().decode(dataBuffer),
+            blob: async () => new Blob([dataBuffer], { 
+                type: response.headers['content-type'] 
+            }),
             headers: new Headers(response.headers as any),
             clone: () => { throw new Error('Clone not implemented for apiFetch'); }
         } as unknown as Response;
     } catch (error: any) {
         const status = error.response?.status || 500;
-        const data = error.response?.data || { message: error.message };
+        let data = error.response?.data;
+        
+        // Error data might also be an ArrayBuffer if we got a 4xx/5xx
+        if (data instanceof ArrayBuffer) {
+            try {
+                data = JSON.parse(new TextDecoder().decode(data));
+            } catch (e) {
+                data = { message: error.message };
+            }
+        }
 
         return {
             ok: false,
