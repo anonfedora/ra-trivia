@@ -154,12 +154,6 @@ importers:
       socket.io:
         specifier: ^4.8.3
         version: 4.8.3
-      swagger-jsdoc:
-        specifier: ^6.2.8
-        version: 6.2.8(openapi-types@12.1.3)
-      swagger-ui-express:
-        specifier: ^5.0.1
-        version: 5.0.1(express@5.2.1)
       xlsx:
         specifier: ^0.18.5
         version: 0.18.5
@@ -203,6 +197,12 @@ importers:
       supertest:
         specifier: ^7.0.0
         version: 7.2.2
+      swagger-jsdoc:
+        specifier: ^6.2.8
+        version: 6.2.8(openapi-types@12.1.3)
+      swagger-ui-express:
+        specifier: ^5.0.1
+        version: 5.0.1(express@5.2.1)
       ts-node-dev:
         specifier: ^2.0.0
         version: 2.0.0(@types/node@20.19.33)(typescript@5.9.3)
