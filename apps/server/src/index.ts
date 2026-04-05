@@ -107,8 +107,13 @@ app.use(express.json({ limit: '10mb' })); // Limit body size
 app.use(sanitizeInput); // Prevent XSS attacks with custom sanitization
 
 // Apply rate limiting
-app.use('/api/', apiLimiter); // General API rate limit
 app.use('/api/auth/', authLimiter); // Strict rate limit for auth endpoints
+// General API rate limit (applied to all other /api routes, excluding auth)
+app.use('/api/', (req, res, next) => {
+    // If it's an auth route, it was already handled by authLimiter
+    if (req.path.startsWith('/auth/')) return next();
+    return apiLimiter(req, res, next);
+});
 
 // Swagger Documentation
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));

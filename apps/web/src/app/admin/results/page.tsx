@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect, useCallback, Suspense } from 'react';
-import { Search, FileDown, ArrowLeft, User, Mail, GraduationCap, Award, Calendar, Activity } from 'lucide-react';
+import { useState, useEffect, useCallback, Suspense, useMemo } from 'react';
+import { Search, FileDown, ArrowLeft, User, Mail, GraduationCap, Award, Calendar, Activity, CheckSquare, Square, Share2 } from 'lucide-react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { ThemeToggle } from '../../../components/ThemeToggle';
@@ -51,9 +51,21 @@ function AdminResultsContent() {
     const [summary, setSummary] = useState<any>(null);
     const [isExporting, setIsExporting] = useState<string | null>(null); // 'excel' | 'formatted-excel' | 'pdf'
     const [releaseModal, setReleaseModal] = useState<string[] | null>(null);
+    const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
     const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
     const { toast } = useToast();
+
+    // Derived: get IDs that are actually releasable (not yet released)
+    const releasableResultsOnPage = useMemo(() => {
+        const now = new Date();
+        return results.filter(r => !r.resultReleasesAt || new Date(r.resultReleasesAt) > now);
+    }, [results]);
+
+    const isAllSelected = useMemo(() => {
+        return releasableResultsOnPage.length > 0 && 
+               releasableResultsOnPage.every(r => selectedIds.includes(r.id));
+    }, [releasableResultsOnPage, selectedIds]);
 
     const fetchResults = useCallback(async (overridePage?: number) => {
         const effectivePage = overridePage ?? page;
@@ -70,6 +82,7 @@ function AdminResultsContent() {
                 setResults(data.items);
                 setTotal(data.total);
                 setSummary(data.summary);
+                setSelectedIds([]); // Clear selection on page/search change
             }
         } catch (err) {
             console.error('Failed to fetch results', err);
@@ -91,6 +104,20 @@ function AdminResultsContent() {
         return () => clearTimeout(t);
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [searchTerm, status]);
+
+    const toggleSelectAll = () => {
+        if (isAllSelected) {
+            setSelectedIds([]);
+        } else {
+            setSelectedIds(releasableResultsOnPage.map(r => r.id));
+        }
+    };
+
+    const toggleSelect = (id: string) => {
+        setSelectedIds(prev => 
+            prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
+        );
+    };
 
     const handleStatusChange = async (sessionId: string, newStatus: string | null) => {
         try {
@@ -332,7 +359,18 @@ function AdminResultsContent() {
                 {/* Results Table */}
                 <section className="bg-white dark:bg-slate-800 rounded-[2.5rem] shadow-xl border border-slate-100 dark:border-slate-700 overflow-hidden animate-slide-up" style={{ animationDelay: '200ms' }}>
                     <div className="p-8 border-b border-slate-50 dark:border-slate-700 flex justify-between items-center bg-slate-50/50 dark:bg-slate-900/50">
-                        <h3 className="text-xl font-bold text-slate-800 dark:text-slate-100">Completed Attempts</h3>
+                        <div className="flex items-center gap-4">
+                            <h3 className="text-xl font-bold text-slate-800 dark:text-slate-100">Completed Attempts</h3>
+                            {selectedIds.length > 0 && (
+                                <button
+                                    onClick={() => setReleaseModal(selectedIds)}
+                                    className="flex items-center gap-2 bg-primary text-white px-4 py-2 rounded-xl font-bold text-sm shadow-lg shadow-primary/20 hover:scale-105 active:scale-95 transition-all animate-in fade-in slide-in-from-left-4"
+                                >
+                                    <Share2 size={16} />
+                                    Release {selectedIds.length} Selected
+                                </button>
+                            )}
+                        </div>
                         <span className="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">{total} completed records</span>
                     </div>
 
@@ -366,12 +404,31 @@ function AdminResultsContent() {
                                     <th className="px-8 py-6 w-[10%]">Score</th>
                                     <th className="px-8 py-6 w-[15%]">Status</th>
                                     <th className="px-8 py-6 w-[15%]">Timeline</th>
-                                    <th className="px-8 py-6 w-[12%]">Actions</th>
+                                    <th className="px-8 py-6 w-[12%]">
+                                        <div className="flex items-center gap-2">
+                                            <button
+                                                onClick={toggleSelectAll}
+                                                className="p-1 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-md transition-colors"
+                                                title={isAllSelected ? "Deselect All" : "Select All Releasable"}
+                                            >
+                                                {isAllSelected ? (
+                                                    <CheckSquare className="text-primary" size={18} />
+                                                ) : (
+                                                    <Square size={18} />
+                                                )}
+                                            </button>
+                                            <span>Actions</span>
+                                        </div>
+                                    </th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-50 dark:divide-slate-700">
-                                {results.length > 0 ? results.map((result) => (
-                                    <tr key={result.id} className="hover:bg-slate-50 dark:hover:bg-slate-900/50 transition-colors">
+                                {results.length > 0 ? results.map((result) => {
+                                    const isReleasable = !result.resultReleasesAt || new Date(result.resultReleasesAt) > new Date();
+                                    const isSelected = selectedIds.includes(result.id);
+                                    
+                                    return (
+                                    <tr key={result.id} className={`hover:bg-slate-50 dark:hover:bg-slate-900/50 transition-colors ${isSelected ? 'bg-primary/5 dark:bg-primary/10' : ''}`}>
                                         <td className="px-8 py-6">
                                             <div className="flex items-center gap-3">
                                                 <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary">
@@ -437,16 +494,28 @@ function AdminResultsContent() {
                                             </div>
                                         </td>
                                         <td className="px-8 py-6">
-                                            <button
-                                                onClick={() => setReleaseModal([result.id])}
-                                                disabled={!!result.resultReleasesAt && new Date(result.resultReleasesAt) <= new Date()}
-                                                className="px-4 py-2 rounded-xl text-xs font-bold bg-primary text-white hover:bg-primary/90 disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-sm hover:shadow-md active:scale-95"
-                                            >
-                                                {result.resultReleasesAt && new Date(result.resultReleasesAt) <= new Date() ? '✓ Released' : 'Release Now'}
-                                            </button>
+                                            {isReleasable ? (
+                                                <button
+                                                    onClick={() => toggleSelect(result.id)}
+                                                    className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all border ${
+                                                        isSelected 
+                                                            ? 'bg-primary text-white border-primary shadow-md' 
+                                                            : 'bg-white dark:bg-slate-700 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-600 hover:border-primary'
+                                                    }`}
+                                                >
+                                                    {isSelected ? <CheckSquare size={16} /> : <Square size={16} />}
+                                                    {isSelected ? 'Selected' : 'Select to Release'}
+                                                </button>
+                                            ) : (
+                                                <div className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold text-emerald-500 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-100 dark:border-emerald-900/30 w-fit">
+                                                    <CheckSquare size={16} />
+                                                    Released
+                                                </div>
+                                            )}
                                         </td>
                                     </tr>
-                                )) : (
+                                    );
+                                }) : (
                                     <tr>
                                         <td colSpan={6} className="px-8 py-20 text-center">
                                             <div className="flex flex-col items-center gap-3">

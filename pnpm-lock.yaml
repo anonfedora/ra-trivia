@@ -9,6 +9,9 @@ overrides:
   react-dom: 19.1.0
   '@types/react': 19.1.10
   '@types/react-dom': 19.1.10
+  expo-router: ~6.0.23
+  '@expo/metro-runtime': ~6.1.2
+  expo-symbols: ~1.0.8
 
 importers:
 
@@ -1185,7 +1188,7 @@ packages:
     hasBin: true
     peerDependencies:
       expo: '*'
-      expo-router: '*'
+      expo-router: ~6.0.23
       react-native: '*'
     peerDependenciesMeta:
       expo-router:
@@ -3555,7 +3558,7 @@ packages:
   expo-router@6.0.23:
     resolution: {integrity: sha512-qCxVAiCrCyu0npky6azEZ6dJDMt77OmCzEbpF6RbUTlfkaCA417LvY14SBkk0xyGruSxy/7pvJOI6tuThaUVCA==}
     peerDependencies:
-      '@expo/metro-runtime': ^6.1.2
+      '@expo/metro-runtime': ~6.1.2
       '@react-navigation/drawer': ^7.5.0
       '@testing-library/react-native': '>= 12.0.0'
       expo: '*'
@@ -3623,7 +3626,7 @@ packages:
     hasBin: true
     peerDependencies:
       '@expo/dom-webview': '*'
-      '@expo/metro-runtime': '*'
+      '@expo/metro-runtime': ~6.1.2
       react: 19.1.0
       react-native: '*'
       react-native-webview: '*'
@@ -10003,7 +10006,7 @@ snapshots:
       eslint: 8.57.1
       eslint-import-resolver-node: 0.3.9
       eslint-import-resolver-typescript: 3.10.1(eslint-plugin-import@2.32.0(eslint@8.57.1))(eslint@8.57.1)
-      eslint-plugin-import: 2.32.0(@typescript-eslint/parser@7.2.0(eslint@8.57.1)(typescript@5.9.3))(eslint-import-resolver-typescript@3.10.1)(eslint@8.57.1)
+      eslint-plugin-import: 2.32.0(@typescript-eslint/parser@7.2.0(eslint@8.57.1)(typescript@5.9.3))(eslint-import-resolver-typescript@3.10.1(eslint-plugin-import@2.32.0(eslint@8.57.1))(eslint@8.57.1))(eslint@8.57.1)
       eslint-plugin-jsx-a11y: 6.10.2(eslint@8.57.1)
       eslint-plugin-react: 7.37.5(eslint@8.57.1)
       eslint-plugin-react-hooks: 5.0.0-canary-7118f5dd7-20230705(eslint@8.57.1)
@@ -10033,7 +10036,7 @@ snapshots:
       tinyglobby: 0.2.15
       unrs-resolver: 1.11.1
     optionalDependencies:
-      eslint-plugin-import: 2.32.0(@typescript-eslint/parser@7.2.0(eslint@8.57.1)(typescript@5.9.3))(eslint-import-resolver-typescript@3.10.1)(eslint@8.57.1)
+      eslint-plugin-import: 2.32.0(@typescript-eslint/parser@7.2.0(eslint@8.57.1)(typescript@5.9.3))(eslint-import-resolver-typescript@3.10.1(eslint-plugin-import@2.32.0(eslint@8.57.1))(eslint@8.57.1))(eslint@8.57.1)
     transitivePeerDependencies:
       - supports-color
 
@@ -10048,7 +10051,7 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  eslint-plugin-import@2.32.0(@typescript-eslint/parser@7.2.0(eslint@8.57.1)(typescript@5.9.3))(eslint-import-resolver-typescript@3.10.1)(eslint@8.57.1):
+  eslint-plugin-import@2.32.0(@typescript-eslint/parser@7.2.0(eslint@8.57.1)(typescript@5.9.3))(eslint-import-resolver-typescript@3.10.1(eslint-plugin-import@2.32.0(eslint@8.57.1))(eslint@8.57.1))(eslint@8.57.1):
     dependencies:
       '@rtsao/scc': 1.1.0
       array-includes: 3.1.9
