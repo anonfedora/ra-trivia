@@ -229,9 +229,10 @@ export const sendBulkWelcomeEmail = async (
 
       <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 20px; margin: 20px 0;">
         <h3 style="margin-top: 0; color: #1e293b; border-bottom: 1px solid #e2e8f0; padding-bottom: 10px;">Registration Details</h3>
-        <p style="margin: 10px 0; font-size: 14px; color: #334155;"><strong>Name:</strong> ${name}</p>
         <p style="margin: 10px 0; font-size: 14px; color: #334155;"><strong>Email:</strong> ${email}</p>
         <p style="margin: 10px 0; font-size: 14px; color: #334155;"><strong>Password:</strong> ${password}</p>
+        <p></p>
+        <p style="margin: 10px 0; font-size: 14px; color: #334155;"><strong>Name:</strong> ${name}</p>
         <p style="margin: 10px 0; font-size: 14px; color: #334155;"><strong>Church:</strong> ${church}</p>
         <p style="margin: 10px 0; font-size: 14px; color: #334155;"><strong>Association:</strong> ${association}</p>
         <p style="margin: 10px 0; font-size: 14px; color: #334155;"><strong>Examination Type:</strong> ${userType.replace(/_/g, ' ')}</p>

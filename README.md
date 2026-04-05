@@ -86,6 +86,7 @@ pnpm --filter web dev
 ## Features
 
 ### Candidates
+- **About Page**: Dedicated informational page for new users to learn about RA Trivia's features and mission.
 - Register, verify email via 6-digit OTP, log in
 - See only exams matching their user type (e.g. `AMBASSADOR_RANK_EXAMS`)
 - Real-time countdown timer with auto-submit on expiry
@@ -232,7 +233,24 @@ pnpm --filter server test -- --run
 
 ## Version History
 
-### v1.8.0 (Current)
+### v1.9.0 (Current)
+- **Bulk Candidate Registration**:
+    - **Excel Import**: Register hundreds of candidates in seconds via `.xlsx` or `.csv`.
+    - **Automated Onboarding**: Candidates receive welcome emails with login credentials and a 24-hour verification OTP.
+    - **Import Summaries**: Real-time reporting of successful vs. failed registrations with error details.
+- **Enhanced Admin Analytics**:
+    - **Pass/Fail Breakdown**: Visual metrics based on a 50% score threshold.
+    - **Score Extremes**: Instant visibility of highest and lowest scores per quiz.
+    - **Summary Headers**: Dynamic results header on the admin search page for filtered result sets.
+- **Platform Experience & UI**:
+    - **About Page**: New informational landing page for prospective users.
+    - **Mobile Warning Optimization**: Centered and wrap-safe timer/violation alerts for mobile users.
+    - **Unverified Login Flow**: Seamless redirection and new OTP generation for unverified accounts.
+- **System Maintenance**:
+    - **Automated Cleanup**: Hourly background task to purge expired (24h+) unverified accounts.
+    - **SDK Downgrade (Mobile)**: Realigned to Expo SDK 54 for guaranteed Expo Go stability.
+
+### v1.8.0
 - **Social Sharing & QR Verification**:
     - **QR Code Generation**: Results pages now include a high-definition QR code for instant physical-to-digital validation.
     - **Public Verification Page**: A new dedicated, unauthenticated landing page (`/verify/[id]`) for third-party result verification.

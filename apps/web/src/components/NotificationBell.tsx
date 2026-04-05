@@ -86,11 +86,15 @@ export default function NotificationBell() {
             console.warn('[SOCKET] Connection error, falling back to polling:', err.message);
             // Fallback: poll every 30s if socket fails
             const interval = setInterval(fetchNotifications, 30000);
-            return () => clearInterval(interval);
+            
+            // Register cleanup for this specific interval
+            socket.on('disconnect', () => clearInterval(interval));
         });
 
         return () => {
             clearTimeout(timer);
+            socket.off('notification');
+            socket.off('connect_error');
             socket.disconnect();
         };
     }, [apiUrl]);
