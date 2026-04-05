@@ -98,13 +98,14 @@ pnpm --filter web dev
 ### Admins
 - Create, edit, activate/deactivate, and delete quizzes
 - Import questions from Excel by user type
+- **Bulk Candidate Import**: Register hundreds of candidates via Excel upload with automated welcome emails and 24-hour verification window
 - Set retake limits, start/end scheduling
 - View all candidate results with search and pagination
 - Support Center: Real-time chat with candidates, thread management, and resolution tracking
 - Manually release results per-session or bulk per-quiz
 - Set manual pass/fail status override
 - Export results as formatted Excel or PDF
-- Analytics dashboard with per-quiz and platform-wide stats
+- **Enhanced Analytics**: Detailed performance metrics (Pass/Fail breakdown, Score extremes) with dynamic summary headers
 - In-app notifications: exam submissions, new registrations
 
 ### SUPER_ADMIN

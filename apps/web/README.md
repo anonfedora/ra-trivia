@@ -112,10 +112,28 @@ pnpm --filter web lint
 | Route | Description |
 |---|---|
 | `/admin/dashboard` | Quiz management, import, recent activity |
-| `/admin/results` | All candidate results, search, release, export |
-| `/admin/analytics` | Performance charts and stats |
+| `/admin/results` | All candidate results, search, release, export, **Bulk Import** |
+| `/admin/analytics` | Performance charts, **Pass/Fail Breakdown**, Score extremes |
 | `/admin/notifications` | Notifications with Exams / Candidates / Admins filter tabs |
 | `/admin/quizzes/:id/preview` | Preview quiz questions |
+
+## Admin Features
+
+### Bulk Candidate Import
+Admins can now register multiple candidates at once via Excel/CSV. 
+- **Template Download**: Get a pre-formatted Excel template with required headers.
+- **Auto-Verification**: Candidates receive a welcome email with their password and a 6-digit verification code.
+- **Status Reporting**: Real-time summary of successful vs. failed registrations with error details.
+
+### Enhanced Analytics
+- **Pass/Fail Breakdown**: Visual distribution based on a 50% score threshold.
+- **Score Extremes**: Prominent display of Highest and Lowest scores per quiz.
+- **Dynamic Summary Headers**: When searching for a specific exam title, a header appears with the filtered Pass/Fail ratio and Average Score.
+
+## UI/UX Improvements
+- **Mobile Optimized Warnings**: Timer and Violation alerts are now centered and wrap properly on small screens.
+- **Unified Dark Mode**: Premium dark mode applied across Dashboard, Quiz, and Admin pages with consistent theme persistence.
+- **Enhanced Verification Flow**: Unverified users attempting to login are automatically sent a new OTP and redirected to the verify page.
 
 ## Toast System
 

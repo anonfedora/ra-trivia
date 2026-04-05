@@ -7,14 +7,45 @@ export const initScheduler = () => {
     console.log(`🌍 Server timezone: ${Intl.DateTimeFormat().resolvedOptions().timeZone}`);
     console.log(`🕐 Current server time: ${new Date().toLocaleString()}`);
 
-    // Run immediately on startup to catch any missed emails
+    // Run immediately on startup to catch any missed tasks
     processResultsRelease();
+    cleanupUnverifiedAccounts();
 
     // Run every 15 minutes to check for pending releases (more frequent than hourly)
     setInterval(async () => {
         await processResultsRelease();
     }, 15 * 60 * 1000); // 15 minutes
+
+    // Run cleanup every hour
+    setInterval(async () => {
+        await cleanupUnverifiedAccounts();
+    }, 60 * 60 * 1000); // 1 hour
 };
+
+async function cleanupUnverifiedAccounts() {
+    try {
+        const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+        
+        console.log(`[SCHEDULER] 🧹 Cleaning up unverified accounts older than ${twentyFourHoursAgo.toISOString()}...`);
+
+        const deleteResult = await prisma.user.deleteMany({
+            where: {
+                emailVerified: false,
+                createdAt: {
+                    lt: twentyFourHoursAgo
+                }
+            }
+        });
+
+        if (deleteResult.count > 0) {
+            console.log(`[SCHEDULER] ✅ Deleted ${deleteResult.count} unverified accounts.`);
+        } else {
+            console.log(`[SCHEDULER] No expired unverified accounts to clean up.`);
+        }
+    } catch (error) {
+        console.error('[SCHEDULER] Error in cleanupUnverifiedAccounts task:', error);
+    }
+}
 
 async function processResultsRelease() {
     try {
