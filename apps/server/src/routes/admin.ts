@@ -4,8 +4,14 @@ import { authenticate, authorizeAdmin, AuthRequest } from '../middlewares/auth';
 import * as xlsx from 'xlsx';
 import { ReportGenerator } from '../services/reportGenerator';
 import { emitNotification } from '../services/socketService';
+import bcrypt from 'bcryptjs';
+import crypto from 'crypto';
+import multer from 'multer';
+import { sendBulkWelcomeEmail, generateOTP } from '../services/email';
 
 const router = Router();
+const upload = multer({ storage: multer.memoryStorage() });
+const WEB_URL = process.env.WEB_URL || 'http://localhost:3000';
 
 /**
  * @openapi
@@ -793,8 +799,139 @@ router.post('/trigger-emails', authenticate, authorizeAdmin, async (req: AuthReq
             results
         });
     } catch (error) {
-        console.error('[ADMIN] Error triggering emails:', error);
-        res.status(500).json({ message: 'Failed to trigger emails' });
+        console.error('Trigger release error:', error);
+        res.status(500).json({ message: 'Failed to manually trigger release' });
+    }
+});
+
+/**
+ * @openapi
+ * /admin/bulk-candidates:
+ *   post:
+ *     tags: [Admin Bulk]
+ *     summary: Bulk register candidates from Excel
+ *     security:
+ *       - BearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               file:
+ *                 type: string
+ *                 format: binary
+ *     responses:
+ *       200:
+ *         description: Bulk registration results
+ */
+router.post('/bulk-candidates', authenticate, authorizeAdmin, upload.single('file'), async (req: AuthRequest, res) => {
+    try {
+        if (!req.file) {
+            return res.status(400).json({ message: 'No file uploaded' });
+        }
+
+        const workbook = xlsx.read(req.file.buffer, { type: 'buffer' });
+        const sheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[sheetName];
+        const data = xlsx.utils.sheet_to_json(worksheet) as any[];
+
+        const results = {
+            success: 0,
+            failed: 0,
+            errors: [] as string[]
+        };
+
+        for (const row of data) {
+            try {
+                const email = row['Email Address']?.toString().trim();
+                const name = row['Full Name']?.toString().trim();
+                const church = row['Church']?.toString().trim();
+                const association = row['Association']?.toString().trim();
+                const rawUserType = row['Examination Type']?.toString().trim();
+                const password = row['Password']?.toString().trim();
+
+                if (!email || !name || !password || !rawUserType) {
+                    results.failed++;
+                    results.errors.push(`Missing required fields for ${email || 'unknown user'}`);
+                    continue;
+                }
+
+                // Map "Examination Type" to UserType enum
+                let userType: UserType;
+                const normalizedType = rawUserType.toUpperCase().replace(/\s+/g, '_');
+                if (normalizedType.includes('AMBASSADOR')) {
+                    userType = 'AMBASSADOR_RANK_EXAMS';
+                } else if (normalizedType.includes('EXTRAORDINARY')) {
+                    userType = 'EXTRAORDINARY_RANK_EXAMS';
+                } else if (normalizedType.includes('PRE_PLENIPOTENTIARY') || normalizedType.includes('PRE-PLENIPOTENTIARY')) {
+                    userType = 'PRE_PLENIPOTENTIARY_EXAMS';
+                } else if (normalizedType.includes('PLENIPOTENTIARY')) {
+                    userType = 'PLENIPOTENTIARY_RANK_EXAMS';
+                } else {
+                    results.failed++;
+                    results.errors.push(`Invalid Examination Type: ${rawUserType} for ${email}`);
+                    continue;
+                }
+
+                const existingUser = await prisma.user.findUnique({ where: { email } });
+                if (existingUser) {
+                    results.failed++;
+                    results.errors.push(`User already exists: ${email}`);
+                    continue;
+                }
+
+                const hashedPassword = await bcrypt.hash(password, 12);
+                const otp = generateOTP();
+                const otpHash = crypto.createHash('sha256').update(otp).digest('hex');
+                const otpExpiresAt = new Date(Date.now() + 1000 * 60 * 60 * 24); // 24 hours for bulk imports
+
+                const user = await prisma.user.create({
+                    data: {
+                        email,
+                        name,
+                        password: hashedPassword,
+                        church: church || null,
+                        association: association || null,
+                        role: 'CANDIDATE',
+                        userType,
+                        emailVerified: false,
+                        emailOtpHash: otpHash,
+                        emailOtpExpiresAt: otpExpiresAt
+                    }
+                });
+
+                const protocol = (req.header('x-forwarded-proto') || req.protocol || 'http').toString();
+                const host = (req.header('x-forwarded-host') || req.get('host') || 'localhost:4000').toString();
+                const frontendUrl = WEB_URL || `${protocol}://${host.replace('4000', '3000')}`;
+                const verifyUrl = `${frontendUrl}/verify-otp?email=${encodeURIComponent(email)}`;
+
+                await sendBulkWelcomeEmail(
+                    email,
+                    name,
+                    password,
+                    church || 'N/A',
+                    association || 'N/A',
+                    userType,
+                    verifyUrl,
+                    otp
+                );
+
+                results.success++;
+            } catch (err: any) {
+                results.failed++;
+                results.errors.push(`Error registering ${row['Email Address']}: ${err.message}`);
+            }
+        }
+
+        res.json({
+            message: `Bulk registration completed: ${results.success} succeeded, ${results.failed} failed.`,
+            ...results
+        });
+    } catch (error) {
+        console.error('Bulk registration error:', error);
+        res.status(500).json({ message: 'Bulk registration failed' });
     }
 });
 

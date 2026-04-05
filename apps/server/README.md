@@ -134,7 +134,7 @@ pnpm --filter server test:coverage
 | Method | Path | Auth | Description |
 |---|---|---|---|
 | GET | `/results` | Admin | Paginated results with search + user type filter |
-| GET | `/analytics` | Admin | Per-quiz performance stats |
+| GET | `/analytics` | Admin | Per-quiz performance stats + **Pass/Fail Breakdown** |
 | GET | `/global-stats` | Admin | Platform-wide stats |
 | POST | `/sessions/release` | Admin | Release results for given session IDs |
 | POST | `/quizzes/:id/release-all` | Admin | Release all sessions for a quiz |
@@ -142,6 +142,20 @@ pnpm --filter server test:coverage
 | POST | `/trigger-emails` | Admin | Manually trigger pending result emails |
 | GET | `/export/formatted-excel` | Admin | Formatted Excel export |
 | GET | `/export/pdf` | Admin | PDF report (Puppeteer) |
+| POST | `/bulk-candidates` | Admin | Bulk register candidates via Excel upload |
+
+## Backend Services
+
+### Bulk Registration & Verification
+The `bulk-candidates` endpoint parses Excel files, hashes passwords, and generates verification OTPs.
+- **24-hour Expiry**: Bulk-imported accounts have a 24-hour verification window.
+- **Automated Cleanup**: A background scheduler deletes any unverified accounts older than 24 hours every hour.
+- **Welcome Emails**: Custom welcome emails are sent with registration details, login password, and verification OTP.
+
+### Scheduler & Automation
+- **Results Release**: Checks for quiz sessions ready for release every 15 minutes.
+- **Account Cleanup**: Runs hourly to purge expired, unverified accounts.
+- **10 PM Batch**: Result emails are specifically triggered during the 22:00 hour for consistency.
 
 ### Notifications — `/api/notifications`
 

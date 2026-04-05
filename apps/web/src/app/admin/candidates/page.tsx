@@ -1,13 +1,14 @@
 "use client";
 
 import { useState, useEffect, useCallback } from 'react';
-import { Search, ArrowLeft } from 'lucide-react';
+import { Search, ArrowLeft, UserPlus } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { ThemeToggle } from '../../../components/ThemeToggle';
 import NotificationBell from '../../../components/NotificationBell';
 import { useToast } from '../../../contexts/ToastContext';
 import CandidateTable from '../../../components/CandidateTable';
+import { BulkImportModal } from '../../../components';
 import { apiFetch } from '../../../lib/api';
 import { getAccessToken, getUser } from '../../../lib/auth';
 
@@ -18,6 +19,7 @@ export default function CandidatesPage() {
     const [searchTerm, setSearchTerm] = useState('');
     const [page, setPage] = useState(1);
     const [total, setTotal] = useState(0);
+    const [isImportModalOpen, setIsImportModalOpen] = useState(false);
     const pageSize = 25;
     const { toast } = useToast();
     const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
@@ -77,6 +79,12 @@ export default function CandidatesPage() {
                         <p className="text-slate-500 dark:text-slate-400 mt-2 font-medium">All registered candidates across the platform.</p>
                     </div>
                     <div className="flex gap-3 items-center">
+                        <button 
+                            onClick={() => setIsImportModalOpen(true)}
+                            className="flex items-center gap-2 px-6 py-3 bg-primary text-white rounded-2xl font-bold shadow-lg shadow-primary/20 hover:bg-primary/90 transition-all transform hover:-translate-y-0.5"
+                        >
+                            <UserPlus size={18} /> Bulk Import
+                        </button>
                         <NotificationBell />
                         <ThemeToggle />
                     </div>
@@ -106,6 +114,12 @@ export default function CandidatesPage() {
                     onNext={() => setPage(p => Math.min(totalPages, p + 1))}
                 />
             </div>
+
+            <BulkImportModal 
+                isOpen={isImportModalOpen}
+                onClose={() => setIsImportModalOpen(false)}
+                onSuccess={() => fetchCandidates(1)}
+            />
         </main>
     );
 }
