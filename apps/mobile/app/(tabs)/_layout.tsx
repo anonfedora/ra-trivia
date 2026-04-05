@@ -13,7 +13,7 @@ export default function TabLayout() {
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: Colors[colorScheme].tint,
+        tabBarActiveTintColor: Colors[colorScheme ?? 'light'].tint,
         // Disable the static render of the header on web
         // to prevent a hydration error in React Navigation v6.
         headerShown: useClientOnlyValue(false, true),
@@ -24,11 +24,11 @@ export default function TabLayout() {
           title: 'Dashboard',
           tabBarIcon: ({ color }) => (
             <SymbolView
-              name={{
+              name={Platform.select({
                 ios: 'house.fill',
-                android: 'home',
-                web: 'home',
-              }}
+                android: 'home' as any,
+                web: 'home' as any,
+              })}
               tintColor={color}
               size={28}
             />
@@ -41,11 +41,28 @@ export default function TabLayout() {
           title: 'Results',
           tabBarIcon: ({ color }) => (
             <SymbolView
-              name={{
+              name={Platform.select({
                 ios: 'chart.bar.fill',
-                android: 'bar_chart',
-                web: 'bar_chart',
-              }}
+                android: 'bar_chart' as any,
+                web: 'bar_chart' as any,
+              })}
+              tintColor={color}
+              size={28}
+            />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="notifications"
+        options={{
+          title: 'Notifications',
+          tabBarIcon: ({ color }) => (
+            <SymbolView
+              name={Platform.select({
+                ios: 'bell.fill',
+                android: 'notifications' as any,
+                web: 'notifications' as any,
+              })}
               tintColor={color}
               size={28}
             />
@@ -58,11 +75,11 @@ export default function TabLayout() {
           title: 'Profile',
           tabBarIcon: ({ color }) => (
             <SymbolView
-              name={{
+              name={Platform.select({
                 ios: 'person.fill',
-                android: 'person',
-                web: 'person',
-              }}
+                android: 'person' as any,
+                web: 'person' as any,
+              })}
               tintColor={color}
               size={28}
             />

@@ -8,6 +8,21 @@ import '../global.css';
 
 import { useColorScheme } from '@/components/useColorScheme';
 import { AuthProvider, useAuth } from '../context/AuthContext';
+import { View, Text, TextInput, TouchableOpacity, KeyboardAvoidingView, ScrollView } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
+import { cssInterop } from 'nativewind';
+
+// Global Styling Interop Registrations
+// We register these here ONCE at app startup to avoid CSS/React lifecycle conflicts
+cssInterop(SafeAreaView, { className: 'style' });
+cssInterop(KeyboardAvoidingView, { className: 'style' });
+cssInterop(ScrollView, { className: 'style' });
+cssInterop(View, { className: 'style' });
+cssInterop(Text, { className: 'style' });
+cssInterop(TextInput, { className: 'style' });
+cssInterop(TouchableOpacity, { className: 'style' });
+cssInterop(LinearGradient, { className: 'style' });
 
 export {
   // Catch any errors thrown by the Layout component.
@@ -15,8 +30,8 @@ export {
 } from 'expo-router';
 
 export const unstable_settings = {
-  // Ensure that reloading on `/modal` keeps a back button present.
-  initialRouteName: '(tabs)',
+  // Ensure that everything defaults to login if unauth
+  initialRouteName: 'login',
 };
 
 // Prevent the splash screen from auto-hiding before asset loading is complete.
@@ -56,17 +71,17 @@ function RootLayoutNav() {
   if (isLoading) return null;
 
   return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <Stack>
+    <ThemeProvider value={DarkTheme}>
+      <Stack screenOptions={{ headerShown: false }}>
         {!user ? (
           <>
-            <Stack.Screen name="login" options={{ headerShown: false }} />
-            <Stack.Screen name="register" options={{ headerShown: false }} />
-            <Stack.Screen name="verify" options={{ title: 'Verify OTP' }} />
+            <Stack.Screen name="login" />
+            <Stack.Screen name="register" />
+            <Stack.Screen name="verify" options={{ title: 'Verify OTP', headerShown: true }} />
           </>
         ) : (
           <>
-            <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+            <Stack.Screen name="(tabs)" />
             <Stack.Screen name="modal" options={{ presentation: 'modal' }} />
           </>
         )}

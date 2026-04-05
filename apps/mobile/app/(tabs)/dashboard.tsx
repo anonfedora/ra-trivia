@@ -1,9 +1,14 @@
+/// <reference types="nativewind/types" />
 import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, RefreshControl, ActivityIndicator, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, RefreshControl, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../../context/AuthContext';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Clock, Users, Calendar, Trophy, Play, BookOpen, TrendingUp } from 'lucide-react-native';
+import { Clock, Users, Calendar, Trophy, Play, BookOpen, TrendingUp, Sparkles, ShieldCheck, RefreshCcw } from 'lucide-react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import { cssInterop } from 'nativewind';
+
+// Global interop is now pre-registered in _layout.tsx
 
 interface Quiz {
   id: string;
@@ -19,7 +24,7 @@ interface Quiz {
 }
 
 export default function DashboardScreen() {
-  const { user, token, apiUrl } = useAuth();
+  const { user, accessToken, apiUrl } = useAuth();
   const router = useRouter();
   const [quizzes, setQuizzes] = useState<Quiz[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -39,10 +44,10 @@ export default function DashboardScreen() {
     try {
       const [quizzesRes, statsRes] = await Promise.all([
         fetch(`${apiUrl}/quizzes`, {
-          headers: { 'Authorization': `Bearer ${token}` }
+          headers: { 'Authorization': `Bearer ${accessToken}` }
         }),
         fetch(`${apiUrl}/quiz/my-sessions`, {
-          headers: { 'Authorization': `Bearer ${token}` }
+          headers: { 'Authorization': `Bearer ${accessToken}` }
         })
       ]);
 
@@ -50,12 +55,11 @@ export default function DashboardScreen() {
         const quizzesData = await quizzesRes.json();
         const sessionsData = await statsRes.json();
 
-        // Process quizzes with status
         const now = new Date();
         const processedQuizzes = quizzesData.map((quiz: any) => {
           const start = quiz.startDate ? new Date(quiz.startDate) : null;
           const end = quiz.endDate ? new Date(quiz.endDate) : null;
-          const completedAttempts = sessionsData.filter((s: any) => 
+          const completedAttempts = sessionsData.filter((s: any) =>
             s.quizId === quiz.id && s.status === 'COMPLETED'
           ).length;
 
@@ -73,7 +77,6 @@ export default function DashboardScreen() {
 
         setQuizzes(processedQuizzes);
 
-        // Calculate stats
         const completedSessions = sessionsData.filter((s: any) => s.status === 'COMPLETED');
         const totalScore = completedSessions.reduce((sum: number, s: any) => sum + (s.score || 0), 0);
         const averageScore = completedSessions.length > 0 ? totalScore / completedSessions.length : 0;
@@ -99,349 +102,186 @@ export default function DashboardScreen() {
   };
 
   const handleQuizPress = (quiz: Quiz) => {
-    if (quiz.status === 'UPCOMING') {
-      // Show upcoming quiz details
-      return;
-    }
-    
-    if (quiz.status === 'ENDED') {
-      // Show ended quiz message
-      return;
-    }
+    if (quiz.status === 'UPCOMING' || quiz.status === 'ENDED') return;
 
-    // Check retake limit
     if (quiz.retakeLimit !== null && quiz.retakeLimit !== undefined && (quiz.completedAttempts || 0) >= quiz.retakeLimit) {
-      // Show max attempts reached
       return;
     }
 
     router.push(`/quiz/${quiz.id}/instructions` as any);
   };
 
-  const getStatusColor = (status: string) => {
+  const getStatusStyle = (status: string) => {
     switch (status) {
-      case 'UPCOMING': return { backgroundColor: '#fef3c7', color: '#d97706' };
-      case 'ACTIVE': return { backgroundColor: '#d1fae5', color: '#059669' };
-      case 'ENDED': return { backgroundColor: '#fee2e2', color: '#dc2626' };
-      default: return { backgroundColor: '#f3f4f6', color: '#6b7280' };
-    }
-  };
-
-  const getStatusText = (status: string) => {
-    switch (status) {
-      case 'UPCOMING': return 'Starts Soon';
-      case 'ACTIVE': return 'Available';
-      case 'ENDED': return 'Ended';
-      default: return 'Unknown';
+      case 'UPCOMING': return 'bg-amber-900/20 text-amber-500 border-amber-900/30';
+      case 'ACTIVE': return 'bg-emerald-900/20 text-emerald-500 border-emerald-900/30';
+      case 'ENDED': return 'bg-rose-900/20 text-rose-500 border-rose-900/30';
+      default: return 'bg-slate-800 text-slate-400';
     }
   };
 
   if (isLoading) {
     return (
-      <SafeAreaView style={styles.container}>
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#3b82f6" />
-        </View>
+      <SafeAreaView className="flex-1 bg-slate-900 items-center justify-center">
+        <ActivityIndicator size="large" color="#3b82f6" />
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container}>
-      <ScrollView 
-        style={styles.scrollView}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-        }
+    <SafeAreaView className="flex-1 bg-slate-900">
+      <LinearGradient
+        colors={['#0f172a', '#020617']}
+        className="flex-1"
       >
-        {/* Header */}
-        <View style={styles.header}>
-          <Text style={styles.headerTitle}>
-            Welcome back, {user?.name?.split(' ')[0]}!
-          </Text>
-          <Text style={styles.headerSubtitle}>
-            Ready to test your knowledge?
-          </Text>
-        </View>
-
-        {/* Stats Cards */}
-        <View style={styles.statsContainer}>
-          <View style={styles.statsRow}>
-            <View style={[styles.statCard, { backgroundColor: '#eff6ff' }]}>
-              <View style={styles.statHeader}>
-                <BookOpen size={20} color="#3b82f6" />
-                <Text style={[styles.statTitle, { color: '#3b82f6' }]}>Total Quizzes</Text>
-              </View>
-              <Text style={[styles.statValue, { color: '#1e40af' }]}>
-                {stats.totalQuizzes}
+        <ScrollView
+          className="flex-1"
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#3b82f6" />
+          }
+        >
+          {/* Header Section */}
+          <View className="px-8 pt-10 pb-8 flex-row justify-between items-center">
+            <View>
+              <Text className="text-slate-400 text-sm font-bold uppercase tracking-widest mb-1">
+                Candidate Dashboard
+              </Text>
+              <Text className="text-3xl font-black text-white">
+                Hi, {user?.name?.split(' ')[0]}
               </Text>
             </View>
-
-            <View style={[styles.statCard, { backgroundColor: '#f0fdf4' }]}>
-              <View style={styles.statHeader}>
-                <Trophy size={20} color="#22c55e" />
-                <Text style={[styles.statTitle, { color: '#22c55e' }]}>Completed</Text>
-              </View>
-              <Text style={[styles.statValue, { color: '#16a34a' }]}>
-                {stats.completedQuizzes}
-              </Text>
+            <View className="w-12 h-12 bg-blue-500/10 rounded-2xl items-center justify-center border border-blue-500/20">
+              <ShieldCheck size={24} color="#3b82f6" />
             </View>
           </View>
 
-          <View style={styles.statsRow}>
-            <View style={[styles.statCard, { backgroundColor: '#faf5ff' }]}>
-              <View style={styles.statHeader}>
-                <TrendingUp size={20} color="#a855f7" />
-                <Text style={[styles.statTitle, { color: '#a855f7' }]}>Avg Score</Text>
+          {/* Stats Grid */}
+          <View className="px-8 mb-10">
+            <View className="flex-row space-x-4 mb-4">
+              <View className="flex-1 bg-slate-900/50 p-6 rounded-[32px] border border-white/5">
+                <View className="flex-row items-center space-x-3 mb-4">
+                  <View className="w-8 h-8 bg-blue-500/10 rounded-xl items-center justify-center">
+                    <BookOpen size={16} color="#3b82f6" />
+                  </View>
+                  <Text className="text-slate-400 font-bold text-xs uppercase tracking-tighter">Total</Text>
+                </View>
+                <Text className="text-3xl font-black text-white">{stats.totalQuizzes}</Text>
               </View>
-              <Text style={[styles.statValue, { color: '#7c3aed' }]}>
-                {stats.averageScore}%
-              </Text>
+
+              <View className="flex-1 bg-slate-900/50 p-6 rounded-[32px] border border-white/5">
+                <View className="flex-row items-center space-x-3 mb-4">
+                  <View className="w-8 h-8 bg-emerald-500/10 rounded-xl items-center justify-center">
+                    <Trophy size={16} color="#10b981" />
+                  </View>
+                  <Text className="text-slate-400 font-bold text-xs uppercase tracking-tighter">Done</Text>
+                </View>
+                <Text className="text-3xl font-black text-white">{stats.completedQuizzes}</Text>
+              </View>
             </View>
 
-            <View style={[styles.statCard, { backgroundColor: '#fff7ed' }]}>
-              <View style={styles.statHeader}>
-                <Users size={20} color="#f97316" />
-                <Text style={[styles.statTitle, { color: '#f97316' }]}>Attempts</Text>
+            <View className="flex-row space-x-4">
+              <View className="flex-1 bg-slate-900/50 p-6 rounded-[32px] border border-white/5">
+                <View className="flex-row items-center space-x-3 mb-4">
+                  <View className="w-8 h-8 bg-purple-500/10 rounded-xl items-center justify-center">
+                    <TrendingUp size={16} color="#a855f7" />
+                  </View>
+                  <Text className="text-slate-400 font-bold text-xs uppercase tracking-tighter">Avg</Text>
+                </View>
+                <Text className="text-3xl font-black text-white">{stats.averageScore}%</Text>
               </View>
-              <Text style={[styles.statValue, { color: '#ea580c' }]}>
-                {stats.totalAttempts}
-              </Text>
+
+              <View className="flex-1 bg-slate-900/50 p-6 rounded-[32px] border border-white/5">
+                <View className="flex-row items-center space-x-3 mb-4">
+                  <View className="w-8 h-8 bg-amber-500/10 rounded-xl items-center justify-center">
+                    <Users size={16} color="#f59e0b" />
+                  </View>
+                  <Text className="text-slate-400 font-bold text-xs uppercase tracking-tighter">Runs</Text>
+                </View>
+                <Text className="text-3xl font-black text-white">{stats.totalAttempts}</Text>
+              </View>
             </View>
           </View>
-        </View>
 
-        {/* Quizzes List */}
-        <View style={styles.quizzesContainer}>
-          <Text style={styles.quizzesTitle}>Available Quizzes</Text>
-
-          {quizzes.length === 0 ? (
-            <View style={styles.emptyContainer}>
-              <BookOpen size={48} color="#9ca3af" />
-              <Text style={styles.emptyText}>
-                No quizzes available right now. Check back later!
-              </Text>
+          {/* Quizzes Section */}
+          <View className="px-8 pb-12">
+            <View className="flex-row justify-between items-center mb-6">
+              <Text className="text-xl font-black text-white px-1">Available Quizzes</Text>
+              <Sparkles size={18} color="#3b82f6" />
             </View>
-          ) : (
-            <View style={styles.quizzesList}>
-              {quizzes.map((quiz) => (
-                <TouchableOpacity
-                  key={quiz.id}
-                  onPress={() => handleQuizPress(quiz)}
-                  disabled={quiz.status !== 'ACTIVE'}
-                  style={[
-                    styles.quizCard,
-                    quiz.status === 'ACTIVE' 
-                      ? styles.quizCardActive 
-                      : styles.quizCardInactive
-                  ]}
-                >
-                  <View style={styles.quizHeader}>
-                    <View style={styles.quizInfo}>
-                      <Text style={styles.quizTitle}>{quiz.title}</Text>
-                      {quiz.description && (
-                        <Text style={styles.quizDescription}>{quiz.description}</Text>
+
+            {quizzes.length === 0 ? (
+              <View className="bg-slate-900/30 p-12 rounded-[40px] border border-dashed border-slate-800 items-center">
+                <BookOpen size={48} color="#334155" />
+                <Text className="text-slate-500 text-center font-bold mt-6 text-base px-4 leading-relaxed">
+                  The curriculum is being updated. Your next exam will appear here shortly.
+                </Text>
+              </View>
+            ) : (
+              <View className="space-y-6">
+                {quizzes.map((quiz) => (
+                  <TouchableOpacity
+                    key={quiz.id}
+                    onPress={() => handleQuizPress(quiz)}
+                    disabled={quiz.status !== 'ACTIVE'}
+                    activeOpacity={0.8}
+                    className={`p-6 rounded-[32px] border ${quiz.status === 'ACTIVE' ? 'bg-slate-900/60 border-white/10 shadow-2xl' : 'bg-slate-900/20 border-transparent opacity-60'}`}
+                  >
+                    <View className="flex-row justify-between items-start mb-6">
+                      <View className="flex-1 mr-4">
+                        <Text className="text-xl font-black text-white leading-tight mb-2">{quiz.title}</Text>
+                        {quiz.description && (
+                          <Text className="text-slate-400 text-sm font-medium leading-relaxed" numberOfLines={2}>
+                            {quiz.description}
+                          </Text>
+                        )}
+                      </View>
+                      <View className={`px-4 py-1.5 rounded-full border ${getStatusStyle(quiz.status || '')}`}>
+                        <Text className="text-[10px] font-black uppercase tracking-widest leading-none">
+                          {quiz.status === 'ACTIVE' ? 'Available' : quiz.status}
+                        </Text>
+                      </View>
+                    </View>
+
+                    <View className="flex-row items-center space-x-6 mb-6">
+                      <View className="flex-row items-center space-x-2.5">
+                        <View className="w-6 h-6 bg-slate-800 rounded-full items-center justify-center">
+                          <Clock size={12} color="#94a3b8" />
+                        </View>
+                        <Text className="text-slate-400 font-bold text-xs uppercase tracking-tighter">{quiz.duration}m</Text>
+                      </View>
+                      <View className="flex-row items-center space-x-2.5">
+                        <View className="w-6 h-6 bg-slate-800 rounded-full items-center justify-center">
+                          <BookOpen size={12} color="#94a3b8" />
+                        </View>
+                        <Text className="text-slate-400 font-bold text-xs uppercase tracking-tighter">{quiz.questionsCount} Ques</Text>
+                      </View>
+                      {quiz.retakeLimit && (
+                        <View className="flex-row items-center space-x-2.5">
+                          <View className="w-6 h-6 bg-slate-800 rounded-full items-center justify-center">
+                            <RefreshCcw size={12} color="#94a3b8" />
+                          </View>
+                          <Text className="text-slate-400 font-bold text-xs uppercase tracking-tighter">
+                            {quiz.retakeLimit - (quiz.completedAttempts || 0)} Lft
+                          </Text>
+                        </View>
                       )}
                     </View>
-                    <View style={[styles.statusBadge, getStatusColor(quiz.status || '')]}>
-                      <Text style={[styles.statusText, { color: getStatusColor(quiz.status || '').color }]}>
-                        {getStatusText(quiz.status || '')}
-                      </Text>
-                    </View>
-                  </View>
 
-                  <View style={styles.quizMeta}>
-                    <View style={styles.metaItem}>
-                      <Clock size={16} color="#6b7280" />
-                      <Text style={styles.metaText}>{quiz.duration} min</Text>
-                    </View>
-                    <View style={styles.metaItem}>
-                      <BookOpen size={16} color="#6b7280" />
-                      <Text style={styles.metaText}>{quiz.questionsCount} questions</Text>
-                    </View>
-                    {quiz.retakeLimit && (
-                      <View style={styles.metaItem}>
-                        <Users size={16} color="#6b7280" />
-                        <Text style={styles.metaText}>
-                          {quiz.retakeLimit ? quiz.retakeLimit - (quiz.completedAttempts || 0) : 0} attempts left
+                    {quiz.status === 'ACTIVE' && (
+                      <View className="bg-emerald-600 h-14 rounded-2xl flex-row items-center justify-center space-x-3 shadow-lg shadow-emerald-500/20">
+                        <Play size={16} color="white" fill="white" />
+                        <Text className="text-white font-bold text-base">
+                          {(quiz.completedAttempts || 0) > 0 ? 'Retake Curriculum' : 'Begin Selection'}
                         </Text>
                       </View>
                     )}
-                  </View>
-
-                  {quiz.status === 'ACTIVE' && (
-                    <TouchableOpacity
-                      onPress={() => handleQuizPress(quiz)}
-                      style={styles.startButton}
-                    >
-                      <Play size={16} color="white" />
-                      <Text style={styles.startButtonText}>
-                        {(quiz.completedAttempts || 0) > 0 ? 'Retake Quiz' : 'Start Quiz'}
-                      </Text>
-                    </TouchableOpacity>
-                  )}
-                </TouchableOpacity>
-              ))}
-            </View>
-          )}
-        </View>
-      </ScrollView>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
+          </View>
+        </ScrollView>
+      </LinearGradient>
     </SafeAreaView>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#ffffff',
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  scrollView: {
-    flex: 1,
-  },
-  header: {
-    padding: 24,
-  },
-  headerTitle: {
-    fontSize: 30,
-    fontWeight: 'bold',
-    color: '#1f2937',
-    marginBottom: 4,
-  },
-  headerSubtitle: {
-    fontSize: 16,
-    color: '#6b7280',
-  },
-  statsContainer: {
-    paddingHorizontal: 24,
-    marginBottom: 24,
-  },
-  statsRow: {
-    flexDirection: 'row',
-    gap: 16,
-    marginBottom: 16,
-  },
-  statCard: {
-    flex: 1,
-    padding: 16,
-    borderRadius: 16,
-    minWidth: '45%',
-  },
-  statHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: 8,
-  },
-  statTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  statValue: {
-    fontSize: 24,
-    fontWeight: 'bold',
-  },
-  quizzesContainer: {
-    paddingHorizontal: 24,
-    paddingBottom: 24,
-  },
-  quizzesTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#1f2937',
-    marginBottom: 16,
-  },
-  emptyContainer: {
-    backgroundColor: '#f9fafb',
-    padding: 32,
-    borderRadius: 16,
-    alignItems: 'center',
-  },
-  emptyText: {
-    color: '#6b7280',
-    textAlign: 'center',
-    marginTop: 16,
-  },
-  quizzesList: {
-    gap: 16,
-  },
-  quizCard: {
-    padding: 16,
-    borderRadius: 16,
-    borderWidth: 1,
-  },
-  quizCardActive: {
-    backgroundColor: '#ffffff',
-    borderColor: '#e5e7eb',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 2,
-  },
-  quizCardInactive: {
-    backgroundColor: '#ffffff',
-    borderColor: '#f3f4f6',
-    opacity: 0.6,
-  },
-  quizHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 12,
-  },
-  quizInfo: {
-    flex: 1,
-  },
-  quizTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#1f2937',
-    marginBottom: 4,
-  },
-  quizDescription: {
-    fontSize: 14,
-    color: '#6b7280',
-  },
-  statusBadge: {
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    borderRadius: 9999,
-  },
-  statusText: {
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  quizMeta: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 16,
-    marginBottom: 12,
-  },
-  metaItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  metaText: {
-    fontSize: 14,
-    color: '#6b7280',
-  },
-  startButton: {
-    backgroundColor: '#3b82f6',
-    padding: 12,
-    borderRadius: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-  },
-  startButtonText: {
-    color: 'white',
-    fontWeight: '600',
-  },
-});

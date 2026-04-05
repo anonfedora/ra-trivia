@@ -1,9 +1,14 @@
+/// <reference types="nativewind/types" />
 import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, RefreshControl, ActivityIndicator, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, RefreshControl, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../../context/AuthContext';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Trophy, Clock, CheckCircle, XCircle, TrendingUp, Calendar } from 'lucide-react-native';
+import { Trophy, Clock, CheckCircle, XCircle, TrendingUp, Calendar, Sparkles, ShieldCheck, ArrowRight } from 'lucide-react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import { cssInterop } from 'nativewind';
+
+// Global interop is now pre-registered in _layout.tsx
 
 interface QuizSession {
   id: string;
@@ -23,7 +28,7 @@ interface QuizSession {
 }
 
 export default function ResultsScreen() {
-  const { user, token, apiUrl } = useAuth();
+  const { user, accessToken, apiUrl } = useAuth();
   const router = useRouter();
   const [sessions, setSessions] = useState<QuizSession[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -37,7 +42,7 @@ export default function ResultsScreen() {
   const fetchResults = async () => {
     try {
       const response = await fetch(`${apiUrl}/quiz/my-sessions`, {
-        headers: { 'Authorization': `Bearer ${token}` }
+        headers: { 'Authorization': `Bearer ${accessToken}` }
       });
 
       if (response.ok) {
@@ -65,35 +70,22 @@ export default function ResultsScreen() {
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
-    return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    return date.toLocaleDateString([], { month: 'short', day: 'numeric' }) + ' @ ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   };
 
-  const getScoreColor = (score: number | null) => {
-    if (score === null) return '#6b7280';
-    if (score >= 80) return '#10b981';
-    if (score >= 60) return '#f59e0b';
-    return '#ef4444';
+  const getScoreStyle = (score: number | null) => {
+    if (score === null) return 'text-slate-500';
+    if (score >= 80) return 'text-emerald-500';
+    if (score >= 60) return 'text-amber-500';
+    return 'text-rose-500';
   };
 
   const getStatusIcon = (status: string) => {
     switch (status) {
-      case 'COMPLETED':
-        return <CheckCircle size={20} color="#10b981" />;
-      case 'RUNNING':
-        return <Clock size={20} color="#3b82f6" />;
-      case 'ABANDONED':
-        return <XCircle size={20} color="#ef4444" />;
-      default:
-        return null;
-    }
-  };
-
-  const getStatusText = (status: string) => {
-    switch (status) {
-      case 'COMPLETED': return 'Completed';
-      case 'RUNNING': return 'In Progress';
-      case 'ABANDONED': return 'Abandoned';
-      default: return status;
+      case 'COMPLETED': return <CheckCircle size={18} color="#10b981" />;
+      case 'RUNNING': return <Clock size={18} color="#3b82f6" />;
+      case 'ABANDONED': return <XCircle size={18} color="#f43f5e" />;
+      default: return null;
     }
   };
 
@@ -114,374 +106,134 @@ export default function ResultsScreen() {
 
   if (isLoading) {
     return (
-      <SafeAreaView style={styles.container}>
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#3b82f6" />
-        </View>
+      <SafeAreaView className="flex-1 bg-slate-950 items-center justify-center">
+        <ActivityIndicator size="large" color="#3b82f6" />
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container}>
-      <ScrollView 
-        style={styles.scrollView}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-        }
+    <SafeAreaView className="flex-1 bg-slate-950">
+      <LinearGradient
+        colors={['#0f172a', '#020617']}
+        className="flex-1"
       >
-        {/* Header */}
-        <View style={styles.header}>
-          <Text style={styles.headerTitle}>Your Results</Text>
-          <Text style={styles.headerSubtitle}>Track your quiz performance</Text>
-        </View>
-
-        {/* Stats Cards */}
-        <View style={styles.statsContainer}>
-          <View style={styles.statsRow}>
-            <View style={[styles.statCard, { backgroundColor: '#eff6ff' }]}>
-              <View style={styles.statHeader}>
-                <Trophy size={20} color="#3b82f6" />
-                <Text style={[styles.statTitle, { color: '#3b82f6' }]}>Total Attempts</Text>
-              </View>
-              <Text style={[styles.statValue, { color: '#1e40af' }]}>
-                {stats.totalSessions}
-              </Text>
+        <ScrollView 
+          className="flex-1"
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#3b82f6" />}
+        >
+          {/* Header */}
+          <View className="px-8 pt-10 pb-8 flex-row justify-between items-center">
+            <View>
+              <Text className="text-slate-400 text-sm font-bold uppercase tracking-widest mb-1">Performance</Text>
+              <Text className="text-3xl font-black text-white">Archives</Text>
             </View>
-
-            <View style={[styles.statCard, { backgroundColor: '#f0fdf4' }]}>
-              <View style={styles.statHeader}>
-                <CheckCircle size={20} color="#22c55e" />
-                <Text style={[styles.statTitle, { color: '#22c55e' }]}>Completed</Text>
-              </View>
-              <Text style={[styles.statValue, { color: '#16a34a' }]}>
-                {stats.completedSessions}
-              </Text>
+            <View className="w-12 h-12 bg-amber-500/10 rounded-2xl items-center justify-center border border-amber-500/20">
+               <Trophy size={24} color="#f59e0b" />
             </View>
           </View>
 
-          <View style={styles.statsRow}>
-            <View style={[styles.statCard, { backgroundColor: '#faf5ff' }]}>
-              <View style={styles.statHeader}>
-                <TrendingUp size={20} color="#a855f7" />
-                <Text style={[styles.statTitle, { color: '#a855f7' }]}>Avg Score</Text>
+          {/* Stats Summary Panel */}
+          <View className="px-8 mb-10">
+            <View className="bg-slate-900/40 p-8 rounded-[40px] border border-white/5 flex-row">
+              <View className="flex-1 items-center border-r border-white/10">
+                <Text className="text-slate-500 text-[10px] font-black uppercase tracking-widest mb-2">Efficiency</Text>
+                <Text className="text-3xl font-black text-white">{stats.averageScore}%</Text>
               </View>
-              <Text style={[styles.statValue, { color: '#7c3aed' }]}>
-                {stats.averageScore}%
-              </Text>
-            </View>
-
-            <View style={[styles.statCard, { backgroundColor: '#fff7ed' }]}>
-              <View style={styles.statHeader}>
-                <Trophy size={20} color="#f97316" />
-                <Text style={[styles.statTitle, { color: '#f97316' }]}>Best Score</Text>
+              <View className="flex-1 items-center">
+                <Text className="text-slate-500 text-[10px] font-black uppercase tracking-widest mb-2">Top Record</Text>
+                <Text className="text-3xl font-black text-blue-500">{stats.bestScore}%</Text>
               </View>
-              <Text style={[styles.statValue, { color: '#ea580c' }]}>
-                {stats.bestScore}%
-              </Text>
             </View>
           </View>
-        </View>
 
-        {/* Filter Tabs */}
-        <View style={styles.filterContainer}>
-          <View style={styles.filterTabs}>
-            {(['all', 'completed', 'running'] as const).map((filterOption) => (
-              <TouchableOpacity
-                key={filterOption}
-                onPress={() => setFilter(filterOption)}
-                style={[
-                  styles.filterTab,
-                  filter === filterOption ? styles.filterTabActive : styles.filterTabInactive
-                ]}
-              >
-                <Text style={[
-                  styles.filterTabText,
-                  filter === filterOption ? styles.filterTabTextActive : styles.filterTabTextInactive
-                ]}>
-                  {filterOption}
-                </Text>
-              </TouchableOpacity>
-            ))}
+          {/* Filter Bar */}
+          <View className="px-8 mb-8">
+             <View className="flex-row bg-slate-900/80 p-1.5 rounded-2xl border border-white/5">
+                {(['all', 'completed', 'running'] as const).map((opt) => (
+                  <TouchableOpacity
+                    key={opt}
+                    onPress={() => setFilter(opt)}
+                    className={`flex-1 py-3.5 rounded-xl items-center ${filter === opt ? 'bg-blue-600 shadow-lg' : ''}`}
+                  >
+                    <Text className={`text-[10px] font-black uppercase tracking-widest ${filter === opt ? 'text-white' : 'text-slate-500'}`}>
+                      {opt}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+            </View>
           </View>
-        </View>
 
-        {/* Results List */}
-        <View style={styles.resultsContainer}>
-          <Text style={styles.resultsTitle}>Quiz History</Text>
-
-          {filteredSessions.length === 0 ? (
-            <View style={styles.emptyContainer}>
-              <Trophy size={48} color="#9ca3af" />
-              <Text style={styles.emptyText}>
-                No quiz results yet. Start a quiz to see your performance!
-              </Text>
+          {/* Content List */}
+          <View className="px-8 pb-12">
+            <View className="flex-row justify-between items-center mb-6">
+                <Text className="text-xl font-black text-white px-1">Detailed History</Text>
+                <TrendingUp size={18} color="#3b82f6" />
             </View>
-          ) : (
-            <View style={styles.resultsList}>
-              {filteredSessions.map((session) => (
-                <TouchableOpacity
-                  key={session.id}
-                  onPress={() => {
-                    if (session.status === 'COMPLETED') {
-                      router.push(`/results/${session.id}` as any);
-                    }
-                  }}
-                  disabled={session.status !== 'COMPLETED'}
-                  style={[
-                    styles.resultCard,
-                    session.status === 'COMPLETED' 
-                      ? styles.resultCardActive 
-                      : styles.resultCardInactive
-                  ]}
-                >
-                  <View style={styles.resultHeader}>
-                    <View style={styles.resultInfo}>
-                      <Text style={styles.resultTitle}>{session.quiz.title}</Text>
-                      <View style={styles.resultStatus}>
-                        {getStatusIcon(session.status)}
-                        <Text style={styles.resultStatusText}>
-                          {getStatusText(session.status)}
-                        </Text>
-                      </View>
-                    </View>
-                    {session.score !== null && (
-                      <View style={styles.scoreBadge}>
-                        <Text style={[styles.scoreText, { color: getScoreColor(session.score) }]}>
-                          {session.score}%
-                        </Text>
-                      </View>
-                    )}
-                  </View>
 
-                  <View style={styles.resultMeta}>
-                    <View style={styles.metaItem}>
-                      <Calendar size={16} color="#6b7280" />
-                      <Text style={styles.metaText}>{formatDate(session.startTime)}</Text>
-                    </View>
-                    <View style={styles.metaItem}>
-                      <CheckCircle size={16} color="#6b7280" />
-                      <Text style={styles.metaText}>{session.correctCount}/{session.totalQuestions}</Text>
-                    </View>
-                    {session.endTime && (
-                      <View style={styles.metaItem}>
-                        <Clock size={16} color="#6b7280" />
-                        <Text style={styles.metaText}>
-                          {Math.round((new Date(session.endTime).getTime() - new Date(session.startTime).getTime()) / 60000)} min
-                        </Text>
+            {filteredSessions.length === 0 ? (
+              <View className="bg-slate-900/30 p-16 rounded-[40px] border border-dashed border-slate-800 items-center">
+                <Trophy size={48} color="#1e293b" />
+                <Text className="text-slate-500 text-center font-bold mt-6 text-base">No records found for this criteria.</Text>
+              </View>
+            ) : (
+              <View className="space-y-4">
+                {filteredSessions.map((session) => (
+                  <TouchableOpacity
+                    key={session.id}
+                    onPress={() => {
+                      if (session.status === 'COMPLETED') {
+                        router.push(`/results/${session.id}` as any);
+                      }
+                    }}
+                    disabled={session.status !== 'COMPLETED'}
+                    activeOpacity={0.8}
+                    className={`p-6 rounded-[32px] border ${session.status === 'COMPLETED' ? 'bg-slate-900/60 border-white/10 shadow-xl' : 'bg-slate-900/20 border-transparent opacity-60'}`}
+                  >
+                    <View className="flex-row justify-between items-start mb-6">
+                      <View className="flex-1 mr-4">
+                        <Text className="text-lg font-black text-white mb-2 leading-tight">{session.quiz.title}</Text>
+                        <View className="flex-row items-center space-x-2">
+                           {getStatusIcon(session.status)}
+                           <Text className="text-slate-500 text-[10px] font-black uppercase tracking-widest">
+                             {session.status}
+                           </Text>
+                        </View>
                       </View>
-                    )}
-                  </View>
+                      
+                      {session.score !== null && (
+                        <View className="items-end">
+                           <Text className={`text-3xl font-black ${getScoreStyle(session.score)}`}>{session.score}%</Text>
+                           <Text className="text-slate-600 text-[8px] font-bold uppercase tracking-tighter">Certified Score</Text>
+                        </View>
+                      )}
+                    </View>
 
-                  {session.status === 'COMPLETED' && (
-                    <TouchableOpacity
-                      onPress={() => router.push(`/results/${session.id}` as any)}
-                      style={styles.detailsButton}
-                    >
-                      <Trophy size={16} color="#3b82f6" />
-                      <Text style={styles.detailsButtonText}>View Details</Text>
-                    </TouchableOpacity>
-                  )}
-                </TouchableOpacity>
-              ))}
-            </View>
-          )}
-        </View>
-      </ScrollView>
+                    <View className="flex-row items-center justify-between">
+                       <View className="flex-row items-center space-x-5">
+                          <View className="flex-row items-center space-x-2">
+                              <Calendar size={12} color="#64748b" />
+                              <Text className="text-slate-400 font-bold text-[10px] uppercase">{formatDate(session.startTime)}</Text>
+                          </View>
+                          <View className="flex-row items-center space-x-2">
+                              <CheckCircle size={12} color="#64748b" />
+                              <Text className="text-slate-400 font-bold text-[10px] uppercase">{session.correctCount}/{session.totalQuestions}</Text>
+                          </View>
+                       </View>
+
+                       {session.status === 'COMPLETED' && (
+                          <View className="w-8 h-8 bg-blue-500/10 rounded-lg items-center justify-center border border-blue-500/20">
+                             <ArrowRight size={16} color="#3b82f6" />
+                          </View>
+                       )}
+                    </View>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
+          </View>
+        </ScrollView>
+      </LinearGradient>
     </SafeAreaView>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#ffffff',
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  scrollView: {
-    flex: 1,
-  },
-  header: {
-    padding: 24,
-  },
-  headerTitle: {
-    fontSize: 30,
-    fontWeight: 'bold',
-    color: '#1f2937',
-    marginBottom: 4,
-  },
-  headerSubtitle: {
-    fontSize: 16,
-    color: '#6b7280',
-  },
-  statsContainer: {
-    paddingHorizontal: 24,
-    marginBottom: 24,
-  },
-  statsRow: {
-    flexDirection: 'row',
-    gap: 16,
-    marginBottom: 16,
-  },
-  statCard: {
-    flex: 1,
-    padding: 16,
-    borderRadius: 16,
-    minWidth: '45%',
-  },
-  statHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: 8,
-  },
-  statTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  statValue: {
-    fontSize: 24,
-    fontWeight: 'bold',
-  },
-  filterContainer: {
-    paddingHorizontal: 24,
-    marginBottom: 16,
-  },
-  filterTabs: {
-    flexDirection: 'row',
-    backgroundColor: '#f3f4f6',
-    padding: 4,
-    borderRadius: 12,
-  },
-  filterTab: {
-    flex: 1,
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderRadius: 8,
-  },
-  filterTabActive: {
-    backgroundColor: '#3b82f6',
-  },
-  filterTabInactive: {
-    backgroundColor: 'transparent',
-  },
-  filterTabText: {
-    textAlign: 'center',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  filterTabTextActive: {
-    color: 'white',
-  },
-  filterTabTextInactive: {
-    color: '#6b7280',
-  },
-  resultsContainer: {
-    paddingHorizontal: 24,
-    paddingBottom: 24,
-  },
-  resultsTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#1f2937',
-    marginBottom: 16,
-  },
-  emptyContainer: {
-    backgroundColor: '#f9fafb',
-    padding: 32,
-    borderRadius: 16,
-    alignItems: 'center',
-  },
-  emptyText: {
-    color: '#6b7280',
-    textAlign: 'center',
-    marginTop: 16,
-  },
-  resultsList: {
-    gap: 16,
-  },
-  resultCard: {
-    padding: 16,
-    borderRadius: 16,
-    borderWidth: 1,
-  },
-  resultCardActive: {
-    backgroundColor: '#ffffff',
-    borderColor: '#e5e7eb',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 2,
-  },
-  resultCardInactive: {
-    backgroundColor: '#ffffff',
-    borderColor: '#f3f4f6',
-  },
-  resultHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 12,
-  },
-  resultInfo: {
-    flex: 1,
-  },
-  resultTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#1f2937',
-    marginBottom: 4,
-  },
-  resultStatus: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  resultStatusText: {
-    fontSize: 14,
-    color: '#6b7280',
-  },
-  scoreBadge: {
-    backgroundColor: '#f3f4f6',
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    borderRadius: 9999,
-  },
-  scoreText: {
-    fontSize: 18,
-    fontWeight: 'bold',
-  },
-  resultMeta: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 16,
-    marginBottom: 12,
-  },
-  metaItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  metaText: {
-    fontSize: 14,
-    color: '#6b7280',
-  },
-  detailsButton: {
-    backgroundColor: '#eff6ff',
-    padding: 12,
-    borderRadius: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-  },
-  detailsButtonText: {
-    color: '#3b82f6',
-    fontWeight: '600',
-  },
-});

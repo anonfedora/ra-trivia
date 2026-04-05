@@ -4,11 +4,7 @@ import axios, { AxiosInstance } from 'axios';
 import { Platform } from 'react-native';
 
 // API Configuration from environment variables
-const DEFAULT_API_URL = process.env.EXPO_PUBLIC_API_URL || Platform.select({
-    android: 'http://10.0.2.2:4000/api',
-    ios: 'http://localhost:4000/api',
-    default: 'http://localhost:4000/api',
-});
+const DEFAULT_API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://10.113.159.193:4000/api';
 
 interface User {
     id: string;
@@ -23,10 +19,10 @@ interface AuthContextType {
     user: User | null;
     accessToken: string | null;
     isLoading: boolean;
-    signIn: (email: string, password: string) => Promise<void>;
-    signUp: (name: string, email: string, church: string, association: string, userType: string) => Promise<void>;
+    signIn: (email: string, password: string) => Promise<any>;
+    signUp: (name: string, email: string, password: string, church: string, association: string, userType: string) => Promise<void>;
     signOut: () => Promise<void>;
-    verifyOtp: (email: string, otp: string) => Promise<void>;
+    verifyOtp: (email: string, otp: string) => Promise<any>;
     apiUrl: string;
     api: AxiosInstance;
 }
@@ -138,16 +134,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             await SecureStore.setItemAsync('accessToken', accessToken);
             await SecureStore.setItemAsync('refreshToken', refreshToken);
             await SecureStore.setItemAsync('user', JSON.stringify(user));
+
+            return response.data;
         } catch (error: any) {
-            throw error.response?.data?.message || 'Login failed';
+            if (error.response?.status === 403 && error.response?.data?.isUnverified) {
+                return error.response.data;
+            }
+            
+            // Handle validation errors or other structured errors
+            const errorMessage = error.response?.data?.message || 
+                               (error.response?.data?.errors && error.response.data.errors[0]?.msg) ||
+                               (error.response ? 'Login failed. Please check your credentials.' : 'Unable to connect to the server. Please check your internet connection.');
+            
+            throw errorMessage;
         }
     };
 
-    const signUp = async (name: string, email: string, church: string, association: string, userType: string) => {
+    const signUp = async (name: string, email: string, password: string, church: string, association: string, userType: string) => {
         try {
-            await axios.post(`${apiUrl}/auth/register`, { name, email, church, association, userType });
+            await axios.post(`${apiUrl}/auth/register`, { name, email, password, church, association, userType });
         } catch (error: any) {
-            throw error.response?.data?.message || 'Registration failed';
+            const errorMessage = error.response?.data?.message || 
+                               (error.response?.data?.errors && error.response.data.errors[0]?.msg) ||
+                               (error.response ? 'Registration failed. Please verify your details.' : 'Unable to connect to the server. Please check your internet connection.');
+            throw errorMessage;
         }
     };
 
@@ -163,6 +173,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             await SecureStore.setItemAsync('accessToken', accessToken);
             await SecureStore.setItemAsync('refreshToken', refreshToken);
             await SecureStore.setItemAsync('user', JSON.stringify(user));
+
+            return response.data;
         } catch (error: any) {
             throw error.response?.data?.message || 'Verification failed';
         }

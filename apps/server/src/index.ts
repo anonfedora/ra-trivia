@@ -56,6 +56,8 @@ app.use(helmet()); // Set security headers
 const allowedOrigins = [
     ...(process.env.CORS_ORIGIN ? process.env.CORS_ORIGIN.split(',') : []),
     'http://localhost:3000',
+    'http://localhost:8081',
+    'http://10.113.159.193:8081',
     'https://ra-trivia.vercel.app',
     'https://ra-trivia.onrender.com'
 ].filter(Boolean);
@@ -86,17 +88,16 @@ app.use((req, res, next) => {
         if (allowedOrigins.includes(origin as string) || !origin) {
             res.header('Access-Control-Allow-Origin', origin || '*');
             res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
-            // Important: include any headers the browser requests (e.g. cache-control)
             res.header(
                 'Access-Control-Allow-Headers',
                 (typeof requestedHeaders === 'string' && requestedHeaders.length > 0)
                     ? requestedHeaders
-                    : 'Content-Type, Authorization, cache-control'
+                    : 'Content-Type, Authorization, cache-control, x-requested-with'
             );
             res.header('Access-Control-Allow-Credentials', 'true');
-            res.status(204).send();
+            return res.status(204).send();
         } else {
-            res.status(403).send('CORS policy violation');
+            return res.status(403).send('CORS policy violation');
         }
     } else {
         next();

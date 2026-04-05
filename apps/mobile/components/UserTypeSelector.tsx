@@ -36,7 +36,7 @@ const userTypeOptions = [
 export default function UserTypeSelector({ value, onChange, error }: UserTypeSelectorProps) {
     return (
         <View>
-            <Text className="text-sm font-bold text-slate-700 dark:text-slate-300 mb-3 ml-1">
+            <Text className="text-sm font-semibold text-slate-300 mb-3 ml-1">
                 Examination Type
             </Text>
             <View className="space-y-3">
@@ -44,24 +44,24 @@ export default function UserTypeSelector({ value, onChange, error }: UserTypeSel
                     <TouchableOpacity
                         key={option.value}
                         onPress={() => onChange(option.value)}
-                        className={`p-4 rounded-2xl border-2 ${
+                        className={`p-5 rounded-2xl border ${
                             value === option.value
-                                ? 'border-primary bg-primary/5'
-                                : 'border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800'
+                                ? 'border-primary bg-primary/10'
+                                : 'border-slate-800 bg-slate-900'
                         }`}
                     >
                         <View className="flex-row items-center justify-between">
                             <Text className={`font-bold text-base ${
                                 value === option.value
                                     ? 'text-primary'
-                                    : 'text-slate-900 dark:text-slate-50'
+                                    : 'text-slate-50'
                             }`}>
                                 {option.label}
                             </Text>
                             {value === option.value ? (
-                                <CheckCircle size={24} color="#0f172a" />
+                                <CheckCircle size={24} color="#3b82f6" />
                             ) : (
-                                <Circle size={24} color="#94a3b8" />
+                                <Circle size={24} color="#475569" />
                             )}
                         </View>
                     </TouchableOpacity>
