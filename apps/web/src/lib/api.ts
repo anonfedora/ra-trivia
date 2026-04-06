@@ -55,7 +55,9 @@ axiosInstance.interceptors.response.use(
     const originalRequest = error.config as AxiosRequestConfig & { _retry?: boolean };
 
     // If 401 Unauthorized, specifically from an authenticated endpoint
-    if (error.response?.status === 401 && !originalRequest._retry) {
+    // We ignore 401s from the login endpoint as those are expected credential errors.
+    const isLoginRequest = originalRequest.url?.includes('/auth/login');
+    if (error.response?.status === 401 && !originalRequest._retry && !isLoginRequest) {
       // If we are already refreshing, queue this request
       if (isRefreshing) {
         return new Promise((resolve) => {

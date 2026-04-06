@@ -18,6 +18,7 @@ interface Quiz {
     duration: number;
     isActive: boolean;
     retakeLimit?: number | null;
+    passMark?: number | null;
     startDate?: string | null;
     endDate?: string | null;
     _count: {
@@ -41,6 +42,7 @@ interface Attempt {
     };
     quiz: {
         title: string;
+        passMark?: number | null;
     };
 }
 
@@ -70,6 +72,7 @@ export default function AdminDashboard() {
     const [editTitle, setEditTitle] = useState('');
     const [editDuration, setEditDuration] = useState('');
     const [editRetakeLimit, setEditRetakeLimit] = useState('2');
+    const [editPassMark, setEditPassMark] = useState('50');
     const [editStartDate, setEditStartDate] = useState('');
     const [editEndDate, setEditEndDate] = useState('');
     const [isSavingEdit, setIsSavingEdit] = useState(false);
@@ -77,6 +80,7 @@ export default function AdminDashboard() {
     // Create Quiz Form
     const [newTitle, setNewTitle] = useState('');
     const [newDuration, setNewDuration] = useState('30');
+    const [newPassMark, setNewPassMark] = useState('50');
     const [isCreating, setIsCreating] = useState(false);
 
     const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
@@ -217,6 +221,7 @@ export default function AdminDashboard() {
         setEditTitle(selected.title ?? '');
         setEditDuration(String(selected.duration ?? ''));
         setEditRetakeLimit(String(selected.retakeLimit ?? 2));
+        setEditPassMark(String(selected.passMark ?? 50));
 
         const toLocalInput = (iso?: string | null) => {
             if (!iso) return '';
@@ -242,6 +247,7 @@ export default function AdminDashboard() {
                     title: editTitle,
                     duration: editDuration,
                     retakeLimit: editRetakeLimit,
+                    passMark: editPassMark,
                     startDate: editStartDate ? new Date(editStartDate).toISOString() : null,
                     endDate: editEndDate ? new Date(editEndDate).toISOString() : null
                 })
@@ -272,11 +278,16 @@ export default function AdminDashboard() {
                 headers: {
                     'Content-Type': 'application/json'
                 },
-                body: JSON.stringify({ title: newTitle, duration: newDuration }),
+                body: JSON.stringify({ 
+                    title: newTitle, 
+                    duration: newDuration,
+                    passMark: newPassMark 
+                }),
             });
 
             if (res.ok) {
                 setNewTitle('');
+                setNewPassMark('50');
                 fetchQuizzes();
                 toast('Quiz created successfully', 'success');
             }
@@ -332,6 +343,7 @@ export default function AdminDashboard() {
     const [importToExisting, setImportToExisting] = useState(true);
     const [importTitle, setImportTitle] = useState('');
     const [importDuration, setImportDuration] = useState('30');
+    const [importPassMark, setImportPassMark] = useState('50');
 
     // Delete confirmation modal
     const [deleteModal, setDeleteModal] = useState<{ id: string; title: string } | null>(null);
@@ -359,6 +371,7 @@ export default function AdminDashboard() {
         const formData = new FormData();
         formData.append('file', file);
         formData.append('questionType', questionType); // Add question type to form data
+        formData.append('passMark', importToExisting ? editPassMark : importPassMark);
         if (importToExisting) {
             formData.append('quizId', selectedQuizId);
         } else {
@@ -625,7 +638,7 @@ export default function AdminDashboard() {
                                                 <td className="px-8 py-6 font-semibold text-slate-600 dark:text-slate-400">{attempt.quiz.title}</td>
                                                 <td className="px-8 py-6 font-bold">
                                                     {attempt.score !== null ? (
-                                                        <span className={attempt.score >= 50 ? 'text-emerald-500' : 'text-rose-500'}>
+                                                        <span className={attempt.score >= (attempt.quiz.passMark ?? 50) ? 'text-emerald-500' : 'text-rose-500'}>
                                                             {attempt.score.toFixed(1)}%
                                                         </span>
                                                     ) : (
@@ -701,6 +714,21 @@ export default function AdminDashboard() {
                                             <p className="text-[10px] text-slate-400 ml-1">1 – 300 minutes</p>
                                         </div>
                                         <div className="space-y-2">
+                                            <label className="text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">Pass Mark (%)</label>
+                                            <input
+                                                type="number"
+                                                min={1}
+                                                max={100}
+                                                value={editPassMark}
+                                                onChange={(e) => setEditPassMark(e.target.value)}
+                                                disabled={user?.role === 'ADMIN' && selected?.createdBy?.id !== user?.id}
+                                                className="w-full px-5 py-3 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all outline-none text-sm text-slate-900 dark:text-slate-100"
+                                            />
+                                            <p className="text-[10px] text-slate-400 ml-1">Default is 50%</p>
+                                        </div>
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <div className="space-y-2">
                                             <label className="text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">Retake Limit</label>
                                             <input
                                                 type="number"
@@ -739,17 +767,19 @@ export default function AdminDashboard() {
                                         <button
                                             type="button"
                                             onClick={handleSaveQuizMeta}
-                                            disabled={isSavingEdit}
+                                            disabled={isSavingEdit || (user?.role === 'ADMIN' && selected?.createdBy?.id !== user?.id)}
                                             className="flex-1 px-6 py-3 rounded-2xl font-bold text-white bg-primary hover:bg-primary/90 transition-all disabled:opacity-60"
                                         >
                                             {isSavingEdit ? 'Saving...' : 'Save Changes'}
                                         </button>
-                                        <Link
-                                            href={`/admin/quizzes/${selectedQuizId}/preview`}
-                                            className="px-6 py-3 rounded-2xl font-bold bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-all"
-                                        >
-                                            Preview
-                                        </Link>
+                                        {selectedQuizId && (
+                                            <Link
+                                                href={`/admin/quizzes/${selectedQuizId}/preview`}
+                                                className="px-6 py-3 rounded-2xl font-bold bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-all"
+                                            >
+                                                Preview
+                                            </Link>
+                                        )}
                                     </div>
                                 </div>
                             )}
@@ -773,15 +803,29 @@ export default function AdminDashboard() {
                                         required
                                     />
                                 </div>
-                                <div className="space-y-2">
-                                    <label className="text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">Duration (min)</label>
-                                    <input
-                                        type="number"
-                                        value={newDuration}
-                                        onChange={(e) => setNewDuration(e.target.value)}
-                                        className="w-full px-5 py-3 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all outline-none text-sm text-slate-900 dark:text-slate-100"
-                                        required
-                                    />
+                                <div className="grid grid-cols-2 gap-3">
+                                    <div className="space-y-2">
+                                        <label className="text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">Duration (min)</label>
+                                        <input
+                                            type="number"
+                                            value={newDuration}
+                                            onChange={(e) => setNewDuration(e.target.value)}
+                                            className="w-full px-5 py-3 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all outline-none text-sm text-slate-900 dark:text-slate-100"
+                                            required
+                                        />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <label className="text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">Pass Mark (%)</label>
+                                        <input
+                                            type="number"
+                                            min={1}
+                                            max={100}
+                                            value={newPassMark}
+                                            onChange={(e) => setNewPassMark(e.target.value)}
+                                            className="w-full px-5 py-3 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all outline-none text-sm text-slate-900 dark:text-slate-100"
+                                            required
+                                        />
+                                    </div>
                                 </div>
                                 <button
                                     type="submit"
@@ -831,14 +875,27 @@ export default function AdminDashboard() {
                                                 className="w-full px-5 py-3 rounded-2xl bg-white/10 border border-white/20 focus:border-white focus:ring-4 focus:ring-white/10 transition-all outline-none text-sm text-white placeholder:text-white/40"
                                             />
                                         </div>
-                                        <div className="space-y-2">
-                                            <label className="text-[10px] font-bold text-white/60 uppercase tracking-widest ml-1">Duration (min)</label>
-                                            <input
-                                                type="number"
-                                                value={importDuration}
-                                                onChange={(e) => setImportDuration(e.target.value)}
-                                                className="w-full px-5 py-3 rounded-2xl bg-white/10 border border-white/20 focus:border-white focus:ring-4 focus:ring-white/10 transition-all outline-none text-sm text-white"
-                                            />
+                                        <div className="grid grid-cols-2 gap-3">
+                                            <div className="space-y-2">
+                                                <label className="text-[10px] font-bold text-white/60 uppercase tracking-widest ml-1">Duration (min)</label>
+                                                <input
+                                                    type="number"
+                                                    value={importDuration}
+                                                    onChange={(e) => setImportDuration(e.target.value)}
+                                                    className="w-full px-5 py-3 rounded-2xl bg-white/10 border border-white/20 focus:border-white focus:ring-4 focus:ring-white/10 transition-all outline-none text-sm text-white"
+                                                />
+                                            </div>
+                                            <div className="space-y-2">
+                                                <label className="text-[10px] font-bold text-white/60 uppercase tracking-widest ml-1">Pass Mark (%)</label>
+                                                <input
+                                                    type="number"
+                                                    min={1}
+                                                    max={100}
+                                                    value={importPassMark}
+                                                    onChange={(e) => setImportPassMark(e.target.value)}
+                                                    className="w-full px-5 py-3 rounded-2xl bg-white/10 border border-white/20 focus:border-white focus:ring-4 focus:ring-white/10 transition-all outline-none text-sm text-white"
+                                                />
+                                            </div>
                                         </div>
                                     </div>
                                 )}

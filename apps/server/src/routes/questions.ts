@@ -65,6 +65,7 @@ router.post('/import', authenticate, authorizeAdmin, upload.single('file'), asyn
         let quizId = req.body.quizId;
         const title = req.body.title;
         const duration = req.body.duration;
+        const passMark = req.body.passMark;
         const questionType = req.body.questionType;
 
         // Validate questionType is provided and valid
@@ -89,6 +90,7 @@ router.post('/import', authenticate, authorizeAdmin, upload.single('file'), asyn
                 data: {
                     title: String(title),
                     duration: Number(duration),
+                    passMark: passMark ? Number(passMark) : 50,
                     isActive: false,
                     createdById: req.user?.userId // Associate quiz with creator
                 }
@@ -97,6 +99,13 @@ router.post('/import', authenticate, authorizeAdmin, upload.single('file'), asyn
             quizId = newQuiz.id;
         } else {
             console.log(`[IMPORT] targetting existing quiz ID: ${quizId}`);
+            // Update passMark if provided even for existing quiz
+            if (passMark) {
+                await prisma.quiz.update({
+                    where: { id: quizId },
+                    data: { passMark: Number(passMark) }
+                });
+            }
         }
 
         const workbook = xlsx.readFile(req.file.path);

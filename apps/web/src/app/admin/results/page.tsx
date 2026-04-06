@@ -362,13 +362,21 @@ function AdminResultsContent() {
                         <div className="flex items-center gap-4">
                             <h3 className="text-xl font-bold text-slate-800 dark:text-slate-100">Completed Attempts</h3>
                             {selectedIds.length > 0 && (
-                                <button
-                                    onClick={() => setReleaseModal(selectedIds)}
-                                    className="flex items-center gap-2 bg-primary text-white px-4 py-2 rounded-xl font-bold text-sm shadow-lg shadow-primary/20 hover:scale-105 active:scale-95 transition-all animate-in fade-in slide-in-from-left-4"
-                                >
-                                    <Share2 size={16} />
-                                    Release {selectedIds.length} Selected
-                                </button>
+                                <div className="flex items-center gap-4">
+                                    <button
+                                        onClick={() => setReleaseModal(selectedIds)}
+                                        className="flex items-center gap-2 bg-primary text-white px-4 py-2 rounded-xl font-bold text-sm shadow-lg shadow-primary/20 hover:scale-105 active:scale-95 transition-all animate-in fade-in slide-in-from-left-4"
+                                    >
+                                        <Share2 size={16} />
+                                        Release {selectedIds.length} Selected
+                                    </button>
+                                    <button
+                                        onClick={() => setSelectedIds([])}
+                                        className="text-xs font-bold text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors uppercase tracking-widest"
+                                    >
+                                        Clear Selection
+                                    </button>
+                                </div>
                             )}
                         </div>
                         <span className="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">{total} completed records</span>

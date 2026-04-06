@@ -23,7 +23,10 @@ interface SessionResult {
     totalQuestions: number;
     correctCount: number;
     incorrectCount: number;
-    quiz: { title: string };
+    quiz: { 
+        title: string;
+        passMark?: number | null;
+    };
     breakdown: QuestionBreakdown[];
 }
 
@@ -121,7 +124,8 @@ function ResultsContent() {
     }
 
     const percentage = result.score ?? 0;
-    const isPassed = percentage >= 50;
+    const passMark = result.quiz.passMark ?? 50;
+    const isPassed = percentage >= passMark;
     const verifyUrl = `${baseUrl}/verify/${sessionId}`;
 
     const handleCopyLink = () => {

@@ -43,7 +43,13 @@ export default function LoginPage() {
                     accessToken: data.accessToken,
                     refreshToken: data.refreshToken
                 }, data.user);
-                router.push(data.user.role === 'ADMIN' ? '/admin/dashboard' : '/dashboard');
+                
+                // Handle both ADMIN and SUPER_ADMIN redirection
+                if (data.user.role === 'ADMIN' || data.user.role === 'SUPER_ADMIN') {
+                    router.push('/admin/dashboard');
+                } else {
+                    router.push('/dashboard');
+                }
             } else {
                 // Handle unverified user redirect
                 if (data?.isUnverified) {
@@ -51,7 +57,7 @@ export default function LoginPage() {
                     return;
                 }
 
-                setError(data?.error || 'Login failed');
+                setError(data?.message || data?.error || 'Login failed');
                 setIsLoading(false);
             }
         } catch (err) {

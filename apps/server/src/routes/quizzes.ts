@@ -180,7 +180,7 @@ router.get('/:id', authenticate, validateUserTypeAccess, async (req: AuthRequest
  *       200:
  *         description: Quiz with question list
  */
-router.get('/:id/preview', authenticate, authorize(['ADMIN']), async (req: AuthRequest, res) => {
+router.get('/:id/preview', authenticate, authorize(['ADMIN', 'SUPER_ADMIN']), async (req: AuthRequest, res) => {
     try {
         const id = req.params.id as string;
         const quiz = await prisma.quiz.findUnique({
@@ -194,6 +194,7 @@ router.get('/:id/preview', authenticate, authorize(['ADMIN']), async (req: AuthR
                         optionB: true,
                         optionC: true,
                         optionD: true,
+                        correctOption: true, // Include correct option for admin preview
                         questionType: true // Include questionType in preview
                     },
                     orderBy: { createdAt: 'asc' }
@@ -242,7 +243,7 @@ router.get('/:id/preview', authenticate, authorize(['ADMIN']), async (req: AuthR
  */
 router.post('/', authenticate, authorize(['ADMIN']), async (req: AuthRequest, res) => {
     try {
-        const { title, duration } = req.body;
+        const { title, duration, passMark } = req.body;
 
         if (!title || !duration) {
             return res.status(400).json({ message: 'Title and duration are required' });
@@ -252,6 +253,7 @@ router.post('/', authenticate, authorize(['ADMIN']), async (req: AuthRequest, re
             data: {
                 title,
                 duration: Number(duration),
+                passMark: passMark !== undefined ? Number(passMark) : 50,
                 isActive: false,
                 createdById: req.user?.userId // Associate quiz with creator
             }
@@ -304,7 +306,7 @@ router.post('/', authenticate, authorize(['ADMIN']), async (req: AuthRequest, re
 router.patch('/:id', authenticate, authorize(['ADMIN', 'SUPER_ADMIN']), async (req: AuthRequest, res) => {
     try {
         const id = req.params.id as string;
-        const { title, duration, startDate, endDate, retakeLimit } = req.body;
+        const { title, duration, startDate, endDate, retakeLimit, passMark } = req.body;
         const userRole = req.user?.role;
         const userId = req.user?.userId;
 
@@ -335,6 +337,11 @@ router.patch('/:id', authenticate, authorize(['ADMIN', 'SUPER_ADMIN']), async (r
             return res.status(400).json({ message: 'Retake limit must be between 1 and 10' });
         }
 
+        const parsedPassMark = passMark !== undefined ? Number(passMark) : undefined;
+        if (parsedPassMark !== undefined && (!Number.isFinite(parsedPassMark) || parsedPassMark < 1 || parsedPassMark > 100)) {
+            return res.status(400).json({ message: 'Pass mark must be between 1 and 100' });
+        }
+
         const parsedStartDate = startDate === '' || startDate === null || startDate === undefined ? undefined : new Date(startDate);
         const parsedEndDate = endDate === '' || endDate === null || endDate === undefined ? undefined : new Date(endDate);
         if (parsedStartDate && Number.isNaN(parsedStartDate.getTime())) {
@@ -353,6 +360,7 @@ router.patch('/:id', authenticate, authorize(['ADMIN', 'SUPER_ADMIN']), async (r
                 ...(title !== undefined ? { title } : {}),
                 ...(parsedDuration !== undefined ? { duration: parsedDuration } : {}),
                 ...(retakeLimit !== undefined ? { retakeLimit: parsedRetakeLimit } : {}),
+                ...(passMark !== undefined ? { passMark: parsedPassMark } : {}),
                 ...(startDate !== undefined ? { startDate: parsedStartDate ?? null } : {}),
                 ...(endDate !== undefined ? { endDate: parsedEndDate ?? null } : {})
             }

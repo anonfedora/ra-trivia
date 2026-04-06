@@ -17,7 +17,7 @@ interface Session {
     score: number | null;
     manualStatus: string | null;
     resultReleasesAt: string | null;
-    quiz: { id: string; title: string; duration: number };
+    quiz: { id: string; title: string; duration: number; passMark: number | null };
 }
 
 interface Candidate {
@@ -186,7 +186,8 @@ export default function CandidateDetailPage() {
                             {candidate.sessions.map((session) => {
                                 const isExpanded = expandedSession === session.id;
                                 const isCompleted = !!session.endTime;
-                                const passed = session.score !== null && session.score >= 50;
+                                const passMark = session.quiz.passMark ?? 50;
+                                const passed = session.score !== null && session.score >= passMark;
                                 const duration = formatDuration(session.startTime, session.endTime);
 
                                 return (
@@ -259,7 +260,7 @@ export default function CandidateDetailPage() {
                                                         <div className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Status</div>
                                                         <div className={`text-sm font-black ${
                                                             !isCompleted ? 'text-blue-500'
-                                                            : session.manualStatus === 'Cleared' ? 'text-emerald-500'
+                                                            : (session.manualStatus === 'Cleared' || (session.manualStatus === null && passed)) ? 'text-emerald-500'
                                                             : 'text-rose-500'
                                                         }`}>
                                                             {!isCompleted ? 'In Progress' : session.manualStatus ?? (passed ? 'Cleared' : 'Not Cleared')}
