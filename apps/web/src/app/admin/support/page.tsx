@@ -254,9 +254,11 @@ export default function AdminSupportPage() {
         }, 2000);
     };
 
-    const handleSendReply = async (e: React.FormEvent) => {
-        e.preventDefault();
-        if (!reply.trim() || !selectedUserId) return;
+    const handleSendReply = async (e?: React.FormEvent, messageOverride?: string) => {
+        if (e) e.preventDefault();
+        const messageToSend = messageOverride || reply;
+        
+        if (!messageToSend.trim() || !selectedUserId) return;
 
         // Clear typing indicator immediately on send
         if (typingTimeoutRef.current) {
@@ -274,11 +276,11 @@ export default function AdminSupportPage() {
                 headers: {
                     'Content-Type': 'application/json'
                 },
-                body: JSON.stringify({ message: reply }),
+                body: JSON.stringify({ message: messageToSend }),
             });
 
             if (res.ok) {
-                setReply('');
+                if (!messageOverride) setReply('');
                 fetchChatHistory(selectedUserId);
                 fetchThreads(); // Refresh thread preview
             } else {
@@ -634,7 +636,7 @@ export default function AdminSupportPage() {
                                                 <button
                                                     key={t.id}
                                                     onClick={() => {
-                                                        setReply(t.content);
+                                                        handleSendReply(undefined, t.content);
                                                         setShowTemplates(false);
                                                     }}
                                                     className="p-3 text-left border border-slate-100 dark:border-slate-700 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-900 transition-all group"

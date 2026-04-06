@@ -23,7 +23,12 @@ router.get('/admin/templates', authenticate, authorizeAdmin, async (req: AuthReq
         { id: '2', title: 'Checking', content: 'We are looking into your request. Please give us a moment.' },
         { id: '3', title: 'Resolved', content: 'The issue has been resolved. Is there anything else you need help with?' },
         { id: '4', title: 'Exam Technical', content: 'If you are facing technical issues during the exam, please try refreshing the page or checking your internet connection.' },
-        { id: '5', title: 'Result Delay', content: 'Results are typically released within 24-48 hours after the exam completion. You will receive a notification once they are ready.' }
+        { id: '5', title: 'Result Delay', content: 'Results are typically released within 24-48 hours after the exam completion. You will receive a notification once they are ready.' },
+        { id: '6', title: 'Login Issue', content: 'If you are having trouble logging in, please ensure you are using the correct email and password. If you forgot your password, use the "Forgot Password" link on the login page.' },
+        { id: '7', title: 'OTP Not Received', content: 'If you haven\'t received your OTP, please check your spam/junk folder. You can also request a new code from the verification screen.' },
+        { id: '8', title: 'Exam Not Showing', content: 'If you don\'t see your exam on the dashboard, please ensure you have selected the correct candidate category during registration.' },
+        { id: '9', title: 'Retake Policy', content: 'Each exam has a specific retake limit set by the admin. If you have exhausted your attempts, you will need to contact your association coordinator for further instructions.' },
+        { id: '10', title: 'Support Hours', content: 'Our support team is available from 8:00 AM to 6:00 PM. Messages sent outside these hours will be addressed as soon as possible on the next business day.' }
     ];
     res.json(templates);
 });

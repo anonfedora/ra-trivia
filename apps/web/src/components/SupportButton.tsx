@@ -11,6 +11,7 @@ import { apiFetch } from '../lib/api';
 
 interface SupportButtonProps {
     quizId?: string;
+    isExam?: boolean;
 }
 
 interface ChatItem {
@@ -23,7 +24,7 @@ interface ChatItem {
     title?: string;
 }
 
-export default function SupportButton({ quizId }: SupportButtonProps) {
+export default function SupportButton({ quizId, isExam }: SupportButtonProps) {
     const [isOpen, setIsOpen] = useState(false);
     const [message, setMessage] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -230,7 +231,7 @@ export default function SupportButton({ quizId }: SupportButtonProps) {
             {/* Floating Action Button */}
             <button
                 onClick={() => setIsOpen(true)}
-                className="fixed bottom-6 right-6 z-50 p-4 bg-primary text-white rounded-full shadow-2xl hover:scale-110 transition-all duration-300 group"
+                className={`fixed ${isExam ? 'bottom-6 left-6' : 'bottom-6 right-6'} z-50 p-4 bg-primary text-white rounded-full shadow-2xl hover:scale-110 transition-all duration-300 group`}
                 title="Report an issue / Support"
             >
                 <HelpCircle size={28} />
@@ -239,14 +240,14 @@ export default function SupportButton({ quizId }: SupportButtonProps) {
                         {unreadCount > 9 ? '9+' : unreadCount}
                     </span>
                 )}
-                <span className="absolute right-full mr-3 top-1/2 -translate-y-1/2 bg-slate-800 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
+                <span className={`absolute ${isExam ? 'left-full ml-3' : 'right-full mr-3'} top-1/2 -translate-y-1/2 bg-slate-800 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap`}>
                     Report an issue / Support
                 </span>
             </button>
 
             {/* Support Chat Modal */}
             {isOpen && (
-                <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center sm:justify-end p-4 sm:p-6 bg-black/20 backdrop-blur-sm">
+                <div className={`fixed inset-0 z-[100] flex items-end sm:items-center justify-center ${isExam ? 'sm:justify-start' : 'sm:justify-end'} p-4 sm:p-6 bg-black/20 backdrop-blur-sm`}>
                     <div className="w-full sm:w-[450px] h-[600px] max-h-[80vh] bg-white dark:bg-slate-800 rounded-3xl shadow-2xl border border-slate-100 dark:border-slate-700 animate-in slide-in-from-bottom-4 duration-300 overflow-hidden flex flex-col">
                         {/* Header */}
                         <div className="bg-primary p-5 flex justify-between items-center text-white shrink-0">
