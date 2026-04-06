@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from 'react';
-import { BookOpen, Clock, PlayCircle, Plus, Upload, Trash2, Power, PowerOff, FileDown, MoreVertical, CheckCircle, BarChart3, Users, MessageCircle } from 'lucide-react';
+import { BookOpen, Clock, PlayCircle, Plus, Upload, Trash2, Power, PowerOff, FileDown, MoreVertical, CheckCircle, BarChart3, Users, MessageCircle, Download } from 'lucide-react';
 import Link from 'next/link';
 import { ThemeToggle } from '../../../components/ThemeToggle';
 import NotificationBell from '../../../components/NotificationBell';
@@ -63,6 +63,7 @@ export default function AdminDashboard() {
     const [user, setUser] = useState<any>(null);
     const [questionType, setQuestionType] = useState<UserType | null>(null);
     const [questionTypeError, setQuestionTypeError] = useState<string>('');
+    const [importFormat, setImportFormat] = useState<'MULTIPLE_CHOICE' | 'FILL_IN_THE_GAP'>('MULTIPLE_CHOICE');
     const [supportUnreadCount, setSupportUnreadCount] = useState(0);
     const [isMaintenanceMode, setIsMaintenanceMode] = useState(false);
     const [isTogglingMaintenance, setIsTogglingMaintenance] = useState(false);
@@ -267,6 +268,27 @@ export default function AdminDashboard() {
         }
     };
 
+    const handleDownloadTemplate = async () => {
+        try {
+            const res = await apiFetch(`questions/templates/${importFormat}`);
+            if (res.ok) {
+                const blob = await res.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = importFormat === 'MULTIPLE_CHOICE' ? 'mcq_template.xlsx' : 'fitg_template.xlsx';
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(url);
+                document.body.removeChild(a);
+            } else {
+                toast('Failed to download template', 'error');
+            }
+        } catch (err) {
+            toast('Download error: Could not connect to the server', 'error');
+        }
+    };
+
     const fetchQuizzes = () => fetchData(); // Alias for backward compatibility if needed
 
     const handleCreateQuiz = async (e: React.FormEvent) => {
@@ -372,6 +394,7 @@ export default function AdminDashboard() {
         formData.append('file', file);
         formData.append('questionType', questionType); // Add question type to form data
         formData.append('passMark', importToExisting ? editPassMark : importPassMark);
+        formData.append('format', importFormat); // Add format to form data
         if (importToExisting) {
             formData.append('quizId', selectedQuizId);
         } else {
@@ -912,6 +935,37 @@ export default function AdminDashboard() {
                                         className="[&>div]:bg-white/10 [&>div]:border-white/20 [&>div]:text-white [&>div]:placeholder:text-white/40 [&>div:focus]:border-white [&>div:focus]:ring-white/10"
                                         error={questionTypeError}
                                     />
+                                </div>
+
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-bold text-white/60 uppercase tracking-widest ml-1">Question Format</label>
+                                    <div className="grid grid-cols-2 gap-2">
+                                        <button
+                                            type="button"
+                                            onClick={() => setImportFormat('MULTIPLE_CHOICE')}
+                                            className={`px-3 py-2 rounded-xl text-[10px] font-bold transition-all border ${importFormat === 'MULTIPLE_CHOICE' ? 'bg-white text-primary border-white' : 'bg-white/10 text-white border-white/20 hover:bg-white/20'}`}
+                                        >
+                                            MCQ
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => setImportFormat('FILL_IN_THE_GAP')}
+                                            className={`px-3 py-2 rounded-xl text-[10px] font-bold transition-all border ${importFormat === 'FILL_IN_THE_GAP' ? 'bg-white text-primary border-white' : 'bg-white/10 text-white border-white/20 hover:bg-white/20'}`}
+                                        >
+                                            Fill Gap
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div className="pt-2">
+                                    <button
+                                        type="button"
+                                        onClick={handleDownloadTemplate}
+                                        className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-2xl bg-white/5 border border-white/10 text-white/80 hover:bg-white/10 hover:text-white transition-all text-xs font-bold"
+                                    >
+                                        <Download size={14} />
+                                        Download {importFormat === 'MULTIPLE_CHOICE' ? 'MCQ' : 'Fill Gap'} Template
+                                    </button>
                                 </div>
 
                                 <input

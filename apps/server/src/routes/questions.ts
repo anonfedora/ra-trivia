@@ -4,6 +4,9 @@ import multer from 'multer';
 import * as xlsx from 'xlsx';
 import { authenticate, authorizeAdmin } from '../middlewares/auth';
 
+// Define locally to avoid linter errors while types catch up
+type QuestionFormat = 'MULTIPLE_CHOICE' | 'FILL_IN_THE_GAP';
+
 const router = Router();
 const upload = multer({ 
     dest: 'uploads/',
@@ -21,6 +24,85 @@ const upload = multer({
         } else {
             cb(new Error('Only Excel files are allowed'));
         }
+    }
+});
+
+/**
+ * @openapi
+ * /questions/templates/{format}:
+ *   get:
+ *     tags: [Admin Questions]
+ *     summary: Download Excel template for questions
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: format
+ *         required: true
+ *         schema:
+ *           type: string
+ *           enum: [MULTIPLE_CHOICE, FILL_IN_THE_GAP]
+ *     responses:
+ *       200:
+ *         description: Excel template file
+ */
+router.get('/templates/:format', authenticate, authorizeAdmin, async (req, res) => {
+    try {
+        const format = req.params.format as QuestionFormat;
+        let data: any[] = [];
+        let filename = '';
+
+        if (format === 'MULTIPLE_CHOICE') {
+            data = [
+                {
+                    'Question': 'Example: What is the capital of Nigeria?',
+                    'Option A': 'Lagos',
+                    'Option B': 'Abuja',
+                    'Option C': 'Kano',
+                    'Option D': 'Ibadan',
+                    'Correct Option': 'B'
+                }
+            ];
+            filename = 'mcq_template.xlsx';
+        } else if (format === 'FILL_IN_THE_GAP') {
+            data = [
+                {
+                    'Question': 'Example: The capital of Nigeria is ___.',
+                    'Correct Answer': 'Abuja'
+                },
+                {
+                    'Question': 'Example: ___ is the largest city in Nigeria.',
+                    'Correct Answer': 'Lagos'
+                }
+            ];
+            filename = 'fitg_template.xlsx';
+        } else {
+            return res.status(400).json({ message: 'Invalid format' });
+        }
+
+        const worksheet = xlsx.utils.json_to_sheet(data);
+        const workbook = xlsx.utils.book_new();
+        xlsx.utils.book_append_sheet(workbook, worksheet, 'Template');
+
+        // Set column widths
+        const wscols = [
+            { wch: 50 }, // Question
+            { wch: 20 }, // Option A / Correct Answer
+            { wch: 20 }, // Option B
+            { wch: 20 }, // Option C
+            { wch: 20 }, // Option D
+            { wch: 15 }, // Correct Option
+        ];
+        worksheet['!cols'] = wscols;
+
+        const buffer = xlsx.write(workbook, { type: 'buffer', bookType: 'xlsx' });
+
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+        res.send(buffer);
+    } catch (error) {
+        console.error('Template generation error:', error);
+        res.status(500).json({ message: 'Failed to generate template' });
     }
 });
 
@@ -49,6 +131,9 @@ const upload = multer({
  *                 type: string
  *               duration:
  *                 type: string
+ *               format:
+ *                 type: string
+ *                 enum: [MULTIPLE_CHOICE, FILL_IN_THE_GAP]
  *               questionType:
  *                 type: string
  *                 enum: [AMBASSADOR_RANK_EXAMS, EXTRAORDINARY_RANK_EXAMS, PRE_PLENIPOTENTIARY_EXAMS, PLENIPOTENTIARY_RANK_EXAMS]
@@ -67,6 +152,7 @@ router.post('/import', authenticate, authorizeAdmin, upload.single('file'), asyn
         const duration = req.body.duration;
         const passMark = req.body.passMark;
         const questionType = req.body.questionType;
+        const format = (req.body.format as QuestionFormat) || 'MULTIPLE_CHOICE';
 
         // Validate questionType is provided and valid
         if (!questionType) {
@@ -130,34 +216,51 @@ router.post('/import', authenticate, authorizeAdmin, upload.single('file'), asyn
         const questionsData = [];
         for (const row of (data as any[])) {
             const text = getVal(row, ['Question', 'text', 'Questions']);
-            const optionA = getVal(row, ['Option A', 'option a', 'A']);
-            const optionB = getVal(row, ['Option B', 'option b', 'B']);
-            const optionC = getVal(row, ['Option C', 'option c', 'C']);
-            const optionD = getVal(row, ['Option D', 'option d', 'D']);
-            const correctOptionValue = getVal(row, ['Correct Option', 'right option', 'Answer', 'Correct']);
+            
+            if (format === 'FILL_IN_THE_GAP') {
+                const correctOptionValue = getVal(row, ['Correct Answer', 'Answer', 'Correct']);
+                if (!text || !correctOptionValue) {
+                    console.log(`[IMPORT] Skipping FITG row: ${JSON.stringify(row)}`);
+                    continue;
+                }
+                questionsData.push({
+                    text: String(text).trim(),
+                    correctOption: String(correctOptionValue).trim(),
+                    format: 'FILL_IN_THE_GAP' as QuestionFormat,
+                    questionType: questionType,
+                    quizId
+                });
+            } else {
+                const optionA = getVal(row, ['Option A', 'option a', 'A']);
+                const optionB = getVal(row, ['Option B', 'option b', 'B']);
+                const optionC = getVal(row, ['Option C', 'option c', 'C']);
+                const optionD = getVal(row, ['Option D', 'option d', 'D']);
+                const correctOptionValue = getVal(row, ['Correct Option', 'right option', 'Answer', 'Correct']);
 
-            if (!text || !optionA || !optionB || !correctOptionValue) {
-                console.log(`[IMPORT] Skipping row: ${JSON.stringify(row)}`);
-                continue;
+                if (!text || !optionA || !optionB || !correctOptionValue) {
+                    console.log(`[IMPORT] Skipping MCQ row: ${JSON.stringify(row)}`);
+                    continue;
+                }
+
+                questionsData.push({
+                    text: String(text).trim(),
+                    optionA: String(optionA).trim(),
+                    optionB: String(optionB).trim(),
+                    optionC: String(optionC || '').trim(),
+                    optionD: String(optionD || '').trim(),
+                    correctOption: String(correctOptionValue).trim().toUpperCase(),
+                    format: 'MULTIPLE_CHOICE' as QuestionFormat,
+                    questionType: questionType,
+                    quizId
+                });
             }
-
-            questionsData.push({
-                text: String(text).trim(),
-                optionA: String(optionA).trim(),
-                optionB: String(optionB).trim(),
-                optionC: String(optionC || '').trim(),
-                optionD: String(optionD || '').trim(),
-                correctOption: String(correctOptionValue).trim().toUpperCase(),
-                questionType: questionType, // Add the validated questionType
-                quizId
-            });
         }
 
         console.log(`[IMPORT] Prepared ${questionsData.length} questions for bulk insert`);
 
         if (questionsData.length > 0) {
             const result = await prisma.question.createMany({
-                data: questionsData,
+                data: questionsData as any,
                 skipDuplicates: false // We want to import all
             });
             console.log(`[IMPORT] Successfully inserted ${result.count} questions`);
@@ -212,11 +315,12 @@ router.get('/', authenticate, authorizeAdmin, async (req, res) => {
                 optionC: true,
                 optionD: true,
                 correctOption: true,
+                format: true,
                 questionType: true, // Include questionType in response
                 quizId: true,
                 createdAt: true,
                 updatedAt: true
-            }
+            } as any
         });
         res.json(questions);
     } catch (error) {
