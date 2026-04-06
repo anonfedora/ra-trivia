@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, ActivityIndicator, StyleSheet, Alert, AppState, BackHandler, Dimensions, Platform } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, ActivityIndicator, StyleSheet, Alert, AppState, BackHandler, Dimensions, Platform, Modal } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Clock, CheckCircle2, XCircle, ChevronLeft, ChevronRight, LayoutGrid, Info } from 'lucide-react-native';
@@ -21,6 +21,8 @@ export default function QuizPlayScreen() {
     const [showReview, setShowReview] = useState(false);
     const [violationCount, setViolationCount] = useState(0);
     const [isLoading, setIsLoading] = useState(true);
+    const [fitgPool, setFitgPool] = useState<string[]>([]);
+    const [showFitgModal, setShowFitgModal] = useState(false);
 
     const appState = useRef(AppState.currentState);
     const violationCountRef = useRef(0);
@@ -60,6 +62,14 @@ export default function QuizPlayScreen() {
             const data = res.data;
 
             if (res.status === 200 || res.status === 201) {
+                if (data.quiz.questions && data.quiz.questions.length > 0) {
+                    const pool = data.quiz.questions
+                        .filter((q: any) => q.format === 'FILL_IN_THE_GAP')
+                        .map((q: any) => q.correctOption);
+                    
+                    const shuffledPool = [...pool].sort(() => Math.random() - 0.5);
+                    setFitgPool(shuffledPool);
+                }
                 setQuiz(data.quiz);
                 setSession(data.session);
                 setAnswers(data.session.answers || {});
@@ -264,30 +274,98 @@ export default function QuizPlayScreen() {
             {showReview ? renderReview() : (
                 <View style={styles.flex1}>
                     <ScrollView contentContainerStyle={styles.questionSection}>
-                        <Text style={styles.questionText}>{currentQuestion.text}</Text>
+                        {currentQuestion.format === 'FILL_IN_THE_GAP' ? (
+                            <View style={styles.fitgContainer}>
+                                <Text style={styles.questionText}>
+                                    {currentQuestion.text.split('___').map((part: string, i: number, arr: any[]) => (
+                                        <React.Fragment key={i}>
+                                            <Text>{part}</Text>
+                                            {i < arr.length - 1 && (
+                                                <TouchableOpacity 
+                                                    onPress={() => setShowFitgModal(true)}
+                                                    style={styles.gapPlaceholder}
+                                                >
+                                                    <Text style={answers[currentQuestion.id] ? styles.gapTextSelected : styles.gapTextEmpty}>
+                                                        {answers[currentQuestion.id] || '  ?  '}
+                                                    </Text>
+                                                </TouchableOpacity>
+                                            )}
+                                        </React.Fragment>
+                                    ))}
+                                </Text>
+                                <View style={styles.fitgInstructions}>
+                                    <Info size={16} color="#94a3b8" />
+                                    <Text style={styles.fitgInstructionsText}>Tap the gap to select an answer from the pool</Text>
+                                </View>
+                            </View>
+                        ) : (
+                            <>
+                                <Text style={styles.questionText}>{currentQuestion.text}</Text>
+                                <View style={styles.optionsList}>
+                                    {['A', 'B', 'C', 'D'].map((key) => {
+                                        const optionText = currentQuestion[`option${key}`];
+                                        if (!optionText) return null;
+                                        const isSelected = answers[currentQuestion.id] === key;
 
-                        <View style={styles.optionsList}>
-                            {['A', 'B', 'C', 'D'].map((key) => {
-                                const optionText = currentQuestion[`option${key}`];
-                                if (!optionText) return null;
-                                const isSelected = answers[currentQuestion.id] === key;
-
-                                return (
-                                    <TouchableOpacity
-                                        key={key}
-                                        onPress={() => saveAnswer(currentQuestion.id, key)}
-                                        style={[styles.optionCard, isSelected && styles.optionCardSelected]}
-                                    >
-                                        <View style={[styles.optionKey, isSelected && styles.optionKeySelected]}>
-                                            <Text style={[styles.optionKeyText, isSelected && styles.optionKeyTextSelected]}>{key}</Text>
-                                        </View>
-                                        <Text style={[styles.optionTextContent, isSelected && styles.optionTextSelected]}>{optionText}</Text>
-                                        {isSelected && <CheckCircle2 size={20} color="#3b82f6" />}
-                                    </TouchableOpacity>
-                                );
-                            })}
-                        </View>
+                                        return (
+                                            <TouchableOpacity
+                                                key={key}
+                                                onPress={() => saveAnswer(currentQuestion.id, key)}
+                                                style={[styles.optionCard, isSelected && styles.optionCardSelected]}
+                                            >
+                                                <View style={[styles.optionKey, isSelected && styles.optionKeySelected]}>
+                                                    <Text style={[styles.optionKeyText, isSelected && styles.optionKeyTextSelected]}>{key}</Text>
+                                                </View>
+                                                <Text style={[styles.optionTextContent, isSelected && styles.optionTextSelected]}>{optionText}</Text>
+                                                {isSelected && <CheckCircle2 size={20} color="#3b82f6" />}
+                                            </TouchableOpacity>
+                                        );
+                                    })}
+                                </View>
+                            </>
+                        )}
                     </ScrollView>
+
+                    {/* FITG Answer Pool Modal */}
+                    <Modal
+                        visible={showFitgModal}
+                        transparent
+                        animationType="slide"
+                        onRequestClose={() => setShowFitgModal(false)}
+                    >
+                        <View style={styles.modalOverlay}>
+                            <View style={styles.poolModalContainer}>
+                                <View style={styles.modalHeader}>
+                                    <Text style={styles.modalTitle}>Select Answer</Text>
+                                    <TouchableOpacity onPress={() => setShowFitgModal(false)}>
+                                        <XCircle size={24} color="#64748b" />
+                                    </TouchableOpacity>
+                                </View>
+                                <ScrollView style={styles.poolScrollView}>
+                                    <View style={styles.poolGrid}>
+                                        {fitgPool.map((answer, index) => {
+                                            const isSelected = answers[currentQuestion.id] === answer;
+                                            return (
+                                                <TouchableOpacity
+                                                    key={`${answer}-${index}`}
+                                                    onPress={() => {
+                                                        saveAnswer(currentQuestion.id, answer);
+                                                        setShowFitgModal(false);
+                                                    }}
+                                                    style={[styles.poolItem, isSelected && styles.poolItemSelected]}
+                                                >
+                                                    <Text style={[styles.poolItemText, isSelected && styles.poolItemTextSelected]}>
+                                                        {answer}
+                                                    </Text>
+                                                    {isSelected && <CheckCircle2 size={18} color="#3b82f6" />}
+                                                </TouchableOpacity>
+                                            );
+                                        })}
+                                    </View>
+                                </ScrollView>
+                            </View>
+                        </View>
+                    </Modal>
 
                     <View style={styles.navigationFooter}>
                         <TouchableOpacity
@@ -615,5 +693,95 @@ const styles = StyleSheet.create({
         fontSize: 16,
         fontWeight: 'bold',
         color: '#ffffff',
+    },
+    fitgContainer: {
+        flex: 1,
+    },
+    gapPlaceholder: {
+        borderBottomWidth: 2,
+        borderBottomColor: '#3b82f6',
+        backgroundColor: '#eff6ff',
+        paddingHorizontal: 8,
+        minWidth: 80,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginHorizontal: 4,
+        borderRadius: 4,
+    },
+    gapTextEmpty: {
+        color: '#3b82f6',
+        fontWeight: 'bold',
+        fontSize: 18,
+    },
+    gapTextSelected: {
+        color: '#1e40af',
+        fontWeight: 'bold',
+        fontSize: 18,
+    },
+    fitgInstructions: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        marginTop: 24,
+        padding: 16,
+        backgroundColor: '#f8fafc',
+        borderRadius: 16,
+    },
+    fitgInstructionsText: {
+        fontSize: 14,
+        color: '#64748b',
+        fontWeight: '500',
+    },
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0,0,0,0.5)',
+        justifyContent: 'flex-end',
+    },
+    poolModalContainer: {
+        backgroundColor: '#ffffff',
+        borderTopLeftRadius: 32,
+        borderTopRightRadius: 32,
+        height: '60%',
+        padding: 24,
+    },
+    modalHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 24,
+    },
+    modalTitle: {
+        fontSize: 20,
+        fontWeight: 'bold',
+        color: '#1e293b',
+    },
+    poolScrollView: {
+        flex: 1,
+    },
+    poolGrid: {
+        gap: 12,
+    },
+    poolItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        padding: 16,
+        borderRadius: 16,
+        backgroundColor: '#f8fafc',
+        borderWidth: 1,
+        borderColor: '#f1f5f9',
+    },
+    poolItemSelected: {
+        backgroundColor: '#eff6ff',
+        borderColor: '#3b82f6',
+    },
+    poolItemText: {
+        fontSize: 16,
+        fontWeight: '600',
+        color: '#475569',
+    },
+    poolItemTextSelected: {
+        color: '#1e40af',
+        fontWeight: 'bold',
     },
 });

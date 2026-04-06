@@ -87,6 +87,9 @@ pnpm --filter web dev
 
 ### Candidates
 - **About Page**: Dedicated informational page for new users to learn about RA Trivia's features and mission.
+- **Multiple Question Formats**:
+  - **Multiple Choice (MCQ)**: Standard 4-option selection.
+  - **Fill in the Gap (FITG)**: Interactive Drag & Drop interface (Web) or Tap-to-Select (Mobile) to fill blanks (`___`) in question text from a shuffled answer pool.
 - Register, verify email via 6-digit OTP, log in
 - See only exams matching their user type (e.g. `AMBASSADOR_RANK_EXAMS`)
 - Real-time countdown timer with auto-submit on expiry
@@ -95,15 +98,20 @@ pnpm --filter web dev
 - View results when released; locked with countdown until release time
 - In-app notifications: new exams available, results released
 - Password reset via email link (15-minute expiry)
+- **Live Support**: Floating support button (bottom-left during exams, bottom-right otherwise) for real-time chat with admins.
 
 ### Admins
 - Create, edit, activate/deactivate, and delete quizzes
-- Import questions from Excel by user type
+- **Question Management**:
+  - Import questions from Excel by user type and format (MCQ/FITG).
+  - **Template Downloads**: Specialized Excel templates for each format to ensure valid imports.
+  - **Pass Mark Configuration**: Set custom pass/fail percentage thresholds per quiz (defaults to 50%).
 - **Bulk Candidate Import**: Register hundreds of candidates via Excel upload with automated welcome emails and 24-hour verification window
 - Set retake limits, start/end scheduling
 - View all candidate results with search and pagination
 - **Bulk Result Release**: Select multiple results at once and release them via a single action; replaces individual "Release Now" buttons
-- Support Center: Real-time chat with candidates, thread management, and resolution tracking
+- Support Center: Real-time chat with candidates, thread management, and resolution tracking.
+  - **Instant Templates**: Library of FAQ and troubleshooting templates that admins can send with a single click.
 - Manually release results per-session or bulk per-quiz
 - Set manual pass/fail status override
 - Export results as formatted Excel or PDF

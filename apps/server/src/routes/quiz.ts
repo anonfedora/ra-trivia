@@ -258,7 +258,14 @@ router.post('/start', authenticate, validateUserTypeAccess, async (req: AuthRequ
 
         console.log('[QUIZ_RANDOMIZATION] Shuffled questions:', questions.map(q => ({ id: q.id, questionType: q.questionType, originalOrder: quizWithQuestions.questions.findIndex(orig => orig.id === q.id) })));
 
-        const randomizedQuestions = questions.map(question => {
+        const randomizedQuestions = questions.map((question: any) => {
+            if (question.format === 'FILL_IN_THE_GAP') {
+                return {
+                    ...question,
+                    randomizedOptions: []
+                };
+            }
+
             // Create array of options and shuffle them using Fisher-Yates
             const options = [
                 { key: 'A', text: question.optionA },
@@ -302,9 +309,9 @@ router.post('/start', authenticate, validateUserTypeAccess, async (req: AuthRequ
         // Store this in the session so submit/results can use remapped keys correctly
         const remap: Record<string, string> = {};
         const optmap: Record<string, Array<{ key: string; text: string }>> = {};
-        randomizedQuestions.forEach(q => {
+        randomizedQuestions.forEach((q: any) => {
             remap[q.id] = q.correctOption;
-            optmap[q.id] = q.randomizedOptions.map(o => ({ key: o.key, text: o.text }));
+            optmap[q.id] = q.randomizedOptions.map((o: any) => ({ key: o.key, text: o.text }));
         });
 
         // Persist the remap and optmap into the session's answers JSON under reserved keys

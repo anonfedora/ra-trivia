@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter, useParams } from 'next/navigation';
-import { CheckCircle2, XCircle } from 'lucide-react';
+import { CheckCircle2, HelpCircle, XCircle } from 'lucide-react';
 import { ThemeToggle, SupportButton } from '../../../components';
 import { useToast } from '../../../contexts/ToastContext';
 import ConfirmModal from '../../../components/ConfirmModal';
@@ -26,6 +26,9 @@ export default function QuizPage() {
     const [showSubmitConfirm, setShowSubmitConfirm] = useState(false);
     const [leaveCount, setLeaveCount] = useState(0);
     const [savedFlash, setSavedFlash] = useState<string | null>(null); // questionId that just saved
+    const [fitgPool, setFitgPool] = useState<string[]>([]);
+    const [draggedAnswer, setDraggedAnswer] = useState<string | null>(null);
+    const [selectedFromPool, setSelectedFromPool] = useState<string | null>(null);
     const [screenshotWarning, setScreenshotWarning] = useState(false);
     const leaveCountRef = useRef(0);
     const { toast } = useToast();
@@ -85,6 +88,15 @@ export default function QuizPage() {
             const data = await res.json();
             
             if (res.ok) {
+                if (data.quiz.questions && data.quiz.questions.length > 0) {
+                    const pool = data.quiz.questions
+                        .filter((q: any) => q.format === 'FILL_IN_THE_GAP')
+                        .map((q: any) => q.correctOption);
+                    
+                    // Shuffle pool
+                    const shuffledPool = [...pool].sort(() => Math.random() - 0.5);
+                    setFitgPool(shuffledPool);
+                }
                 setQuiz(data.quiz);
                 setSession(data.session);
 
@@ -505,50 +517,160 @@ export default function QuizPage() {
             </div>
 
             <div className="max-w-4xl w-full bg-white dark:bg-slate-800 rounded-[2.5rem] shadow-xl shadow-slate-200/50 dark:shadow-none p-10 border border-slate-100 dark:border-slate-700 mb-10 min-h-[400px] flex flex-col">
-                <h2 className="text-2xl font-bold text-slate-800 dark:text-slate-100 mb-10 leading-snug">
-                    {currentQuestion.text}
-                </h2>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-auto">
-                    {(() => {
-                        const options = currentQuestion.randomizedOptions || [
-                            { key: 'A', text: currentQuestion.optionA },
-                            { key: 'B', text: currentQuestion.optionB },
-                            { key: 'C', text: currentQuestion.optionC },
-                            { key: 'D', text: currentQuestion.optionD }
-                        ].filter(opt => opt && opt.text);
-                        
-                        console.log('Rendering options for question:', currentQuestion.id, options);
-                        
-                        return options.map((opt: any, index: number) => {
-                            const isSelected = answers[currentQuestion.id] === opt.key;
-                            const isFlashing = savedFlash === currentQuestion.id && isSelected;
-                            return (
-                                <button
-                                    key={opt.key}
-                                    onClick={() => saveAnswer(currentQuestion.id, opt.key)}
-                                    className={`p-6 rounded-2xl text-left font-semibold transition-all border-2 relative overflow-hidden ${
-                                        isSelected
-                                            ? 'bg-primary/5 dark:bg-primary/10 border-primary text-primary shadow-md'
-                                            : 'bg-slate-50 dark:bg-slate-900/50 border-transparent dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'
-                                    }`}
-                                >
-                                    {/* Save flash overlay */}
-                                    {isFlashing && (
-                                        <span className="absolute inset-0 bg-primary/10 animate-ping rounded-2xl pointer-events-none" />
-                                    )}
-                                    <span className={`inline-flex items-center justify-center w-8 h-8 rounded-lg mr-3 shadow-sm transition-all ${isSelected ? 'bg-primary text-white' : 'bg-white dark:bg-slate-800 text-slate-400'}`}>
-                                        {isSelected && isFlashing
-                                            ? <CheckCircle2 size={16} />
-                                            : String.fromCharCode(65 + index)
-                                        }
+                {currentQuestion.format === 'FILL_IN_THE_GAP' ? (
+                    <div className="flex flex-col md:flex-row gap-8 flex-1 items-start">
+                        {/* Question Side */}
+                        <div className="flex-1 space-y-8 w-full">
+                            <h2 className="text-2xl font-bold text-slate-800 dark:text-slate-100 leading-snug">
+                                {currentQuestion.text.split('___').map((part: string, i: number, arr: any[]) => (
+                                    <span key={i}>
+                                        {part}
+                                        {i < arr.length - 1 && (
+                                            <div
+                                                onDragOver={(e) => {
+                                                    e.preventDefault();
+                                                    e.currentTarget.classList.add('bg-primary/20', 'border-primary');
+                                                }}
+                                                onDragLeave={(e) => {
+                                                    e.currentTarget.classList.remove('bg-primary/20', 'border-primary');
+                                                }}
+                                                onDrop={(e) => {
+                                                    e.preventDefault();
+                                                    e.currentTarget.classList.remove('bg-primary/20', 'border-primary');
+                                                    if (draggedAnswer) {
+                                                        saveAnswer(currentQuestion.id, draggedAnswer);
+                                                    }
+                                                }}
+                                                onClick={() => {
+                                                    if (selectedFromPool) {
+                                                        saveAnswer(currentQuestion.id, selectedFromPool);
+                                                        setSelectedFromPool(null);
+                                                    } else if (answers[currentQuestion.id]) {
+                                                        // Optional: Clear on click if already filled
+                                                        const newAnswers = { ...answers };
+                                                        delete newAnswers[currentQuestion.id];
+                                                        setAnswers(newAnswers);
+                                                    }
+                                                }}
+                                                className={`inline-flex items-center justify-center min-w-[140px] h-11 mx-2 border-2 border-dashed rounded-xl transition-all cursor-pointer shadow-sm ${
+                                                    answers[currentQuestion.id]
+                                                        ? 'bg-primary/10 border-primary text-primary font-bold'
+                                                        : selectedFromPool
+                                                        ? 'bg-primary/5 border-primary/40 text-slate-400 animate-pulse'
+                                                        : 'bg-slate-50 dark:bg-slate-900/50 border-slate-300 dark:border-slate-700 text-slate-400'
+                                                }`}
+                                            >
+                                                {answers[currentQuestion.id] || (selectedFromPool ? 'Tap to Fill' : 'Drop Here')}
+                                            </div>
+                                        )}
                                     </span>
-                                    {opt.text}
-                                </button>
-                            );
-                        });
-                    })()}
-                </div>
+                                ))}
+                            </h2>
+                            <div className="bg-slate-50 dark:bg-slate-900/50 p-4 rounded-2xl border border-slate-100 dark:border-slate-700">
+                                <p className="text-sm text-slate-500 dark:text-slate-400 font-medium flex items-center gap-2">
+                                    <HelpCircle size={16} className="text-primary" />
+                                    <span>
+                                        <span className="hidden md:inline">Drag answers to the gaps or </span>
+                                        <span>Click an answer then tap the gap to fill it.</span>
+                                    </span>
+                                </p>
+                            </div>
+                        </div>
+
+                        {/* Answer Pool Side - Sticky on Desktop */}
+                        <div className="w-full md:w-72 md:sticky md:top-24 bg-slate-50 dark:bg-slate-900/50 p-6 rounded-3xl border border-slate-100 dark:border-slate-700 max-h-[70vh] flex flex-col">
+                            <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4 flex items-center justify-between">
+                                <span>Answer Pool</span>
+                                {selectedFromPool && (
+                                    <button 
+                                        onClick={() => setSelectedFromPool(null)}
+                                        className="text-[10px] text-primary hover:underline"
+                                    >
+                                        Clear Selection
+                                    </button>
+                                )}
+                            </h3>
+                            <div className="flex flex-wrap md:flex-col gap-2 overflow-y-auto pr-2 custom-scrollbar">
+                                {fitgPool.map((answer, index) => {
+                                    const isUsed = Object.values(answers).includes(answer);
+                                    const isSelected = selectedFromPool === answer;
+                                    return (
+                                        <div
+                                            key={`${answer}-${index}`}
+                                            draggable={!isUsed}
+                                            onDragStart={() => !isUsed && setDraggedAnswer(answer)}
+                                            onDragEnd={() => setDraggedAnswer(null)}
+                                            onClick={() => {
+                                                if (!isUsed) {
+                                                    setSelectedFromPool(isSelected ? null : answer);
+                                                }
+                                            }}
+                                            className={`px-4 py-3 rounded-xl border font-bold text-sm transition-all active:scale-95 select-none cursor-pointer ${
+                                                isUsed
+                                                    ? 'bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-400 opacity-40 cursor-not-allowed'
+                                                    : isSelected
+                                                    ? 'bg-primary border-primary text-white shadow-lg scale-105 z-10'
+                                                    : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:border-primary hover:shadow-md'
+                                            }`}
+                                        >
+                                            <div className="flex items-center justify-between">
+                                                <span>{answer}</span>
+                                                {isSelected && <CheckCircle2 size={14} color="white" />}
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    </div>
+                ) : (
+                    <>
+                        <h2 className="text-2xl font-bold text-slate-800 dark:text-slate-100 mb-10 leading-snug">
+                            {currentQuestion.text}
+                        </h2>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-auto">
+                            {(() => {
+                                const options = currentQuestion.randomizedOptions || [
+                                    { key: 'A', text: currentQuestion.optionA },
+                                    { key: 'B', text: currentQuestion.optionB },
+                                    { key: 'C', text: currentQuestion.optionC },
+                                    { key: 'D', text: currentQuestion.optionD }
+                                ].filter(opt => opt && opt.text);
+                                
+                                console.log('Rendering options for question:', currentQuestion.id, options);
+                                
+                                return options.map((opt: any, index: number) => {
+                                    const isSelected = answers[currentQuestion.id] === opt.key;
+                                    const isFlashing = savedFlash === currentQuestion.id && isSelected;
+                                    return (
+                                        <button
+                                            key={opt.key}
+                                            onClick={() => saveAnswer(currentQuestion.id, opt.key)}
+                                            className={`p-6 rounded-2xl text-left font-semibold transition-all border-2 relative overflow-hidden ${
+                                                isSelected
+                                                    ? 'bg-primary/5 dark:bg-primary/10 border-primary text-primary shadow-md'
+                                                    : 'bg-slate-50 dark:bg-slate-900/50 border-transparent dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'
+                                            }`}
+                                        >
+                                            {/* Save flash overlay */}
+                                            {isFlashing && (
+                                                <span className="absolute inset-0 bg-primary/10 animate-ping rounded-2xl pointer-events-none" />
+                                            )}
+                                            <span className={`inline-flex items-center justify-center w-8 h-8 rounded-lg mr-3 shadow-sm transition-all ${isSelected ? 'bg-primary text-white' : 'bg-white dark:bg-slate-800 text-slate-400'}`}>
+                                                {isSelected && isFlashing
+                                                    ? <CheckCircle2 size={16} />
+                                                    : String.fromCharCode(65 + index)
+                                                }
+                                            </span>
+                                            {opt.text}
+                                        </button>
+                                    );
+                                });
+                            })()}
+                        </div>
+                    </>
+                )}
             </div>
 
             <div className="max-w-4xl w-full flex flex-col sm:flex-row justify-between gap-3 sm:gap-4">

@@ -35,16 +35,22 @@ model User {
 model Question {
   id            String   @id @default(uuid())
   text          String
-  optionA       String
-  optionB       String
-  optionC       String
-  optionD       String
+  optionA       String?
+  optionB       String?
+  optionC       String?
+  optionD       String?
   correctOption String
+  format        QuestionFormat @default(MULTIPLE_CHOICE)
   questionType  UserType @default(AMBASSADOR_RANK_EXAMS)
   quizId        String
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
   quiz          Quiz     @relation(fields: [quizId], references: [id])
+}
+
+enum QuestionFormat {
+  MULTIPLE_CHOICE
+  FILL_IN_THE_GAP
 }
 
 model Quiz {
