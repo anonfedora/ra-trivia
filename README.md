@@ -102,6 +102,7 @@ pnpm --filter web dev
 - **Bulk Candidate Import**: Register hundreds of candidates via Excel upload with automated welcome emails and 24-hour verification window
 - Set retake limits, start/end scheduling
 - View all candidate results with search and pagination
+- **Bulk Result Release**: Select multiple results at once and release them via a single action; replaces individual "Release Now" buttons
 - Support Center: Real-time chat with candidates, thread management, and resolution tracking
 - Manually release results per-session or bulk per-quiz
 - Set manual pass/fail status override
@@ -243,12 +244,15 @@ pnpm --filter server test -- --run
     - **Score Extremes**: Instant visibility of highest and lowest scores per quiz.
     - **Summary Headers**: Dynamic results header on the admin search page for filtered result sets.
 - **Platform Experience & UI**:
+    - **Bulk Result Release**: Modern selection-based results release workflow for admins.
     - **About Page**: New informational landing page for prospective users.
+    - **Admin Preview Enhancement**: Correct answers now highlighted in the read-only preview for admin verification.
     - **Mobile Warning Optimization**: Centered and wrap-safe timer/violation alerts for mobile users.
     - **Unverified Login Flow**: Seamless redirection and new OTP generation for unverified accounts.
 - **System Maintenance**:
     - **Automated Cleanup**: Hourly background task to purge expired (24h+) unverified accounts.
     - **SDK Downgrade (Mobile)**: Realigned to Expo SDK 54 for guaranteed Expo Go stability.
+    - **Rate Limiting Fix**: Skips CORS OPTIONS preflight requests and increases API limits to 300 per 15-min window.
 
 ### v1.8.0
 - **Social Sharing & QR Verification**:

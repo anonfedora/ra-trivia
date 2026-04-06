@@ -1,7 +1,7 @@
 "use client";
 
 import Link from 'next/link';
-import { ArrowLeft, CheckCircle2, Shield, Zap, BarChart3, Users, Mail } from 'lucide-react';
+import { ArrowLeft, ArrowRight, CheckCircle2, Shield, Zap, BarChart3, Users, Mail } from 'lucide-react';
 import { ThemeToggle } from '../../components/ThemeToggle';
 
 export default function AboutPage() {
@@ -63,6 +63,31 @@ export default function AboutPage() {
                                 Comprehensive analytics for admins and detailed result breakdowns for candidates once results are released.
                             </p>
                         </div>
+                    </div>
+                </div>
+            </section>
+
+            {/* How it Works */}
+            <section className="py-24 px-6 bg-white dark:bg-slate-800/50">
+                <div className="max-w-6xl mx-auto">
+                    <div className="text-center mb-16">
+                        <h2 className="text-4xl font-bold text-slate-900 dark:text-white mb-4">How it Works</h2>
+                        <p className="text-slate-500 dark:text-slate-400">Four simple steps to get started with your assessment journey.</p>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
+                        {[
+                            { step: "01", title: "Registration", desc: "Create your account and verify your email via a 6-digit secure OTP." },
+                            { step: "02", title: "Assignment", desc: "Admins assign relevant exams based on your rank or user category." },
+                            { step: "03", title: "Examination", desc: "Complete your assessment within the allocated time in a secure environment." },
+                            { step: "04", title: "Certification", desc: "Receive detailed results and verified certificates once results are released." }
+                        ].map((item, i) => (
+                            <div key={i} className="relative p-8 bg-slate-50 dark:bg-slate-900 rounded-3xl border border-slate-100 dark:border-slate-800 group hover:border-primary transition-all">
+                                <div className="text-5xl font-black text-primary/10 group-hover:text-primary/20 transition-colors mb-4">{item.step}</div>
+                                <h4 className="text-xl font-bold text-slate-900 dark:text-white mb-2">{item.title}</h4>
+                                <p className="text-sm text-slate-500 dark:text-slate-400 leading-relaxed">{item.desc}</p>
+                                {i < 3 && <ArrowRight className="hidden md:block absolute -right-6 top-1/2 -translate-y-1/2 text-slate-200 dark:text-slate-700" size={24} />}
+                            </div>
+                        ))}
                     </div>
                 </div>
             </section>

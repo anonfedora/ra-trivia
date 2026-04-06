@@ -44,6 +44,7 @@ export class ReportGenerator {
                 quiz: {
                     select: {
                         title: true,
+                        passMark: true,
                         questions: true
                     }
                 }
@@ -137,8 +138,14 @@ export class ReportGenerator {
             }
 
             // Calculate pass/fail statistics
-            const passCount = results.filter(r => (r.score || 0) >= 50).length;
-            const failCount = results.filter(r => (r.score || 0) < 50 && r.score !== null).length;
+            const passCount = results.filter(r => {
+                const passMark = r.quiz.passMark ?? 50;
+                return (r.score || 0) >= passMark;
+            }).length;
+            const failCount = results.filter(r => {
+                const passMark = r.quiz.passMark ?? 50;
+                return (r.score || 0) < passMark && r.score !== null;
+            }).length;
             
             html = `
         <!DOCTYPE html>
@@ -277,10 +284,11 @@ export class ReportGenerator {
                 <tbody>
                     ${results.map((result: any, index: number) => {
                         const score = result.score || 0;
+                        const passMark = result.quiz.passMark ?? 50;
                         // REMARK is based on score (Pass/Fail)
-                        const remark = score >= 50 ? 'Pass' : 'Fail';
+                        const remark = score >= passMark ? 'Pass' : 'Fail';
                         // STATUS is the manual status or auto-calculated status (Cleared/Not Cleared)
-                        const status = result.manualStatus || (score >= 50 ? 'Cleared' : 'Not Cleared - No Certificates');
+                        const status = result.manualStatus || (score >= passMark ? 'Cleared' : 'Not Cleared - No Certificates');
                         
                         return `
                         <tr>

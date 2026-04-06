@@ -43,7 +43,7 @@ router.get('/analytics', authenticate, authorizeAdmin, async (req: AuthRequest, 
                     select: { questions: true }
                 },
                 sessions: {
-                    where: { endTime: { not: null } },
+                    // Remove where filter to allow calculating total attempts vs completed sessions
                     select: {
                         score: true,
                         startTime: true,
@@ -63,8 +63,9 @@ router.get('/analytics', authenticate, authorizeAdmin, async (req: AuthRequest, 
                 ? completedScores.reduce((sum: number, score: number) => sum + score, 0) / completedSessions.length
                 : 0;
 
-            const passCount = completedScores.filter((s: number) => s >= 50).length;
-            const failCount = completedScores.length - passCount;
+            const passMark = quiz.passMark ?? 50;
+            const passCount = completedScores.filter((s: number) => s >= passMark).length;
+            const failCount = completedSessions.length - passCount;
             const highestScore = completedScores.length > 0 ? Math.max(...completedScores) : 0;
             const lowestScore = completedScores.length > 0 ? Math.min(...completedScores) : 0;
 
@@ -383,7 +384,7 @@ router.get('/results', authenticate, authorizeAdmin, async (req: AuthRequest, re
                         select: { name: true, church: true, email: true }
                     },
                     quiz: {
-                        select: { title: true }
+                        select: { title: true, passMark: true }
                     }
                 },
                 orderBy: { startTime: 'desc' },
@@ -396,12 +397,15 @@ router.get('/results', authenticate, authorizeAdmin, async (req: AuthRequest, re
         if (q) {
             const summaryData = await prisma.quizSession.findMany({
                 where: { ...where, endTime: { not: null } },
-                select: { score: true }
+                select: { 
+                    score: true,
+                    quiz: { select: { passMark: true } }
+                }
             });
 
             if (summaryData.length > 0) {
-                const scores = summaryData.map((s: { score: number | null }) => s.score || 0);
-                const passCount = scores.filter((s: number) => s >= 50).length;
+                const scores = summaryData.map((s: any) => s.score || 0);
+                const passCount = summaryData.filter((s: any) => (s.score || 0) >= (s.quiz.passMark ?? 50)).length;
                 const averageScore = scores.reduce((a: number, b: number) => a + b, 0) / scores.length;
                 summary = {
                     totalCompleted: summaryData.length,
@@ -578,7 +582,7 @@ router.get('/candidates/:userId', authenticate, authorizeAdmin, async (req: Auth
                         score: true,
                         manualStatus: true,
                         resultReleasesAt: true,
-                        quiz: { select: { id: true, title: true, duration: true } },
+                        quiz: { select: { id: true, title: true, duration: true, passMark: true } },
                     },
                 },
             },

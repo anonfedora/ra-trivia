@@ -53,6 +53,7 @@ model Quiz {
   duration    Int
   isActive    Boolean       @default(false)
   retakeLimit Int?          @default(2)
+  passMark    Float?        @default(50) // Default pass mark percentage
   startDate   DateTime?
   endDate     DateTime?
   createdById String?

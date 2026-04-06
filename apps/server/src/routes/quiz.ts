@@ -611,7 +611,12 @@ router.get('/session/:id', authenticate, async (req: AuthRequest, res) => {
             where: { id },
             include: {
                 quiz: {
-                    include: { questions: true }
+                    select: {
+                        id: true,
+                        title: true,
+                        passMark: true,
+                        questions: true
+                    }
                 }
             }
         });
@@ -709,7 +714,7 @@ router.get('/verify/:sessionId', async (req, res) => {
             where: { id: sessionId },
             include: {
                 user: { select: { name: true, church: true, association: true, userType: true } },
-                quiz: { select: { title: true } }
+                quiz: { select: { title: true, passMark: true } }
             }
         });
 
@@ -718,7 +723,8 @@ router.get('/verify/:sessionId', async (req, res) => {
         }
 
         const score = session.score ?? 0;
-        const status = session.manualStatus || (score >= 50 ? 'Cleared' : 'Not Cleared');
+        const passMark = session.quiz.passMark ?? 50;
+        const status = session.manualStatus || (score >= passMark ? 'Cleared' : 'Not Cleared');
 
         res.json({
             id: session.id,
