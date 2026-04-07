@@ -33,8 +33,9 @@ src/
 │   ├── auth.ts               # Register, login, OTP, password reset
 │   ├── quiz.ts               # Start, submit, update-answer, my-sessions
 │   ├── quizzes.ts            # CRUD + toggle (admin)
-│   ├── questions.ts          # Import questions from Excel
+│   ├── questions.ts          # Import questions from Excel (MCQ + FITG support)
 │   ├── admin.ts              # Results, analytics, release, export
+│   ├── support.ts            # Real-time chat + FAQ templates
 │   ├── notifications.ts      # CRUD notifications
 │   └── password-requirements.ts
 ├── services/

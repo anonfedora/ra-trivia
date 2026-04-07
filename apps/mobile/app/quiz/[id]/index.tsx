@@ -8,7 +8,7 @@ import { useAuth } from '../../../context/AuthContext';
 const { width } = Dimensions.get('window');
 
 export default function QuizPlayScreen() {
-    const { id: quizId } = useLocalSearchParams<{ id: string }>();
+    const { id: quizId, code: examCode } = useLocalSearchParams<{ id: string, code: string }>();
     const { api, apiUrl } = useAuth();
     const router = useRouter();
 
@@ -58,7 +58,7 @@ export default function QuizPlayScreen() {
 
     const fetchQuiz = useCallback(async () => {
         try {
-            const res = await api.post('/quiz/start', { quizId });
+            const res = await api.post('/quiz/start', { quizId, examCode });
             const data = res.data;
 
             if (res.status === 200 || res.status === 201) {

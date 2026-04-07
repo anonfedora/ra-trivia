@@ -36,11 +36,13 @@ src/
 │       ├── results/
 │       ├── analytics/
 │       ├── notifications/
+│       ├── support/                  # Real-time admin support chat
 │       └── quizzes/[id]/preview/
 ├── components/
 │   ├── ClientProviders.tsx           # "use client" wrapper for ErrorBoundary
 │   ├── ErrorBoundary.tsx             # Class component — catches render errors
 │   ├── NotificationBell.tsx          # Bell icon + portal dropdown + Socket.IO listener
+│   ├── SupportButton.tsx             # Floating chat button (repositions during exams)
 │   ├── Toaster.tsx                   # Portal-rendered toast stack
 │   ├── ThemeToggle.tsx
 │   ├── PasswordInput.tsx

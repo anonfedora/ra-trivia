@@ -151,6 +151,7 @@ router.post('/import', authenticate, authorizeAdmin, upload.single('file'), asyn
         const title = req.body.title;
         const duration = req.body.duration;
         const passMark = req.body.passMark;
+        const examCode = req.body.examCode;
         const questionType = req.body.questionType;
         const format = (req.body.format as QuestionFormat) || 'MULTIPLE_CHOICE';
 
@@ -177,6 +178,7 @@ router.post('/import', authenticate, authorizeAdmin, upload.single('file'), asyn
                     title: String(title),
                     duration: Number(duration),
                     passMark: passMark ? Number(passMark) : 50,
+                    examCode: examCode || null,
                     isActive: false,
                     createdById: req.user?.userId // Associate quiz with creator
                 }

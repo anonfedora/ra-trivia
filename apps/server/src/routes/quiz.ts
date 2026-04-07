@@ -90,7 +90,7 @@ router.post('/maintenance/toggle', authenticate, authorizeAdmin, (req: AuthReque
  */
 router.post('/start', authenticate, validateUserTypeAccess, async (req: AuthRequest, res) => {
     try {
-        const { quizId } = req.body;
+        const { quizId, examCode } = req.body;
         const userId = req.user!.userId;
         const userRole = req.user!.role;
 
@@ -107,6 +107,7 @@ router.post('/start', authenticate, validateUserTypeAccess, async (req: AuthRequ
 
         console.log(`[QUIZ_START] Session start request:`, {
             quizId,
+            examCode: examCode ? 'PROVIDED' : 'NOT_PROVIDED',
             userId,
             userRole,
             userType,
@@ -122,6 +123,22 @@ router.post('/start', authenticate, validateUserTypeAccess, async (req: AuthRequ
 
         if (!quiz) {
             return res.status(404).json({ message: 'Quiz not found' });
+        }
+
+        // Validate examCode if it exists for the quiz
+        if (quiz.examCode && userRole === 'CANDIDATE') {
+            if (!examCode) {
+                return res.status(400).json({ 
+                    message: 'This exam requires an access code. Please provide the code sent by the admin.',
+                    requiresExamCode: true 
+                });
+            }
+            if (examCode !== quiz.examCode) {
+                return res.status(400).json({ 
+                    message: 'The exam code you entered is incorrect. Please check and try again.',
+                    requiresExamCode: true
+                });
+            }
         }
 
         const completedSessions = await prisma.quizSession.count({

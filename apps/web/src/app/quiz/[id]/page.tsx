@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { useRouter, useParams } from 'next/navigation';
+import { useRouter, useParams, useSearchParams } from 'next/navigation';
 import { CheckCircle2, HelpCircle, XCircle } from 'lucide-react';
 import { ThemeToggle, SupportButton } from '../../../components';
 import { useToast } from '../../../contexts/ToastContext';
@@ -12,8 +12,10 @@ export const dynamic = 'force-dynamic';
 
 export default function QuizPage() {
     const params = useParams();
+    const searchParams = useSearchParams();
     const router = useRouter();
     const quizId = params?.id as string;
+    const examCode = searchParams?.get('code');
     
     const [quiz, setQuiz] = useState<any>(null);
     const [session, setSession] = useState<any>(null);
@@ -82,7 +84,7 @@ export default function QuizPage() {
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({ quizId }),
+                body: JSON.stringify({ quizId, examCode }),
             });
 
             const data = await res.json();

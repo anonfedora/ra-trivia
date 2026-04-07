@@ -19,6 +19,7 @@ interface Quiz {
     isActive: boolean;
     retakeLimit?: number | null;
     passMark?: number | null;
+    examCode?: string | null;
     startDate?: string | null;
     endDate?: string | null;
     _count: {
@@ -74,6 +75,7 @@ export default function AdminDashboard() {
     const [editDuration, setEditDuration] = useState('');
     const [editRetakeLimit, setEditRetakeLimit] = useState('2');
     const [editPassMark, setEditPassMark] = useState('50');
+    const [editExamCode, setEditExamCode] = useState('');
     const [editStartDate, setEditStartDate] = useState('');
     const [editEndDate, setEditEndDate] = useState('');
     const [isSavingEdit, setIsSavingEdit] = useState(false);
@@ -82,6 +84,7 @@ export default function AdminDashboard() {
     const [newTitle, setNewTitle] = useState('');
     const [newDuration, setNewDuration] = useState('30');
     const [newPassMark, setNewPassMark] = useState('50');
+    const [newExamCode, setNewExamCode] = useState('');
     const [isCreating, setIsCreating] = useState(false);
 
     const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
@@ -214,6 +217,8 @@ export default function AdminDashboard() {
             setEditTitle('');
             setEditDuration('');
             setEditRetakeLimit('2');
+            setEditPassMark('50');
+            setEditExamCode('');
             setEditStartDate('');
             setEditEndDate('');
             return;
@@ -223,6 +228,7 @@ export default function AdminDashboard() {
         setEditDuration(String(selected.duration ?? ''));
         setEditRetakeLimit(String(selected.retakeLimit ?? 2));
         setEditPassMark(String(selected.passMark ?? 50));
+        setEditExamCode(selected.examCode ?? '');
 
         const toLocalInput = (iso?: string | null) => {
             if (!iso) return '';
@@ -249,6 +255,7 @@ export default function AdminDashboard() {
                     duration: editDuration,
                     retakeLimit: editRetakeLimit,
                     passMark: editPassMark,
+                    examCode: editExamCode || null,
                     startDate: editStartDate ? new Date(editStartDate).toISOString() : null,
                     endDate: editEndDate ? new Date(editEndDate).toISOString() : null
                 })
@@ -303,13 +310,15 @@ export default function AdminDashboard() {
                 body: JSON.stringify({ 
                     title: newTitle, 
                     duration: newDuration,
-                    passMark: newPassMark 
+                    passMark: newPassMark,
+                    examCode: newExamCode || null
                 }),
             });
 
             if (res.ok) {
                 setNewTitle('');
                 setNewPassMark('50');
+                setNewExamCode('');
                 fetchQuizzes();
                 toast('Quiz created successfully', 'success');
             }
@@ -366,6 +375,7 @@ export default function AdminDashboard() {
     const [importTitle, setImportTitle] = useState('');
     const [importDuration, setImportDuration] = useState('30');
     const [importPassMark, setImportPassMark] = useState('50');
+    const [importExamCode, setImportExamCode] = useState('');
 
     // Delete confirmation modal
     const [deleteModal, setDeleteModal] = useState<{ id: string; title: string } | null>(null);
@@ -400,6 +410,7 @@ export default function AdminDashboard() {
         } else {
             formData.append('title', importTitle);
             formData.append('duration', importDuration);
+            formData.append('examCode', importExamCode);
         }
 
         try {
@@ -764,6 +775,18 @@ export default function AdminDashboard() {
                                             />
                                             <p className="text-[10px] text-slate-400 ml-1">1 – 10 attempts</p>
                                         </div>
+                                        <div className="space-y-2">
+                                            <label className="text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">Exam Code (optional)</label>
+                                            <input
+                                                type="text"
+                                                value={editExamCode}
+                                                onChange={(e) => setEditExamCode(e.target.value)}
+                                                disabled={user?.role === 'ADMIN' && selected?.createdBy?.id !== user?.id}
+                                                placeholder="e.g. MATH2026"
+                                                className="w-full px-5 py-3 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all outline-none text-sm text-slate-900 dark:text-slate-100"
+                                            />
+                                            <p className="text-[10px] text-slate-400 ml-1">Required to start exam</p>
+                                        </div>
                                     </div>
                                     <div className="space-y-2">
                                         <label className="text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">Start Date (optional)</label>
@@ -850,6 +873,17 @@ export default function AdminDashboard() {
                                         />
                                     </div>
                                 </div>
+                                <div className="space-y-2">
+                                    <label className="text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">Exam Code (optional)</label>
+                                    <input
+                                        type="text"
+                                        value={newExamCode}
+                                        onChange={(e) => setNewExamCode(e.target.value)}
+                                        placeholder="e.g. PLENIEXAM2026"
+                                        className="w-full px-5 py-3 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all outline-none text-sm text-slate-900 dark:text-slate-100"
+                                    />
+                                    <p className="text-[10px] text-slate-400 ml-1">Candidates must enter this to start</p>
+                                </div>
                                 <button
                                     type="submit"
                                     disabled={isCreating}
@@ -919,6 +953,16 @@ export default function AdminDashboard() {
                                                     className="w-full px-5 py-3 rounded-2xl bg-white/10 border border-white/20 focus:border-white focus:ring-4 focus:ring-white/10 transition-all outline-none text-sm text-white"
                                                 />
                                             </div>
+                                        </div>
+                                        <div className="space-y-2">
+                                            <label className="text-[10px] font-bold text-white/60 uppercase tracking-widest ml-1">New Exam Code (optional)</label>
+                                            <input
+                                                type="text"
+                                                value={importExamCode}
+                                                onChange={(e) => setImportExamCode(e.target.value)}
+                                                placeholder="e.g. IMPORT2026"
+                                                className="w-full px-5 py-3 rounded-2xl bg-white/10 border border-white/20 focus:border-white focus:ring-4 focus:ring-white/10 transition-all outline-none text-sm text-white placeholder:text-white/40"
+                                            />
                                         </div>
                                     </div>
                                 )}
