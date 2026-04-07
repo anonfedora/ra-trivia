@@ -1,14 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, ActivityIndicator, StyleSheet, Alert } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, ActivityIndicator, StyleSheet, Alert, TextInput } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Clock, AlertCircle, CheckCircle, Info, ArrowLeft, Play, Calendar, Repeat } from 'lucide-react-native';
+import { Clock, AlertCircle, CheckCircle, Info, ArrowLeft, Play, Calendar, Repeat, Lock } from 'lucide-react-native';
 import { useAuth } from '../../../context/AuthContext';
 
 interface Quiz {
     id: string;
     title: string;
     duration: number;
+    examCode?: string | null;
     startDate?: string | null;
     endDate?: string | null;
     retakeLimit?: number | null;
@@ -24,6 +25,7 @@ export default function InstructionsScreen() {
     const router = useRouter();
     const [quiz, setQuiz] = useState<Quiz | null>(null);
     const [isLoading, setIsLoading] = useState(true);
+    const [userExamCode, setUserExamCode] = useState('');
 
     useEffect(() => {
         fetchQuizDetails();
@@ -100,6 +102,20 @@ export default function InstructionsScreen() {
         return `${remaining} tries left`;
     };
 
+    const handleStartExam = () => {
+        if (!quiz) return;
+
+        if (quiz.examCode && !userExamCode) {
+            Alert.alert('Code Required', 'Please enter the access code to start this exam.');
+            return;
+        }
+
+        router.push({
+            pathname: `/quiz/${quiz.id}`,
+            params: { code: userExamCode }
+        } as any);
+    };
+
     if (isLoading) {
         return (
             <SafeAreaView style={styles.container}>
@@ -126,6 +142,27 @@ export default function InstructionsScreen() {
             </View>
 
             <ScrollView contentContainerStyle={styles.scrollContent}>
+                {/* Exam Code Section */}
+                {quiz.examCode && (
+                    <View style={styles.examCodeContainer}>
+                        <View style={styles.examCodeHeader}>
+                            <Lock size={18} color="#3b82f6" />
+                            <Text style={styles.examCodeTitle}>ACCESS CODE REQUIRED</Text>
+                        </View>
+                        <TextInput
+                            style={styles.examCodeInput}
+                            value={userExamCode}
+                            onChangeText={setUserExamCode}
+                            placeholder="Enter code from admin"
+                            placeholderTextColor="#94a3b8"
+                            autoCapitalize="characters"
+                            secureTextEntry={false}
+                            autoComplete="off"
+                        />
+                        <Text style={styles.examCodeHint}>Contact admin if you don't have a code.</Text>
+                    </View>
+                )}
+
                 <View style={styles.statsGrid}>
                     <View style={styles.statCard}>
                         <View style={styles.statIconBadge}>
@@ -200,7 +237,7 @@ export default function InstructionsScreen() {
                 </View>
 
                 <TouchableOpacity
-                    onPress={() => router.push(`/quiz/${quiz.id}` as any)}
+                    onPress={handleStartExam}
                     style={styles.startButton}
                 >
                     <Play size={20} color="white" fill="white" />
@@ -262,6 +299,46 @@ const styles = StyleSheet.create({
     },
     scrollContent: {
         padding: 24,
+    },
+    examCodeContainer: {
+        backgroundColor: '#eff6ff',
+        borderRadius: 24,
+        padding: 20,
+        marginBottom: 24,
+        borderWidth: 1,
+        borderColor: '#dbeafe',
+    },
+    examCodeHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        marginBottom: 12,
+    },
+    examCodeTitle: {
+        fontSize: 12,
+        fontWeight: '900',
+        color: '#3b82f6',
+        letterSpacing: 1.2,
+    },
+    examCodeInput: {
+        backgroundColor: '#ffffff',
+        borderRadius: 16,
+        paddingHorizontal: 20,
+        paddingVertical: 16,
+        fontSize: 18,
+        fontWeight: 'bold',
+        color: '#1e293b',
+        borderWidth: 1,
+        borderColor: '#dbeafe',
+        textAlign: 'center',
+        letterSpacing: 4,
+    },
+    examCodeHint: {
+        fontSize: 11,
+        color: '#64748b',
+        marginTop: 8,
+        textAlign: 'center',
+        fontWeight: '500',
     },
     statsGrid: {
         flexDirection: 'row',

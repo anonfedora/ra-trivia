@@ -2,13 +2,14 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
-import { Clock, AlertCircle, CheckCircle, Info, ArrowLeft, Play, Calendar, Repeat } from 'lucide-react';
+import { Clock, AlertCircle, CheckCircle, Info, ArrowLeft, Play, Calendar, Repeat, Lock } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
 
 interface Quiz {
     id: string;
     title: string;
     duration: number;
+    examCode?: string | null;
     startDate?: string | null;
     endDate?: string | null;
     retakeLimit?: number | null;
@@ -24,6 +25,7 @@ import { useToast } from '../../../../contexts/ToastContext';
 export default function InstructionsPage() {
     const [quiz, setQuiz] = useState<Quiz | null>(null);
     const [isLoading, setIsLoading] = useState(true);
+    const [userExamCode, setUserExamCode] = useState('');
     const router = useRouter();
     const params = useParams();
     const quizId = params?.id as string;
@@ -57,7 +59,7 @@ export default function InstructionsPage() {
                     }
 
                     // Check retake limit
-                    const completedAttempts = sessionsData.filter((s: any) => s.status === 'COMPLETED').length;
+                    const completedAttempts = sessionsData.filter((s: any) => s.status === 'COMPLETED' && s.quizId === quizId).length;
                     if (quizData.retakeLimit !== null && completedAttempts >= quizData.retakeLimit) {
                         toast('You have reached the maximum number of attempts for this quiz.', 'warning');
                         router.push('/dashboard');
@@ -110,6 +112,21 @@ export default function InstructionsPage() {
         return `${remaining} tries left`;
     };
 
+    const handleStartExam = () => {
+        if (!quiz) return;
+        
+        if (quiz.examCode && !userExamCode) {
+            toast('Please enter the exam code to start.', 'warning');
+            return;
+        }
+
+        const url = quiz.examCode 
+            ? `/quiz/${quiz.id}?code=${encodeURIComponent(userExamCode)}`
+            : `/quiz/${quiz.id}`;
+            
+        router.push(url);
+    };
+
     if (isLoading) {
         return (
             <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-900 transition-colors duration-200">
@@ -143,6 +160,34 @@ export default function InstructionsPage() {
                 </div>
 
                 <div className="p-10 space-y-8">
+                    {/* Exam Code Section */}
+                    {quiz.examCode && (
+                        <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-900/40 rounded-3xl p-6 animate-pulse-slow">
+                            <h3 className="text-sm font-bold text-blue-800 dark:text-blue-300 uppercase tracking-widest mb-3 flex items-center gap-2">
+                                <AlertCircle size={16} />
+                                Access Code Required
+                            </h3>
+                            <div className="relative">
+                                <input
+                                    type="text"
+                                    value={userExamCode}
+                                    onChange={(e) => setUserExamCode(e.target.value)}
+                                    placeholder="Enter exam code provided by admin"
+                                    autoComplete="off"
+                                    data-lpignore="true"
+                                    spellCheck="false"
+                                    className="w-full px-5 py-4 rounded-2xl bg-white dark:bg-slate-900 border border-blue-200 dark:border-blue-800 focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all outline-none text-slate-900 dark:text-slate-100 font-bold tracking-widest uppercase placeholder:normal-case placeholder:font-medium placeholder:tracking-normal"
+                                />
+                                <div className="absolute right-4 top-1/2 -translate-y-1/2 text-blue-400">
+                                    <Lock size={18} />
+                                </div>
+                            </div>
+                            <p className="text-xs text-blue-600 dark:text-blue-400 mt-3 font-medium">
+                                You cannot start the exam without the correct access code.
+                            </p>
+                        </div>
+                    )}
+
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div className="bg-slate-50 dark:bg-slate-900 p-6 rounded-3xl border border-slate-100 dark:border-slate-700 items-center flex gap-4">
                             <div className="bg-primary/10 p-3 rounded-2xl text-primary">
@@ -226,7 +271,7 @@ export default function InstructionsPage() {
                     </div>
 
                     <button
-                        onClick={() => router.push(`/quiz/${quiz.id}`)}
+                        onClick={handleStartExam}
                         className="w-full bg-primary hover:bg-primary/90 text-white py-5 rounded-2xl font-bold shadow-lg shadow-primary/20 transform transition-all hover:scale-[1.02] active:scale-95 flex items-center justify-center gap-3 mt-4"
                     >
                         <Play size={20} fill="currentColor" />

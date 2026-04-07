@@ -90,6 +90,7 @@ pnpm --filter web dev
 - **Multiple Question Formats**:
   - **Multiple Choice (MCQ)**: Standard 4-option selection.
   - **Fill in the Gap (FITG)**: Interactive Drag & Drop interface (Web) or Tap-to-Select (Mobile) to fill blanks (`___`) in question text from a shuffled answer pool.
+- **Exam Access Code**: Secure entry required for specific exams if set by admin (Web & Mobile).
 - Register, verify email via 6-digit OTP, log in
 - See only exams matching their user type (e.g. `AMBASSADOR_RANK_EXAMS`)
 - Real-time countdown timer with auto-submit on expiry
@@ -106,6 +107,7 @@ pnpm --filter web dev
   - Import questions from Excel by user type and format (MCQ/FITG).
   - **Template Downloads**: Specialized Excel templates for each format to ensure valid imports.
   - **Pass Mark Configuration**: Set custom pass/fail percentage thresholds per quiz (defaults to 50%).
+  - **Exam Access Code**: Optional code (e.g., `PLENIEXAM2026`) that candidates must enter to start the exam.
 - **Bulk Candidate Import**: Register hundreds of candidates via Excel upload with automated welcome emails and 24-hour verification window
 - Set retake limits, start/end scheduling
 - View all candidate results with search and pagination
@@ -163,15 +165,15 @@ POST /api/auth/reset-password
 ```
 GET    /api/quizzes                        # List (filtered by role + user type)
 GET    /api/quizzes/:id
-POST   /api/quizzes                        # Create (admin)
-PATCH  /api/quizzes/:id                    # Update metadata
+POST   /api/quizzes                        # Create with optional examCode (admin)
+PATCH  /api/quizzes/:id                    # Update metadata (including examCode)
 PATCH  /api/quizzes/:id/toggle             # Activate/deactivate
 DELETE /api/quizzes/:id
 ```
 
 ### Quiz Session
 ```
-POST /api/quiz/start
+POST /api/quiz/start                       # Starts session (requires examCode if set)
 POST /api/quiz/submit
 POST /api/quiz/update-answer               # Auto-save answer
 GET  /api/quiz/my-sessions
@@ -242,7 +244,14 @@ pnpm --filter server test -- --run
 
 ## Version History
 
-### v1.9.0 (Current)
+### v1.9.1 (Current)
+- **Exam Access Code**:
+    - **Secure Exam Entry**: Admins can now set an optional access code (e.g., `PLENIEXAM2026`) that candidates must enter before starting an exam.
+    - **Multi-Platform Support**: Implemented across Web and Mobile candidate interfaces with secure password inputs.
+    - **Validation Logic**: Robust server-side validation ensures the correct code is provided before initiating a quiz session.
+    - **Import Integration**: Support for setting the exam code during bulk question imports.
+
+### v1.9.0
 - **Bulk Candidate Registration**:
     - **Excel Import**: Register hundreds of candidates in seconds via `.xlsx` or `.csv`.
     - **Automated Onboarding**: Candidates receive welcome emails with login credentials and a 24-hour verification OTP.

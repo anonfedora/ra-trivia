@@ -195,6 +195,7 @@ router.get('/:id/preview', authenticate, authorize(['ADMIN', 'SUPER_ADMIN']), as
                         optionC: true,
                         optionD: true,
                         correctOption: true, // Include correct option for admin preview
+                        format: true, // Include format to distinguish MCQ/FITG
                         questionType: true // Include questionType in preview
                     },
                     orderBy: { createdAt: 'asc' }
@@ -243,7 +244,7 @@ router.get('/:id/preview', authenticate, authorize(['ADMIN', 'SUPER_ADMIN']), as
  */
 router.post('/', authenticate, authorize(['ADMIN']), async (req: AuthRequest, res) => {
     try {
-        const { title, duration, passMark } = req.body;
+        const { title, duration, passMark, examCode } = req.body;
 
         if (!title || !duration) {
             return res.status(400).json({ message: 'Title and duration are required' });
@@ -254,6 +255,7 @@ router.post('/', authenticate, authorize(['ADMIN']), async (req: AuthRequest, re
                 title,
                 duration: Number(duration),
                 passMark: passMark !== undefined ? Number(passMark) : 50,
+                examCode: examCode || null,
                 isActive: false,
                 createdById: req.user?.userId // Associate quiz with creator
             }
@@ -306,7 +308,7 @@ router.post('/', authenticate, authorize(['ADMIN']), async (req: AuthRequest, re
 router.patch('/:id', authenticate, authorize(['ADMIN', 'SUPER_ADMIN']), async (req: AuthRequest, res) => {
     try {
         const id = req.params.id as string;
-        const { title, duration, startDate, endDate, retakeLimit, passMark } = req.body;
+        const { title, duration, startDate, endDate, retakeLimit, passMark, examCode } = req.body;
         const userRole = req.user?.role;
         const userId = req.user?.userId;
 
@@ -362,7 +364,8 @@ router.patch('/:id', authenticate, authorize(['ADMIN', 'SUPER_ADMIN']), async (r
                 ...(retakeLimit !== undefined ? { retakeLimit: parsedRetakeLimit } : {}),
                 ...(passMark !== undefined ? { passMark: parsedPassMark } : {}),
                 ...(startDate !== undefined ? { startDate: parsedStartDate ?? null } : {}),
-                ...(endDate !== undefined ? { endDate: parsedEndDate ?? null } : {})
+                ...(endDate !== undefined ? { endDate: parsedEndDate ?? null } : {}),
+                ...(examCode !== undefined ? { examCode: examCode || null } : {})
             }
         });
 

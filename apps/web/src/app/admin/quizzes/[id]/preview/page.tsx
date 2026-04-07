@@ -3,11 +3,12 @@
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, BookOpen, Clock, ListChecks } from 'lucide-react';
+import { ArrowLeft, BookOpen, Clock, ListChecks, Copy, Check } from 'lucide-react';
 import { ThemeToggle } from '../../../../../components/ThemeToggle';
 import NotificationBell from '../../../../../components/NotificationBell';
 import { apiFetch } from '../../../../../lib/api';
 import { getAccessToken, getUser } from '../../../../../lib/auth';
+import { useToast } from '../../../../../contexts/ToastContext';
 
 interface PreviewQuestion {
     id: string;
@@ -17,6 +18,7 @@ interface PreviewQuestion {
     optionC: string | null;
     optionD: string | null;
     correctOption: string;
+    format: 'MULTIPLE_CHOICE' | 'FILL_IN_THE_GAP';
     questionType: string;
 }
 
@@ -25,6 +27,7 @@ interface PreviewQuiz {
     title: string;
     duration: number;
     isActive: boolean;
+    examCode: string | null;
     retakeLimit: number | null;
     startDate: string | null;
     endDate: string | null;
@@ -40,6 +43,8 @@ export default function AdminQuizPreviewPage() {
     const [quiz, setQuiz] = useState<PreviewQuiz | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [questionTypeStats, setQuestionTypeStats] = useState<any>(null);
+    const [isCopied, setIsCopied] = useState(false);
+    const { toast } = useToast();
 
     useEffect(() => {
         const user = getUser();
@@ -116,6 +121,14 @@ export default function AdminQuizPreviewPage() {
         return typeMap[questionType] || questionType;
     };
 
+    const handleCopyCode = () => {
+        if (!quiz?.examCode) return;
+        navigator.clipboard.writeText(quiz.examCode);
+        setIsCopied(true);
+        toast('Exam code copied to clipboard!', 'success');
+        setTimeout(() => setIsCopied(false), 2000);
+    };
+
     return (
         <main className="min-h-screen bg-slate-50 dark:bg-slate-900 p-6 md:p-12 transition-colors duration-200">
             <div className="max-w-4xl mx-auto space-y-8">
@@ -158,6 +171,21 @@ export default function AdminQuizPreviewPage() {
                                     <div className="text-slate-500 dark:text-slate-400 text-sm font-bold">Retake Limit</div>
                                     <div className="text-xl font-black text-slate-800 dark:text-slate-100 mt-2">{quiz.retakeLimit ?? 2}</div>
                                 </div>
+                                {quiz.examCode && (
+                                    <div className="bg-primary/5 dark:bg-primary/10 rounded-2xl p-4 border border-primary/20 relative group">
+                                        <div className="text-primary dark:text-primary text-sm font-bold">Exam Access Code</div>
+                                        <div className="flex items-center justify-between mt-2">
+                                            <div className="text-xl font-black text-primary tracking-widest uppercase">{quiz.examCode}</div>
+                                            <button 
+                                                onClick={handleCopyCode}
+                                                className="p-2 hover:bg-primary/10 rounded-lg transition-all text-primary"
+                                                title="Copy Code"
+                                            >
+                                                {isCopied ? <Check size={18} /> : <Copy size={18} />}
+                                            </button>
+                                        </div>
+                                    </div>
+                                )}
                             </div>
 
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6">
@@ -203,40 +231,53 @@ export default function AdminQuizPreviewPage() {
                                     </div>
                                 </div>
                                 <div className="font-semibold text-slate-800 dark:text-slate-100 mb-4 leading-relaxed">{q.text}</div>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                    {([
-                                        { key: 'A', text: q.optionA },
-                                        { key: 'B', text: q.optionB },
-                                        { key: 'C', text: q.optionC },
-                                        { key: 'D', text: q.optionD }
-                                    ].filter(o => o.text) as { key: string; text: string }[]).map(opt => {
-                                        const isCorrect = q.correctOption === opt.key;
-                                        return (
-                                            <div 
-                                                key={opt.key} 
-                                                className={`px-4 py-3 rounded-xl border transition-all ${
-                                                    isCorrect 
-                                                        ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-400 ring-2 ring-emerald-500/20' 
-                                                        : 'bg-slate-50 dark:bg-slate-900 border-slate-100 dark:border-slate-700 text-slate-700 dark:text-slate-300'
-                                                }`}
-                                            >
-                                                <div className="flex items-center justify-between">
-                                                    <div>
-                                                        <span className={`font-black mr-2 ${isCorrect ? 'text-emerald-600 dark:text-emerald-400' : ''}`}>
-                                                            {opt.key}.
-                                                        </span>
-                                                        {opt.text}
+                                
+                                {q.format === 'FILL_IN_THE_GAP' ? (
+                                    <div className="bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-2xl p-4 flex items-center gap-3">
+                                        <div className="w-8 h-8 rounded-lg bg-emerald-500 flex items-center justify-center text-white">
+                                            <Check size={18} />
+                                        </div>
+                                        <div>
+                                            <div className="text-[10px] font-black uppercase tracking-widest text-emerald-600 dark:text-emerald-400">Correct Answer</div>
+                                            <div className="text-lg font-bold text-emerald-700 dark:text-emerald-300">{q.correctOption}</div>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                        {([
+                                            { key: 'A', text: q.optionA },
+                                            { key: 'B', text: q.optionB },
+                                            { key: 'C', text: q.optionC },
+                                            { key: 'D', text: q.optionD }
+                                        ].filter(o => o.text) as { key: string; text: string }[]).map(opt => {
+                                            const isCorrect = q.correctOption === opt.key;
+                                            return (
+                                                <div 
+                                                    key={opt.key} 
+                                                    className={`px-4 py-3 rounded-xl border transition-all ${
+                                                        isCorrect 
+                                                            ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-400 ring-2 ring-emerald-500/20' 
+                                                            : 'bg-slate-50 dark:bg-slate-900 border-slate-100 dark:border-slate-700 text-slate-700 dark:text-slate-300'
+                                                    }`}
+                                                >
+                                                    <div className="flex items-center justify-between">
+                                                        <div>
+                                                            <span className={`font-black mr-2 ${isCorrect ? 'text-emerald-600 dark:text-emerald-400' : ''}`}>
+                                                                {opt.key}.
+                                                            </span>
+                                                            {opt.text}
+                                                        </div>
+                                                        {isCorrect && (
+                                                            <span className="text-[10px] font-black uppercase tracking-widest bg-emerald-500 text-white px-2 py-0.5 rounded-md shadow-sm">
+                                                                Correct
+                                                            </span>
+                                                        )}
                                                     </div>
-                                                    {isCorrect && (
-                                                        <span className="text-[10px] font-black uppercase tracking-widest bg-emerald-500 text-white px-2 py-0.5 rounded-md shadow-sm">
-                                                            Correct
-                                                        </span>
-                                                    )}
                                                 </div>
-                                            </div>
-                                        );
-                                    })}
-                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                )}
                             </div>
                         ))}
                     </div>
