@@ -53,7 +53,7 @@ router.get('/', authenticate, async (req: AuthRequest, res) => {
             where.type = { in: ADMIN_TYPES };
         } else {
             // Candidates see only their own candidate notifications
-            where.createdById = userId;
+            where.userId = userId;
             where.type = { in: CANDIDATE_TYPES };
         }
 
@@ -114,7 +114,7 @@ router.patch('/:id/read', authenticate, async (req: AuthRequest, res) => {
             return res.status(404).json({ message: 'Notification not found' });
         }
 
-        if (userRole !== 'SUPER_ADMIN' && notification.createdById !== userId) {
+        if (userRole !== 'SUPER_ADMIN' && notification.createdById !== userId && (notification as any).userId !== userId) {
             return res.status(403).json({ message: 'You do not have permission to mark this notification' });
         }
 
@@ -158,7 +158,7 @@ router.post('/mark-all-read', authenticate, async (req: AuthRequest, res) => {
             where.createdById = userId;
             where.type = { in: ADMIN_TYPES };
         } else {
-            where.createdById = userId;
+            where.userId = userId;
             where.type = { in: CANDIDATE_TYPES };
         }
 

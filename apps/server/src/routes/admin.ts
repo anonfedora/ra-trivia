@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { prisma, UserType } from 'database';
 import { authenticate, authorizeAdmin, AuthRequest } from '../middlewares/auth';
+import { sendGeneralAnnouncementEmail } from '../services/email';
 import * as xlsx from 'xlsx';
 import { ReportGenerator } from '../services/reportGenerator';
 import { emitNotification } from '../services/socketService';
@@ -12,6 +13,86 @@ import { sendBulkWelcomeEmail, generateOTP } from '../services/email';
 const router = Router();
 const upload = multer({ storage: multer.memoryStorage() });
 const WEB_URL = process.env.WEB_URL || 'http://localhost:3000';
+
+/**
+ * @openapi
+ * /admin/announcement:
+ *   post:
+ *     tags: [Admin]
+ *     summary: Send a general announcement to candidates
+ *     security:
+ *       - BearerAuth: []
+ */
+router.post('/announcement', authenticate, authorizeAdmin, async (req: AuthRequest, res) => {
+    try {
+        const { subject, message, targetUserType } = req.body;
+        const adminId = req.user?.userId;
+
+        if (!subject || !message) {
+            return res.status(400).json({ message: 'Subject and message are required' });
+        }
+
+        // 1. Build where clause
+        const where: any = { role: 'CANDIDATE' };
+        if (targetUserType) {
+            where.userType = targetUserType as UserType;
+        }
+
+        // 2. Fetch candidates
+        const candidates = await prisma.user.findMany({
+            where,
+            select: { id: true, email: true, name: true }
+        });
+
+        if (candidates.length === 0) {
+            return res.json({ message: 'No candidates found for the specified criteria', sentCount: 0 });
+        }
+
+        // 3. Send notifications and emails
+        let successCount = 0;
+        const announcementPromises = candidates.map(async (candidate) => {
+            try {
+                // A. Create in-app notification
+                const notification = await prisma.notification.create({
+                    data: {
+                        userId: candidate.id,
+                        type: 'GENERAL_ANNOUNCEMENT',
+                        title: subject,
+                        message: message,
+                        createdById: adminId
+                    }
+                });
+
+                // B. Emit socket notification
+                emitNotification(candidate.id, notification);
+
+                // C. Send email
+                const emailSuccess = await sendGeneralAnnouncementEmail(
+                    candidate.email,
+                    candidate.name,
+                    subject,
+                    message
+                );
+
+                if (emailSuccess) successCount++;
+            } catch (err) {
+                console.error(`[ANNOUNCEMENT] Failed to notify ${candidate.email}:`, err);
+            }
+        });
+
+        await Promise.all(announcementPromises);
+
+        res.json({
+            message: `Announcement sent successfully to ${candidates.length} candidates.`,
+            sentCount: candidates.length,
+            emailSuccessCount: successCount
+        });
+
+    } catch (error) {
+        console.error('Announcement error:', error);
+        res.status(500).json({ message: 'Failed to send announcement' });
+    }
+});
 
 /**
  * @openapi

@@ -109,10 +109,15 @@ pnpm --filter web dev
   - **Pass Mark Configuration**: Set custom pass/fail percentage thresholds per quiz (defaults to 50%).
   - **Exam Access Code**: Optional code (e.g., `PLENIEXAM2026`) that candidates must enter to start the exam.
 - **Bulk Candidate Import**: Register hundreds of candidates via Excel upload with automated welcome emails and 24-hour verification window
+- **Bulk Communication**:
+  - **Exam Notifications**: One-click broadcast to all candidates in an exam's category with date, time, and access code.
+  - **General Announcements**: Send custom platform-wide or rank-specific messages via email and in-app notifications.
 - Set retake limits, start/end scheduling
 - View all candidate results with search and pagination
 - **Bulk Result Release**: Select multiple results at once and release them via a single action; replaces individual "Release Now" buttons
-- Support Center: Real-time chat with candidates, thread management, and resolution tracking.
+- **AI-Powered Support Center**: Real-time chat with candidates, thread management, and resolution tracking.
+  - **AI Support Assistant**: Analyzes candidate messages using Gemini 2.0 Flash to suggest the best FAQ template.
+  - **AI Auto-Reply**: Automatically responds to high-confidence (85%+) common queries like login issues or result delays.
   - **Instant Templates**: Library of FAQ and troubleshooting templates that admins can send with a single click.
 - Manually release results per-session or bulk per-quiz
 - Set manual pass/fail status override
@@ -245,6 +250,23 @@ pnpm --filter server test -- --run
 ## Version History
 
 ### v1.9.1 (Current)
+- **AI-Powered Support Assistant**:
+    - **Contextual Analysis**: Uses **Gemini 2.0 Flash** to analyze candidate messages and suggest the most relevant FAQ templates.
+    - **AI Auto-Reply**: Automatically responds to common queries (Login, OTP, Results) with high confidence (85%+) matching.
+    - **Keyword Fallback Engine**: Robust matching system ensures functionality even when the AI API quota is exceeded.
+- **Bulk Communication Suite**:
+    - **Exam Notifications**: Send bulk email and in-app alerts for upcoming exams, including date, time, and access code.
+    - **General Announcements**: Broadcast custom messages to all or specific candidate ranks (Ambassador, Plenipotentiary, etc.).
+- **Exam Access Code**:
+    - **Secure Exam Entry**: Optional access codes required for candidates to start specific exams.
+    - **Admin Controls**: Set codes during quiz creation, editing, or bulk question imports.
+    - **Multi-Platform Support**: Secure entry implemented across Web and Mobile candidate interfaces.
+- **UX & Layout Improvements**:
+    - **Responsive Admin Controls**: Re-engineered button layouts for "Save", "Notify", and "Preview" for perfect mobile/desktop viewing.
+    - **Enhanced Preview**: Correct answers for FITG questions and the exam code are now visible and copyable in admin preview mode.
+- **Security & Stability**:
+    - **Anti-Cheat Fix**: Suppressed password-manager popups on exam entry to prevent false-positive focus-loss violations.
+    - **Database Integrity**: Linked notifications directly to users for personalized, persistent alert history.
 - **Exam Access Code**:
     - **Secure Exam Entry**: Admins can now set an optional access code (e.g., `PLENIEXAM2026`) that candidates must enter before starting an exam.
     - **Multi-Platform Support**: Implemented across Web and Mobile candidate interfaces with secure password inputs.

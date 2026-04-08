@@ -20,6 +20,7 @@
   "dependencies": {
     "@prisma/client": "^6.0.0",
     "@sparticuz/chromium": "^143.0.4",
+    "@google/generative-ai": "^0.21.0",
     "@types/puppeteer": "^7.0.4",
     "bcryptjs": "^3.0.3",
     "cors": "^2.8.6",

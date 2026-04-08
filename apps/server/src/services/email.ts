@@ -273,3 +273,98 @@ export const sendBulkWelcomeEmail = async (
   console.log(`[EMAIL] Bulk welcome email to ${email}: ${ok ? 'OK' : 'FAILED'}`);
   return ok;
 };
+
+export const sendExamNotificationEmail = async (
+  email: string,
+  name: string,
+  quizTitle: string,
+  startDate: string,
+  examCode: string | null
+): Promise<boolean> => {
+  const formattedDate = new Date(startDate).toLocaleString('en-GB', {
+    day: '2-digit',
+    month: 'long',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+
+  const emailHtml = `
+    <div style="font-family: sans-serif; max-width: 600px; margin: auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 10px;">
+      <div style="text-align: center; margin-bottom: 20px;">
+        <h1 style="color: #1e293b;">Upcoming Examination Notification</h1>
+        <p style="font-size: 16px; color: #64748b;">Important details for your upcoming exam session.</p>
+      </div>
+
+      <p style="font-size: 16px; color: #334155;">Hi <strong>${name}</strong>,</p>
+      <p style="font-size: 16px; color: #334155;">This is to notify you of an upcoming examination session assigned to your category.</p>
+
+      <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 20px; margin: 20px 0;">
+        <h3 style="margin-top: 0; color: #1e293b; border-bottom: 1px solid #e2e8f0; padding-bottom: 10px;">Examination Details</h3>
+        <p style="margin: 10px 0; font-size: 14px; color: #334155;"><strong>Exam Title:</strong> ${quizTitle}</p>
+        <p style="margin: 10px 0; font-size: 14px; color: #334155;"><strong>Scheduled For:</strong> ${formattedDate}</p>
+        ${examCode ? `<p style="margin: 10px 0; font-size: 14px; color: #334155;"><strong>Access Code:</strong> <span style="background-color: #fffbeb; padding: 2px 6px; border-radius: 4px; border: 1px solid #fde68a; font-family: monospace; font-weight: bold; color: #b45309;">${examCode}</span></p>` : ''}
+      </div>
+
+      <div style="background-color: #eff6ff; border: 1px solid #dbeafe; border-radius: 8px; padding: 15px; margin: 20px 0;">
+        <p style="margin: 0; color: #1e40af; font-size: 13px; line-height: 1.5;">
+          <strong>Instructions:</strong> Please ensure you are logged in to the portal at least 10 minutes before the scheduled time. ${examCode ? 'You will need the access code above to start the exam.' : ''}
+        </p>
+      </div>
+
+      <div style="text-align: center; margin: 30px 0;">
+        <a href="${process.env.WEB_URL || 'http://localhost:3000'}/dashboard" style="background-color: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block;">Go to Dashboard</a>
+      </div>
+
+      <p style="margin-top: 30px; color: #94a3b8; font-size: 12px; border-top: 1px solid #eee; padding-top: 20px;">
+        This is an automated message from the R.A Quiz Portal. Please do not reply.
+      </p>
+    </div>
+  `;
+
+  if (logEmailForDev(email, `Upcoming Exam: ${quizTitle}`, emailHtml)) return true;
+
+  const ok = await sendMail(
+    email,
+    `Upcoming Exam Notification: ${quizTitle}`,
+    emailHtml,
+    `Hi ${name}, your exam "${quizTitle}" is scheduled for ${formattedDate}. ${examCode ? `Access Code: ${examCode}` : ''}`
+  );
+  console.log(`[EMAIL] Exam notification email to ${email}: ${ok ? 'OK' : 'FAILED'}`);
+  return ok;
+};
+
+export const sendGeneralAnnouncementEmail = async (
+  email: string,
+  name: string,
+  subject: string,
+  message: string
+): Promise<boolean> => {
+  const emailHtml = `
+    <div style="font-family: sans-serif; max-width: 600px; margin: auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 10px;">
+      <div style="text-align: center; margin-bottom: 20px;">
+        <h1 style="color: #1e293b;">RA Quiz Portal Announcement</h1>
+      </div>
+
+      <p style="font-size: 16px; color: #334155;">Hi <strong>${name}</strong>,</p>
+      
+      <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 20px; margin: 20px 0; color: #334155; line-height: 1.6;">
+        ${message.replace(/\n/g, '<br>')}
+      </div>
+
+      <div style="text-align: center; margin: 30px 0;">
+        <a href="${process.env.WEB_URL || 'http://localhost:3000'}/dashboard" style="background-color: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block;">Go to Dashboard</a>
+      </div>
+
+      <p style="margin-top: 30px; color: #94a3b8; font-size: 12px; border-top: 1px solid #eee; padding-top: 20px;">
+        This is an automated message from the RA Quiz Portal. Please do not reply.
+      </p>
+    </div>
+  `;
+
+  if (logEmailForDev(email, subject, emailHtml)) return true;
+
+  const ok = await sendMail(email, subject, emailHtml, message);
+  console.log(`[EMAIL] General announcement email to ${email}: ${ok ? 'OK' : 'FAILED'}`);
+  return ok;
+};

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from 'react';
-import { BookOpen, Clock, PlayCircle, Plus, Upload, Trash2, Power, PowerOff, FileDown, MoreVertical, CheckCircle, BarChart3, Users, MessageCircle, Download } from 'lucide-react';
+import { BookOpen, Clock, PlayCircle, Plus, Upload, Trash2, Power, PowerOff, FileDown, MoreVertical, CheckCircle, BarChart3, Users, MessageCircle, Download, Bell } from 'lucide-react';
 import Link from 'next/link';
 import { ThemeToggle } from '../../../components/ThemeToggle';
 import NotificationBell from '../../../components/NotificationBell';
@@ -79,6 +79,7 @@ export default function AdminDashboard() {
     const [editStartDate, setEditStartDate] = useState('');
     const [editEndDate, setEditEndDate] = useState('');
     const [isSavingEdit, setIsSavingEdit] = useState(false);
+    const [isNotifying, setIsNotifying] = useState(false);
 
     // Create Quiz Form
     const [newTitle, setNewTitle] = useState('');
@@ -272,6 +273,34 @@ export default function AdminDashboard() {
             toast('Update error: Could not connect to the server', 'error');
         } finally {
             setIsSavingEdit(false);
+        }
+    };
+
+    const handleNotifyCandidates = async () => {
+        if (!selectedQuizId) return;
+        
+        if (!editStartDate) {
+            toast('Please set a start date before notifying candidates', 'warning');
+            return;
+        }
+
+        setIsNotifying(true);
+        try {
+            const res = await apiFetch(`quizzes/${selectedQuizId}/notify`, {
+                method: 'POST'
+            });
+
+            if (res.ok) {
+                const data = await res.json();
+                toast(data.message, 'success');
+            } else {
+                const errData = await res.json().catch(() => ({}));
+                toast(`Failed to send notifications: ${errData.message || 'Unknown error'}`, 'error');
+            }
+        } catch (err) {
+            toast('Notification error: Could not connect to the server', 'error');
+        } finally {
+            setIsNotifying(false);
         }
     };
 
@@ -809,19 +838,33 @@ export default function AdminDashboard() {
                                         />
                                     </div>
 
-                                    <div className="flex gap-3 pt-2">
+                                    <div className="flex flex-wrap justify-end gap-3 pt-2">
                                         <button
                                             type="button"
                                             onClick={handleSaveQuizMeta}
                                             disabled={isSavingEdit || (user?.role === 'ADMIN' && selected?.createdBy?.id !== user?.id)}
-                                            className="flex-1 px-6 py-3 rounded-2xl font-bold text-white bg-primary hover:bg-primary/90 transition-all disabled:opacity-60"
+                                            className="w-full md:w-auto px-6 py-3 rounded-2xl font-bold text-white bg-primary hover:bg-primary/90 transition-all disabled:opacity-60"
                                         >
                                             {isSavingEdit ? 'Saving...' : 'Save Changes'}
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={handleNotifyCandidates}
+                                            disabled={isNotifying || (user?.role === 'ADMIN' && selected?.createdBy?.id !== user?.id) || !editStartDate}
+                                            className="w-full md:w-auto px-6 py-3 rounded-2xl font-bold bg-amber-500 text-white hover:bg-amber-600 transition-all disabled:opacity-60 flex items-center justify-center gap-2"
+                                            title="Notify Candidates"
+                                        >
+                                            {isNotifying ? (
+                                                <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                                            ) : (
+                                                <Bell size={18} />
+                                            )}
+                                            Notify
                                         </button>
                                         {selectedQuizId && (
                                             <Link
                                                 href={`/admin/quizzes/${selectedQuizId}/preview`}
-                                                className="px-6 py-3 rounded-2xl font-bold bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-all"
+                                                className="w-full md:w-auto px-6 py-3 rounded-2xl font-bold bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-all flex items-center justify-center"
                                             >
                                                 Preview
                                             </Link>
