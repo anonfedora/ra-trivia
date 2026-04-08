@@ -1,8 +1,9 @@
 import { Router } from 'express';
-import { prisma } from 'database';
+import { prisma, UserType } from 'database';
 import { authenticate, AuthRequest, authorize } from '../middlewares/auth';
 import { validateQuizListAccess, validateUserTypeAccess } from '../middlewares/userTypeAccess';
 import { emitNotification } from '../services/socketService';
+import { sendExamNotificationEmail } from '../services/email';
 
 const router = Router();
 
@@ -524,6 +525,119 @@ router.delete('/:id', authenticate, authorize(['ADMIN', 'SUPER_ADMIN']), async (
     } catch (error) {
         console.error('[QUIZ_DELETE_ERROR]', error);
         res.status(500).json({ message: 'Internal server error' });
+    }
+});
+
+/**
+ * @openapi
+ * /quizzes/{id}/notify:
+ *   post:
+ *     tags: [Quizzes]
+ *     summary: Send exam notifications to relevant candidates
+ *     security:
+ *       - BearerAuth: []
+ */
+router.post('/:id/notify', authenticate, authorize(['ADMIN', 'SUPER_ADMIN']), async (req: AuthRequest, res) => {
+    try {
+        const quizId = req.params.id as string;
+        const userRole = req.user?.role;
+        const adminId = req.user?.userId;
+
+        // 1. Fetch quiz details
+        const quiz = await prisma.quiz.findUnique({
+            where: { id: quizId },
+            include: {
+                questions: {
+                    select: { questionType: true },
+                    take: 1
+                }
+            }
+        });
+
+        if (!quiz) {
+            return res.status(404).json({ message: 'Quiz not found' });
+        }
+
+        if (userRole === 'ADMIN' && quiz.createdById !== adminId) {
+            return res.status(403).json({ message: 'You can only send notifications for quizzes you created' });
+        }
+
+        if (!quiz.startDate) {
+            return res.status(400).json({ message: 'Quiz must have a start date to send notifications' });
+        }
+
+        // 2. Identify target user types based on questions in the quiz
+        const questionTypes = await prisma.question.findMany({
+            where: { quizId },
+            select: { questionType: true },
+            distinct: ['questionType']
+        });
+
+        if (questionTypes.length === 0) {
+            return res.status(400).json({ message: 'Cannot send notifications for an empty quiz' });
+        }
+
+        const targetUserTypes = questionTypes.map(q => q.questionType) as UserType[];
+
+        // 3. Find candidates matching those user types
+        const candidates = await prisma.user.findMany({
+            where: {
+                role: 'CANDIDATE',
+                userType: { in: targetUserTypes }
+            },
+            select: { id: true, email: true, name: true }
+        });
+
+        if (candidates.length === 0) {
+            return res.json({ message: 'No candidates found for this exam category', sentCount: 0 });
+        }
+
+        // 4. Send Notifications (In-app and Email)
+        let successCount = 0;
+        const notificationPromises = candidates.map(async (candidate) => {
+            try {
+                // A. Create In-App Notification
+                const notification = await prisma.notification.create({
+                    data: {
+                        userId: candidate.id,
+                        quizId: quizId,
+                        type: 'NEW_EXAM_AVAILABLE',
+                        title: `Upcoming Exam: ${quiz.title}`,
+                        message: `An exam is scheduled for ${new Date(quiz.startDate!).toLocaleString()}. ${quiz.examCode ? `Access Code: ${quiz.examCode}` : ''}`,
+                        isRead: false,
+                        createdById: adminId // Store who sent it
+                    }
+                });
+
+                // B. Emit real-time socket notification
+                emitNotification(candidate.id, notification);
+
+                // C. Send Email
+                const emailSuccess = await sendExamNotificationEmail(
+                    candidate.email,
+                    candidate.name,
+                    quiz.title,
+                    quiz.startDate!.toISOString(),
+                    quiz.examCode
+                );
+
+                if (emailSuccess) successCount++;
+            } catch (err) {
+                console.error(`[NOTIFY] Failed to notify user ${candidate.email}:`, err);
+            }
+        });
+
+        await Promise.all(notificationPromises);
+
+        res.json({ 
+            message: `Notifications sent successfully to ${candidates.length} candidates.`,
+            sentCount: candidates.length,
+            emailSuccessCount: successCount
+        });
+
+    } catch (error) {
+        console.error('Notify candidates error:', error);
+        res.status(500).json({ message: 'Failed to send notifications' });
     }
 });
 

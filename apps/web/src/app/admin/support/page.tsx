@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { Search, ArrowLeft, MessageCircle, User, Clock, CheckCircle2, AlertCircle, Send, Bell, Check, CheckCheck, Book } from 'lucide-react';
+import { Search, ArrowLeft, MessageCircle, User, Clock, CheckCircle2, AlertCircle, Send, Bell, Check, CheckCheck, Book, Sparkles } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { ThemeToggle } from '../../../components/ThemeToggle';
@@ -51,6 +51,8 @@ export default function AdminSupportPage() {
     const [filterUserType, setFilterUserType] = useState<string>('');
     const [pagination, setPagination] = useState({ page: 1, totalPages: 1 });
     const [templates, setTemplates] = useState<{ id: string, title: string, content: string }[]>([]);
+    const [aiSuggestion, setAiSuggestion] = useState<{ templateId: string | null, confidence: number, reasoning: string, suggestedReply?: string } | null>(null);
+    const [isAiLoading, setIsAiLoading] = useState(false);
     const [showTemplates, setShowTemplates] = useState(false);
     const [typingUsers, setTypingUsers] = useState<Set<string>>(new Set());
     const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -95,6 +97,22 @@ export default function AdminSupportPage() {
             }
         } catch (err) {
             console.error('Failed to fetch templates', err);
+        }
+    }, []);
+
+    const fetchAiSuggestions = useCallback(async (userId: string) => {
+        setIsAiLoading(true);
+        setAiSuggestion(null);
+        try {
+            const res = await apiFetch(`support/admin/${userId}/ai-suggestions`);
+            if (res.ok) {
+                const data = await res.json();
+                setAiSuggestion(data);
+            }
+        } catch (err) {
+            console.error('Failed to fetch AI suggestions', err);
+        } finally {
+            setIsAiLoading(false);
         }
     }, []);
 
@@ -179,6 +197,7 @@ export default function AdminSupportPage() {
                 // If the user is currently chatting with this user, refresh their chat too
                 if (selectedUserIdRef.current === msg.userId) {
                     fetchChatHistory(msg.userId);
+                    fetchAiSuggestions(msg.userId); // Fetch AI suggestion for new message
                 }
             });
 
@@ -211,13 +230,14 @@ export default function AdminSupportPage() {
                 socketRef.current.disconnect();
             }
         };
-    }, [fetchThreads, fetchChatHistory]);
+    }, [fetchThreads, fetchChatHistory, fetchAiSuggestions]);
 
     useEffect(() => {
         if (selectedUserId) {
             fetchChatHistory(selectedUserId);
+            fetchAiSuggestions(selectedUserId);
         }
-    }, [selectedUserId, fetchChatHistory]);
+    }, [selectedUserId, fetchChatHistory, fetchAiSuggestions]);
 
     const scrollToBottom = (smooth = true) => {
         if (scrollRef.current) {
@@ -618,6 +638,62 @@ export default function AdminSupportPage() {
 
                             {/* Reply Input */}
                             <div className="p-4 bg-white dark:bg-slate-800 border-t border-slate-200 dark:border-slate-700 shrink-0 relative">
+                                {/* AI Suggestion Section */}
+                                {aiSuggestion && (aiSuggestion.templateId || aiSuggestion.suggestedReply) && (
+                                    <div className="mb-4 animate-in slide-in-from-bottom-2 duration-300">
+                                        <div className="bg-primary/5 dark:bg-primary/10 border border-primary/20 rounded-2xl p-4">
+                                            <div className="flex justify-between items-center mb-2">
+                                                <div className="flex items-center gap-2">
+                                                    <div className="w-6 h-6 rounded-lg bg-primary/10 flex items-center justify-center text-primary">
+                                                        <Sparkles size={14} />
+                                                    </div>
+                                                    <span className="text-[10px] font-black uppercase tracking-widest text-primary">AI Suggestion</span>
+                                                    {aiSuggestion.confidence > 0.8 && (
+                                                        <span className="px-2 py-0.5 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 text-[8px] font-black rounded-full uppercase tracking-tighter">High Confidence</span>
+                                                    )}
+                                                </div>
+                                                <div className="text-[10px] text-slate-400 font-medium italic">
+                                                    {aiSuggestion.reasoning}
+                                                </div>
+                                            </div>
+                                            
+                                            <div className="flex items-start gap-3">
+                                                <div className="flex-1">
+                                                    <p className="text-xs text-slate-700 dark:text-slate-300 line-clamp-2">
+                                                        {aiSuggestion.templateId 
+                                                            ? templates.find(t => t.id === aiSuggestion.templateId)?.content 
+                                                            : aiSuggestion.suggestedReply}
+                                                    </p>
+                                                </div>
+                                                <button
+                                                    onClick={() => {
+                                                        const content = aiSuggestion.templateId 
+                                                            ? templates.find(t => t.id === aiSuggestion.templateId)?.content 
+                                                            : aiSuggestion.suggestedReply;
+                                                        if (content) {
+                                                            setReply(content);
+                                                            setAiSuggestion(null); // Clear suggestion after use
+                                                        }
+                                                    }}
+                                                    className="px-3 py-1.5 bg-primary text-white text-[10px] font-bold rounded-lg hover:bg-primary/90 transition-all shadow-sm shrink-0"
+                                                >
+                                                    Apply Suggestion
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {isAiLoading && (
+                                    <div className="mb-4 animate-pulse">
+                                        <div className="bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 rounded-2xl p-4 flex items-center gap-3">
+                                            <div className="w-6 h-6 rounded-lg bg-slate-200 dark:bg-slate-700" />
+                                            <div className="h-3 w-24 bg-slate-200 dark:bg-slate-700 rounded-full" />
+                                            <div className="h-3 flex-1 bg-slate-100 dark:bg-slate-800 rounded-full" />
+                                        </div>
+                                    </div>
+                                )}
+
                                 {showTemplates && (
                                     <div className="absolute bottom-full left-0 w-full p-4 bg-white dark:bg-slate-800 border-t border-slate-200 dark:border-slate-700 shadow-xl z-50 animate-in slide-in-from-bottom-2 duration-200">
                                         <div className="flex justify-between items-center mb-3">

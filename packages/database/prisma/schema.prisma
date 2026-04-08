@@ -30,6 +30,7 @@ model User {
   auditLogs UserTypeAuditLog[]
   supportMessages SupportMessage[]
   refreshTokens RefreshToken[]
+  notifications Notification[]
 }
 
 model Question {
@@ -121,6 +122,7 @@ model UserTypeAuditLog {
 
 model Notification {
   id          String   @id @default(uuid())
+  userId      String?  // Targeted user (null if global or admin-only)
   type        String   // "EXAM_SUBMITTED", "EXAM_COMPLETED", etc.
   title       String
   message     String
@@ -133,6 +135,9 @@ model Notification {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   
+  user        User?    @relation(fields: [userId], references: [id])
+  
+  @@index([userId, isRead])
   @@index([createdById, isRead])
   @@index([createdAt])
 }

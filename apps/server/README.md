@@ -64,6 +64,7 @@ cp apps/server/.env.example apps/server/.env
 DATABASE_URL="postgresql://user:pass@localhost:5432/ra_trivia"
 JWT_SECRET="change-me-in-production"
 WEB_URL="https://ra-trivia.vercel.app"   # Used in password reset emails
+GEMINI_API_KEY="AIza..."                # Google Generative AI for Support Assistant
 RESEND_API_KEY="re_..."
 FROM_EMAIL="noreply@yourdomain.com"
 PORT=4000
@@ -120,6 +121,7 @@ pnpm --filter server test:coverage
 | PATCH | `/:id` | Admin | Update title, duration, retake limit, schedule |
 | PATCH | `/:id/toggle` | Admin | Activate/deactivate; notifies matching candidates |
 | DELETE | `/:id` | Admin | Delete quiz + all sessions |
+| POST | `/:id/notify` | Admin | Send bulk exam notifications to category candidates |
 
 ### Quiz Session — `/api/quiz`
 
@@ -144,6 +146,7 @@ pnpm --filter server test:coverage
 | GET | `/export/formatted-excel` | Admin | Formatted Excel export |
 | GET | `/export/pdf` | Admin | PDF report (Puppeteer) |
 | POST | `/bulk-candidates` | Admin | Bulk register candidates via Excel upload |
+| POST | `/announcement` | Admin | Send broadcast message to all/rank candidates |
 
 ## Backend Services
 

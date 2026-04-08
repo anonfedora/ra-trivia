@@ -1,14 +1,14 @@
 "use client";
 
 import { useState, useEffect, useCallback } from 'react';
-import { Search, ArrowLeft, UserPlus } from 'lucide-react';
+import { Search, ArrowLeft, UserPlus, Megaphone } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { ThemeToggle } from '../../../components/ThemeToggle';
 import NotificationBell from '../../../components/NotificationBell';
 import { useToast } from '../../../contexts/ToastContext';
 import CandidateTable from '../../../components/CandidateTable';
-import { BulkImportModal } from '../../../components';
+import { BulkImportModal, AnnouncementModal } from '../../../components';
 import { apiFetch } from '../../../lib/api';
 import { getAccessToken, getUser } from '../../../lib/auth';
 
@@ -20,6 +20,7 @@ export default function CandidatesPage() {
     const [page, setPage] = useState(1);
     const [total, setTotal] = useState(0);
     const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+    const [isAnnouncementModalOpen, setIsAnnouncementModalOpen] = useState(false);
     const pageSize = 25;
     const { toast } = useToast();
     const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
@@ -80,6 +81,12 @@ export default function CandidatesPage() {
                     </div>
                     <div className="flex gap-3 items-center">
                         <button 
+                            onClick={() => setIsAnnouncementModalOpen(true)}
+                            className="flex items-center gap-2 px-6 py-3 bg-amber-500 text-white rounded-2xl font-bold shadow-lg shadow-amber-500/20 hover:bg-amber-600 transition-all transform hover:-translate-y-0.5"
+                        >
+                            <Megaphone size={18} /> Broadcast
+                        </button>
+                        <button 
                             onClick={() => setIsImportModalOpen(true)}
                             className="flex items-center gap-2 px-6 py-3 bg-primary text-white rounded-2xl font-bold shadow-lg shadow-primary/20 hover:bg-primary/90 transition-all transform hover:-translate-y-0.5"
                         >
@@ -119,6 +126,11 @@ export default function CandidatesPage() {
                 isOpen={isImportModalOpen}
                 onClose={() => setIsImportModalOpen(false)}
                 onSuccess={() => fetchCandidates(1)}
+            />
+
+            <AnnouncementModal 
+                isOpen={isAnnouncementModalOpen}
+                onClose={() => setIsAnnouncementModalOpen(false)}
             />
         </main>
     );

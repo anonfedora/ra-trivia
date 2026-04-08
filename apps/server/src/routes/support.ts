@@ -2,8 +2,22 @@ import { Router } from 'express';
 import { prisma } from 'database';
 import { authenticate, authorizeAdmin, AuthRequest } from '../middlewares/auth';
 import { emitToRoom } from '../services/socketService';
+import { aiService, SupportTemplate } from '../services/aiService';
 
 const router = Router();
+
+export const SUPPORT_TEMPLATES: SupportTemplate[] = [
+    { id: '1', title: 'Greeting', content: 'Hello! How can we help you today?' },
+    { id: '2', title: 'Checking', content: 'We are looking into your request. Please give us a moment.' },
+    { id: '3', title: 'Resolved', content: 'The issue has been resolved. Is there anything else you need help with?' },
+    { id: '4', title: 'Exam Technical', content: 'If you are facing technical issues during the exam, please try refreshing the page or checking your internet connection.' },
+    { id: '5', title: 'Result Delay', content: 'Results are typically released within 24-48 hours after the exam completion. You will receive a notification once they are ready.' },
+    { id: '6', title: 'Login Issue', content: 'If you are having trouble logging in, please ensure you are using the correct email and password. If you forgot your password, use the "Forgot Password" link on the login page.' },
+    { id: '7', title: 'OTP Not Received', content: 'If you haven\'t received your OTP, please check your spam/junk folder. You can also request a new code from the verification screen.' },
+    { id: '8', title: 'Exam Not Showing', content: 'If you don\'t see your exam on the dashboard, please ensure you have selected the correct candidate category during registration.' },
+    { id: '9', title: 'Retake Policy', content: 'Each exam has a specific retake limit set by the admin. If you have exhausted your attempts, you will need to contact your association coordinator for further instructions.' },
+    { id: '10', title: 'Support Hours', content: 'Our support team is available from 8:00 AM to 6:00 PM. Messages sent outside these hours will be addressed as soon as possible on the next business day.' }
+];
 
 /**
  * @openapi
@@ -18,19 +32,7 @@ const router = Router();
  *         description: List of templates
  */
 router.get('/admin/templates', authenticate, authorizeAdmin, async (req: AuthRequest, res) => {
-    const templates = [
-        { id: '1', title: 'Greeting', content: 'Hello! How can we help you today?' },
-        { id: '2', title: 'Checking', content: 'We are looking into your request. Please give us a moment.' },
-        { id: '3', title: 'Resolved', content: 'The issue has been resolved. Is there anything else you need help with?' },
-        { id: '4', title: 'Exam Technical', content: 'If you are facing technical issues during the exam, please try refreshing the page or checking your internet connection.' },
-        { id: '5', title: 'Result Delay', content: 'Results are typically released within 24-48 hours after the exam completion. You will receive a notification once they are ready.' },
-        { id: '6', title: 'Login Issue', content: 'If you are having trouble logging in, please ensure you are using the correct email and password. If you forgot your password, use the "Forgot Password" link on the login page.' },
-        { id: '7', title: 'OTP Not Received', content: 'If you haven\'t received your OTP, please check your spam/junk folder. You can also request a new code from the verification screen.' },
-        { id: '8', title: 'Exam Not Showing', content: 'If you don\'t see your exam on the dashboard, please ensure you have selected the correct candidate category during registration.' },
-        { id: '9', title: 'Retake Policy', content: 'Each exam has a specific retake limit set by the admin. If you have exhausted your attempts, you will need to contact your association coordinator for further instructions.' },
-        { id: '10', title: 'Support Hours', content: 'Our support team is available from 8:00 AM to 6:00 PM. Messages sent outside these hours will be addressed as soon as possible on the next business day.' }
-    ];
-    res.json(templates);
+    res.json(SUPPORT_TEMPLATES);
 });
 
 /**
@@ -318,6 +320,60 @@ router.get('/admin/unread-count', authenticate, authorizeAdmin, async (req: Auth
 
 /**
  * @openapi
+ * /support/admin/{userId}/ai-suggestions:
+ *   get:
+ *     tags: [Support Admin]
+ *     summary: Get AI suggested templates for user's latest message
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: userId
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: AI suggestions
+ */
+router.get('/admin/:userId/ai-suggestions', authenticate, authorizeAdmin, async (req: AuthRequest, res) => {
+    try {
+        const userId = req.params.userId as string;
+
+        // Get the absolute latest message in the thread (could be candidate or admin)
+        const latestThreadMsg = await prisma.supportMessage.findFirst({
+            where: { userId },
+            orderBy: { createdAt: 'desc' }
+        });
+
+        // If the latest message is already from an admin, we don't need a suggestion
+        if (latestThreadMsg?.isAdmin) {
+            return res.json({ templateId: null, confidence: 0, reasoning: 'Latest message is an admin reply' });
+        }
+
+        // Get the latest candidate message
+        const latestCandidateMsg = await prisma.supportMessage.findFirst({
+            where: {
+                userId,
+                isAdmin: false
+            },
+            orderBy: { createdAt: 'desc' }
+        });
+
+        if (!latestCandidateMsg) {
+            return res.json({ templateId: null, confidence: 0, reasoning: 'No candidate messages found' });
+        }
+
+        const suggestion = await aiService.suggestTemplate(latestCandidateMsg.message, SUPPORT_TEMPLATES);
+        res.json(suggestion);
+    } catch (error) {
+        console.error('AI suggestions error:', error);
+        res.status(500).json({ message: 'Failed to fetch AI suggestions' });
+    }
+});
+
+/**
+ * @openapi
  * /support/admin/{userId}/read:
  *   patch:
  *     tags: [Support Admin]
@@ -561,6 +617,47 @@ router.post('/', authenticate, async (req: AuthRequest, res) => {
         emitToRoom('admin', 'notification', notification);
         // Emit specifically to the support room for real-time chat updates
         emitToRoom('admin', 'support_message', supportMessage);
+
+        // --- AI Auto-Reply Logic ---
+        // If confidence is high, auto-reply from the support team
+        try {
+            const aiResult = await aiService.suggestTemplate(message, SUPPORT_TEMPLATES);
+            
+            // Auto-reply threshold: 0.85
+            if (aiResult.confidence >= 0.85) {
+                const autoReplyContent = aiResult.templateId 
+                    ? SUPPORT_TEMPLATES.find(t => t.id === aiResult.templateId)?.content 
+                    : aiResult.suggestedReply;
+
+                if (autoReplyContent) {
+                    // Wait a bit to simulate a "thinking" human-like delay (optional, but feels better)
+                    setTimeout(async () => {
+                        try {
+                            const autoReply = await prisma.supportMessage.create({
+                                data: {
+                                    userId,
+                                    quizId: quizId || null,
+                                    message: autoReplyContent,
+                                    isAdmin: true,
+                                    status: 'RESOLVED' // AI auto-replies often resolve common queries
+                                }
+                            });
+                            
+                            // Notify user of the auto-reply
+                            emitToRoom(`user:${userId}`, 'support_reply', autoReply);
+                            // Also notify admins so their chat window stays in sync
+                            emitToRoom('admin', 'support_message', autoReply);
+                            
+                            console.log(`[AI_AUTO_REPLY] Successfully auto-replied to user ${userId} with confidence ${aiResult.confidence}`);
+                        } catch (err) {
+                            console.error('[AI_AUTO_REPLY] Error creating auto-reply message:', err);
+                        }
+                    }, 2000); // 2 second delay
+                }
+            }
+        } catch (aiErr) {
+            console.error('[AI_AUTO_REPLY] Error during AI suggestion/auto-reply:', aiErr);
+        }
 
         res.status(201).json({ 
             message: 'Support request submitted successfully',
