@@ -267,6 +267,11 @@ pnpm --filter server test -- --run
 - **Security & Stability**:
     - **Anti-Cheat Fix**: Suppressed password-manager popups on exam entry to prevent false-positive focus-loss violations.
     - **Database Integrity**: Linked notifications directly to users for personalized, persistent alert history.
+- **Exam Access Code**:
+    - **Secure Exam Entry**: Admins can now set an optional access code (e.g., `PLENIEXAM2026`) that candidates must enter before starting an exam.
+    - **Multi-Platform Support**: Implemented across Web and Mobile candidate interfaces with secure password inputs.
+    - **Validation Logic**: Robust server-side validation ensures the correct code is provided before initiating a quiz session.
+    - **Import Integration**: Support for setting the exam code during bulk question imports.
 
 ### v1.9.0
 - **Bulk Candidate Registration**:
