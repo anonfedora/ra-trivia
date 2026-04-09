@@ -102,6 +102,7 @@ export default function UserTypeSelector({
           cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800
           ${disabled ? 'opacity-50 cursor-not-allowed' : ''}
           flex items-center justify-between
+          ${selectedOption ? '[&>div]:bg-primary/10 [&>div]:border-primary/20 [&>div]:text-primary [&>div]:placeholder:text-primary/40 [&>div]:focus]:border-primary [&>div]:focus]:ring-primary/10' : ''}
         `}
         onClick={() => !disabled && setIsOpen(!isOpen)}
         onKeyDown={handleKeyDown}
