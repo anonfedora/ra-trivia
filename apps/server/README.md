@@ -147,14 +147,17 @@ pnpm --filter server test:coverage
 | GET | `/export/pdf` | Admin | PDF report (Puppeteer) |
 | POST | `/bulk-candidates` | Admin | Bulk register candidates via Excel upload |
 | POST | `/announcement` | Admin | Send broadcast message to all/rank candidates |
+| GET | `/candidates` | Admin | List candidates (SUPER_ADMIN: all, ADMIN: uploaded only) |
+| GET | `/my-exam-takers` | Admin | List candidates who attempted admin's quizzes |
 
 ## Backend Services
 
 ### Bulk Registration & Verification
 The `bulk-candidates` endpoint parses Excel files, hashes passwords, and generates verification OTPs.
-- **24-hour Expiry**: Bulk-imported accounts have a 24-hour verification window.
-- **Automated Cleanup**: A background scheduler deletes any unverified accounts older than 24 hours every hour.
+- **48-hour Expiry**: Bulk-imported accounts have a 48-hour verification window.
+- **Automated Cleanup**: A background scheduler deletes any unverified accounts older than 48 hours every hour.
 - **Welcome Emails**: Custom welcome emails are sent with registration details, login password, and verification OTP.
+- **Admin Tracking**: Each bulk-imported candidate tracks which admin uploaded them for permission scoping.
 
 ### Scheduler & Automation
 - **Results Release**: Checks for quiz sessions ready for release every 15 minutes.
@@ -198,7 +201,16 @@ The `bulk-candidates` endpoint parses Excel files, hashes passwords, and generat
 
 - **SUPER_ADMIN**: `EXAM_SUBMITTED`, `NEW_USER_REGISTERED`, `NEW_ADMIN_REGISTERED`
 - **ADMIN**: same types, own notifications only (`createdById = userId`)
-- **CANDIDATE**: `NEW_EXAM_AVAILABLE`, `RESULT_RELEASED` (own only)
+- **CANDIDATE`: `NEW_EXAM_AVAILABLE`, `RESULT_RELEASED` (own only)
+
+### Admin Permission Scoping
+
+- **SUPER_ADMIN**: Full access to all candidates, quizzes, and system-wide features
+- **ADMIN**: Scoped access to only their own uploaded candidates and created quizzes
+  - Can only view/manage candidates they uploaded via bulk registration
+  - Can only send broadcast messages to their uploaded candidates
+  - Can only view exam results for their own quizzes
+  - Full access to question import and quiz creation for their content
 
 ## Real-time (Socket.IO)
 
