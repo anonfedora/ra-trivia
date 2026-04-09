@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter, useParams, useSearchParams } from 'next/navigation';
 import { CheckCircle2, HelpCircle, XCircle } from 'lucide-react';
-import { ThemeToggle, SupportButton } from '../../../components';
+import { ThemeToggle } from '../../../components';
 import { useToast } from '../../../contexts/ToastContext';
 import ConfirmModal from '../../../components/ConfirmModal';
 import { apiFetch } from '../../../lib/api';
@@ -136,7 +136,7 @@ export default function QuizPage() {
             toast('An error occurred while starting the quiz', 'error');
             router.push('/dashboard');
         }
-    }, [quizId, router, toast]);
+    }, [quizId, examCode, router, toast]);
 
     // Check for tab reload and show warning
     useEffect(() => {
@@ -461,7 +461,6 @@ export default function QuizPage() {
                     onConfirm={handleSubmit}
                     onCancel={() => setShowSubmitConfirm(false)}
                 />
-                <SupportButton quizId={quizId} isExam={true} />
             </main>
         );
     }
@@ -655,7 +654,7 @@ export default function QuizPage() {
                                 console.log('Rendering options for question:', currentQuestion.id, options);
                                 
                                 return options.map((opt: any, index: number) => {
-                                    const isSelected = answers[currentQuestion.id] === opt.key;
+                                    const isSelected = answers[currentQuestion.id]?.value === opt.key;
                                     const isFlashing = savedFlash === currentQuestion.id && isSelected;
                                     return (
                                         <button
@@ -663,8 +662,8 @@ export default function QuizPage() {
                                             onClick={() => saveAnswer(currentQuestion.id, opt.key)}
                                             className={`p-6 rounded-2xl text-left font-semibold transition-all border-2 relative overflow-hidden ${
                                                 isSelected
-                                                    ? 'bg-primary/5 dark:bg-primary/10 border-primary text-primary shadow-md'
-                                                    : 'bg-slate-50 dark:bg-slate-900/50 border-transparent dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'
+                                                    ? 'border-2 border-primary bg-primary text-white font-bold shadow-lg ring-2 ring-primary/20'
+                                                    : 'border-2 border-slate-300 dark:border-slate-600 hover:border-primary hover:bg-primary/5 text-slate-700 dark:text-slate-300'
                                             }`}
                                         >
                                             {/* Save flash overlay */}
@@ -672,10 +671,7 @@ export default function QuizPage() {
                                                 <span className="absolute inset-0 bg-primary/10 animate-ping rounded-2xl pointer-events-none" />
                                             )}
                                             <span className={`inline-flex items-center justify-center w-8 h-8 rounded-lg mr-3 shadow-sm transition-all ${isSelected ? 'bg-primary text-white' : 'bg-white dark:bg-slate-800 text-slate-400'}`}>
-                                                {isSelected && isFlashing
-                                                    ? <CheckCircle2 size={16} />
-                                                    : String.fromCharCode(65 + index)
-                                                }
+                                                {String.fromCharCode(65 + index)}
                                             </span>
                                             {opt.text}
                                         </button>
@@ -747,7 +743,6 @@ export default function QuizPage() {
                     <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded bg-slate-200 dark:bg-slate-700 inline-block" />Unanswered</span>
                 </div>
             </div>
-            <SupportButton quizId={quizId} isExam={true} />
         </main>
     );
 }
