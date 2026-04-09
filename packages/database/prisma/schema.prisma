@@ -23,6 +23,7 @@ model User {
   emailOtpExpiresAt DateTime?
   passwordResetTokenHash String?
   passwordResetTokenExpiresAt DateTime?
+  uploadedById String?     // Track which admin uploaded this candidate
   createdAt DateTime      @default(now())
   updatedAt DateTime      @updatedAt
   sessions  QuizSession[]
@@ -31,6 +32,8 @@ model User {
   supportMessages SupportMessage[]
   refreshTokens RefreshToken[]
   notifications Notification[]
+  uploadedBy User?         @relation("CandidateUploader", fields: [uploadedById], references: [id])
+  uploadedCandidates User[] @relation("CandidateUploader")
 }
 
 model Question {

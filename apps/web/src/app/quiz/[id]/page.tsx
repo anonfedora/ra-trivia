@@ -29,8 +29,8 @@ export default function QuizPage() {
     const [leaveCount, setLeaveCount] = useState(0);
     const [savedFlash, setSavedFlash] = useState<string | null>(null); // questionId that just saved
     const [fitgPool, setFitgPool] = useState<string[]>([]);
-    const [draggedAnswer, setDraggedAnswer] = useState<string | null>(null);
-    const [selectedFromPool, setSelectedFromPool] = useState<string | null>(null);
+    const [draggedAnswer, setDraggedAnswer] = useState<{answer: string, index: number} | null>(null);
+    const [selectedFromPool, setSelectedFromPool] = useState<{answer: string, index: number} | null>(null);
     const [screenshotWarning, setScreenshotWarning] = useState(false);
     const leaveCountRef = useRef(0);
     const { toast } = useToast();
@@ -103,7 +103,19 @@ export default function QuizPage() {
                 setSession(data.session);
 
                 // Start fresh - don't recover old answers to ensure new randomization
-                setAnswers(data.session.answers || {});
+                // Convert old answer format to new format if needed
+                const sessionAnswers = data.session.answers || {};
+                const convertedAnswers: any = {};
+                Object.entries(sessionAnswers).forEach(([questionId, answer]) => {
+                    if (typeof answer === 'string') {
+                        // Old format - convert to new format
+                        convertedAnswers[questionId] = { value: answer, poolIndex: undefined };
+                    } else {
+                        // New format
+                        convertedAnswers[questionId] = answer;
+                    }
+                });
+                setAnswers(convertedAnswers);
 
                 // Initialize timer
                 const durationSeconds = data.quiz.duration * 60;
@@ -299,8 +311,8 @@ export default function QuizPage() {
         return <div>Loading...</div>;
     }
 
-    const saveAnswer = async (questionId: string, option: string) => {
-        const newAnswers = { ...answers, [questionId]: option };
+    const saveAnswer = async (questionId: string, option: string, poolIndex?: number) => {
+        const newAnswers = { ...answers, [questionId]: { value: option, poolIndex } };
         setAnswers(newAnswers);
 
         // Flash feedback
@@ -337,7 +349,7 @@ export default function QuizPage() {
     };
 
     const isQuestionAnswered = (questionId: string) => {
-        return answers[questionId] !== undefined;
+        return answers[questionId] !== undefined && answers[questionId].value !== undefined;
     };
 
     const formatTime = (seconds: number) => {
@@ -349,7 +361,7 @@ export default function QuizPage() {
     if (!quiz) return <div className="min-h-screen flex items-center justify-center font-bold text-slate-400 dark:bg-slate-900 transition-colors duration-200">Loading quiz...</div>;
 
     const currentQuestion = quiz.questions[currentIndex];
-    const answeredCount = Object.keys(answers).length;
+    const answeredCount = Object.values(answers).filter((answer: any) => answer && answer.value !== undefined).length;
     const unansweredCount = quiz.questions.length - answeredCount;
     const progressPct = Math.round((answeredCount / quiz.questions.length) * 100);
 
@@ -540,12 +552,12 @@ export default function QuizPage() {
                                                     e.preventDefault();
                                                     e.currentTarget.classList.remove('bg-primary/20', 'border-primary');
                                                     if (draggedAnswer) {
-                                                        saveAnswer(currentQuestion.id, draggedAnswer);
+                                                        saveAnswer(currentQuestion.id, draggedAnswer.answer, draggedAnswer.index);
                                                     }
                                                 }}
                                                 onClick={() => {
                                                     if (selectedFromPool) {
-                                                        saveAnswer(currentQuestion.id, selectedFromPool);
+                                                        saveAnswer(currentQuestion.id, selectedFromPool.answer, selectedFromPool.index);
                                                         setSelectedFromPool(null);
                                                     } else if (answers[currentQuestion.id]) {
                                                         // Optional: Clear on click if already filled
@@ -555,14 +567,14 @@ export default function QuizPage() {
                                                     }
                                                 }}
                                                 className={`inline-flex items-center justify-center min-w-[140px] h-11 mx-2 border-2 border-dashed rounded-xl transition-all cursor-pointer shadow-sm ${
-                                                    answers[currentQuestion.id]
+                                                    answers[currentQuestion.id]?.value
                                                         ? 'bg-primary/10 border-primary text-primary font-bold'
                                                         : selectedFromPool
                                                         ? 'bg-primary/5 border-primary/40 text-slate-400 animate-pulse'
                                                         : 'bg-slate-50 dark:bg-slate-900/50 border-slate-300 dark:border-slate-700 text-slate-400'
                                                 }`}
                                             >
-                                                {answers[currentQuestion.id] || (selectedFromPool ? 'Tap to Fill' : 'Drop Here')}
+                                                {answers[currentQuestion.id]?.value || (selectedFromPool ? 'Tap to Fill' : 'Drop Here')}
                                             </div>
                                         )}
                                     </span>
@@ -594,17 +606,17 @@ export default function QuizPage() {
                             </h3>
                             <div className="flex flex-wrap md:flex-col gap-2 overflow-y-auto pr-2 custom-scrollbar">
                                 {fitgPool.map((answer, index) => {
-                                    const isUsed = Object.values(answers).includes(answer);
-                                    const isSelected = selectedFromPool === answer;
+                                    const isUsed = Object.values(answers).some((a: any) => a && a.poolIndex === index);
+                                    const isSelected = selectedFromPool?.index === index;
                                     return (
                                         <div
                                             key={`${answer}-${index}`}
                                             draggable={!isUsed}
-                                            onDragStart={() => !isUsed && setDraggedAnswer(answer)}
+                                            onDragStart={() => !isUsed && setDraggedAnswer({answer, index})}
                                             onDragEnd={() => setDraggedAnswer(null)}
                                             onClick={() => {
                                                 if (!isUsed) {
-                                                    setSelectedFromPool(isSelected ? null : answer);
+                                                    setSelectedFromPool(isSelected ? null : {answer, index});
                                                 }
                                             }}
                                             className={`px-4 py-3 rounded-xl border font-bold text-sm transition-all active:scale-95 select-none cursor-pointer ${

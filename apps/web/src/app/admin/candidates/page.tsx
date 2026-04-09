@@ -25,13 +25,7 @@ export default function CandidatesPage() {
     const { toast } = useToast();
     const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
 
-    // Redirect regular ADMIN to their scoped page
-    useEffect(() => {
-        const user = getUser();
-        if (user?.role === 'ADMIN') {
-            router.replace('/admin/my-exam-takers');
-        }
-    }, [router]);
+    // Note: Allow ADMIN users to access this page to see candidates they uploaded
 
     const fetchCandidates = useCallback(async (overridePage?: number) => {
         const effectivePage = overridePage ?? page;
