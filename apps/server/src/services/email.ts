@@ -225,7 +225,7 @@ export const sendBulkWelcomeEmail = async (
       </div>
 
       <p style="font-size: 16px; color: #334155;">Hi <strong>${name}</strong>,</p>
-      <p style="font-size: 16px; color: #334155;">An account has been created for you. <strong>Please verify your email address using the code below first Note: This email is valid for 24 hours</strong>, then you can use these details to log in:</p>
+      <p style="font-size: 16px; color: #334155;">An account has been created for you. <strong>Please verify your email address using the code below first Note: This email is valid for 48 hours</strong>, then you can use these details to log in:</p>
 
       <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 20px; margin: 20px 0;">
         <h3 style="margin-top: 0; color: #1e293b; border-bottom: 1px solid #e2e8f0; padding-bottom: 10px;">Registration Details</h3>

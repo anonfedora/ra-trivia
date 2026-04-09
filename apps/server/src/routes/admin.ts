@@ -37,6 +37,11 @@ router.post('/announcement', authenticate, authorizeAdmin, async (req: AuthReque
         if (targetUserType) {
             where.userType = targetUserType as UserType;
         }
+        
+        // If user is ADMIN (not SUPER_ADMIN), only send to candidates they uploaded
+        if (req.user?.role === 'ADMIN') {
+            where.uploadedById = req.user.userId;
+        }
 
         // 2. Fetch candidates
         const candidates = await prisma.user.findMany({
@@ -50,9 +55,10 @@ router.post('/announcement', authenticate, authorizeAdmin, async (req: AuthReque
 
         // 3. Send notifications and emails
         let successCount = 0;
-        const announcementPromises = candidates.map(async (candidate) => {
+        
+        // Create in-app notifications first (can be done in parallel)
+        const notificationPromises = candidates.map(async (candidate) => {
             try {
-                // A. Create in-app notification
                 const notification = await prisma.notification.create({
                     data: {
                         userId: candidate.id,
@@ -62,11 +68,21 @@ router.post('/announcement', authenticate, authorizeAdmin, async (req: AuthReque
                         createdById: adminId
                     }
                 });
-
-                // B. Emit socket notification
                 emitNotification(candidate.id, notification);
+                return { success: true, candidate };
+            } catch (err) {
+                console.error(`[ANNOUNCEMENT] Failed to create notification for ${candidate.email}:`, err);
+                return { success: false, candidate };
+            }
+        });
 
-                // C. Send email
+        await Promise.all(notificationPromises);
+
+        // Send emails with rate limiting (max 4 requests per second to stay under Resend's 5/second limit)
+        console.log(`[ANNOUNCEMENT] Starting to send ${candidates.length} emails with rate limiting...`);
+        for (let i = 0; i < candidates.length; i++) {
+            const candidate = candidates[i];
+            try {
                 const emailSuccess = await sendGeneralAnnouncementEmail(
                     candidate.email,
                     candidate.name,
@@ -74,13 +90,21 @@ router.post('/announcement', authenticate, authorizeAdmin, async (req: AuthReque
                     message
                 );
 
-                if (emailSuccess) successCount++;
-            } catch (err) {
-                console.error(`[ANNOUNCEMENT] Failed to notify ${candidate.email}:`, err);
-            }
-        });
+                if (emailSuccess) {
+                    successCount++;
+                    console.log(`[ANNOUNCEMENT] Email ${i + 1}/${candidates.length} sent to ${candidate.email}`);
+                } else {
+                    console.log(`[ANNOUNCEMENT] Email ${i + 1}/${candidates.length} failed for ${candidate.email}`);
+                }
 
-        await Promise.all(announcementPromises);
+                // Rate limiting: wait 250ms between emails (4 emails per second)
+                if (i < candidates.length - 1) {
+                    await new Promise(resolve => setTimeout(resolve, 250));
+                }
+            } catch (err) {
+                console.error(`[ANNOUNCEMENT] Failed to send email to ${candidate.email}:`, err);
+            }
+        }
 
         res.json({
             message: `Announcement sent successfully to ${candidates.length} candidates.`,
@@ -571,9 +595,8 @@ router.get('/export/excel', authenticate, authorizeAdmin, async (req: AuthReques
  *         description: Super admin access required
  */
 router.get('/candidates', authenticate, authorizeAdmin, async (req: AuthRequest, res) => {
-    if (req.user?.role !== 'SUPER_ADMIN') {
-        return res.status(403).json({ message: 'Forbidden: Super admin access required' });
-    }
+    // Allow both SUPER_ADMIN and ADMIN users
+    // SUPER_ADMIN can see all candidates, ADMIN can see candidates they uploaded
 
     try {
         const page = Math.max(1, parseInt(String(req.query.page ?? '1'), 10) || 1);
@@ -582,6 +605,11 @@ router.get('/candidates', authenticate, authorizeAdmin, async (req: AuthRequest,
         const q = typeof req.query.q === 'string' ? req.query.q.trim() : '';
 
         const where: any = { role: 'CANDIDATE' };
+
+        // If user is ADMIN (not SUPER_ADMIN), only show candidates they uploaded
+        if (req.user?.role === 'ADMIN') {
+            where.uploadedById = req.user.userId;
+        }
 
         if (q) {
             where.OR = [
@@ -970,7 +998,7 @@ router.post('/bulk-candidates', authenticate, authorizeAdmin, upload.single('fil
                 const hashedPassword = await bcrypt.hash(password, 12);
                 const otp = generateOTP();
                 const otpHash = crypto.createHash('sha256').update(otp).digest('hex');
-                const otpExpiresAt = new Date(Date.now() + 1000 * 60 * 60 * 24); // 24 hours for bulk imports
+                const otpExpiresAt = new Date(Date.now() + 1000 * 60 * 60 * 48); // 48 hours for bulk imports
 
                 const user = await prisma.user.create({
                     data: {
@@ -983,7 +1011,8 @@ router.post('/bulk-candidates', authenticate, authorizeAdmin, upload.single('fil
                         userType,
                         emailVerified: false,
                         emailOtpHash: otpHash,
-                        emailOtpExpiresAt: otpExpiresAt
+                        emailOtpExpiresAt: otpExpiresAt,
+                        uploadedById: req.user?.userId // Track which admin uploaded this candidate
                     }
                 });
 
