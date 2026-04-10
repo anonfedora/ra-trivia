@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
-import { BookOpen, Clock, PlayCircle, LogOut, Calendar, Repeat, User, CalendarClock } from 'lucide-react';
+import { BookOpen, Clock, PlayCircle, LogOut, Calendar, Repeat, User, CalendarClock, Search } from 'lucide-react';
 import { ThemeToggle, SupportButton } from '../../components';
 import NotificationBell from '../../components/NotificationBell';
 import { useToast } from '../../contexts/ToastContext';
@@ -45,6 +45,7 @@ export default function DashboardPage() {
     const [loadingResults, setLoadingResults] = useState(true);
     const [isLoading, setIsLoading] = useState(true);
     const [user, setUser] = useState<any>(null);
+    const [searchQuery, setSearchQuery] = useState('');
     const router = useRouter();
     const { toast } = useToast();
 
@@ -71,6 +72,13 @@ export default function DashboardPage() {
         if (remaining === 0) return 'No tries left';
         if (remaining === 1) return '1 try left';
         return `${remaining} tries left`;
+    };
+
+    const filterQuizzes = (quizzes: Quiz[]) => {
+        if (!searchQuery.trim()) return quizzes;
+        return quizzes.filter(quiz => 
+            quiz.title.toLowerCase().includes(searchQuery.toLowerCase())
+        );
     };
 
     useEffect(() => {
@@ -197,10 +205,22 @@ export default function DashboardPage() {
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
                     <div className="lg:col-span-2 space-y-12">
                         <section>
-                            <h2 className="text-2xl font-bold text-slate-800 dark:text-slate-100 mb-6 flex items-center gap-2">
-                                <PlayCircle className="text-primary" size={24} />
-                                Available Exams
-                            </h2>
+                            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+                                <h2 className="text-2xl font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
+                                    <PlayCircle className="text-primary" size={24} />
+                                    Available Exams
+                                </h2>
+                                <div className="relative w-full sm:w-auto">
+                                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
+                                    <input
+                                        type="text"
+                                        placeholder="Search exams..."
+                                        value={searchQuery}
+                                        onChange={(e) => setSearchQuery(e.target.value)}
+                                        className="w-full sm:w-80 pl-12 pr-6 py-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl text-slate-900 dark:text-slate-50 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-primary/10 focus:border-primary transition-all"
+                                    />
+                                </div>
+                            </div>
                             {loadingQuizzes ? (
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                                     {[0, 1].map((i) => (
@@ -216,6 +236,14 @@ export default function DashboardPage() {
                                         </div>
                                     ))}
                                 </div>
+                            ) : searchQuery.trim() && filterQuizzes(quizzes).length === 0 && filterQuizzes(upcomingQuizzes).length === 0 ? (
+                                <div className="bg-white dark:bg-slate-800 rounded-[2.5rem] p-12 text-center shadow-xl border border-slate-100 dark:border-slate-700 animate-slide-up">
+                                    <div className="bg-slate-50 dark:bg-slate-900 w-20 h-20 rounded-3xl flex items-center justify-center mx-auto mb-6 text-slate-400">
+                                        <Search size={40} />
+                                    </div>
+                                    <h3 className="text-2xl font-bold text-slate-900 dark:text-slate-50 mb-2">No results found</h3>
+                                    <p className="text-slate-500 dark:text-slate-400">No exams found matching &quot;{searchQuery}&quot;. Try a different search term.</p>
+                                </div>
                             ) : quizzes.length === 0 && upcomingQuizzes.length === 0 ? (
                                 <div className="bg-white dark:bg-slate-800 rounded-[2.5rem] p-12 text-center shadow-xl border border-slate-100 dark:border-slate-700 animate-slide-up">
                                     <div className="bg-slate-50 dark:bg-slate-900 w-20 h-20 rounded-3xl flex items-center justify-center mx-auto mb-6 text-slate-400">
@@ -226,9 +254,9 @@ export default function DashboardPage() {
                                 </div>
                             ) : (
                                 <div className="space-y-8">
-                                    {quizzes.length > 0 && (
+                                    {filterQuizzes(quizzes).length > 0 && (
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                                            {quizzes.map((quiz, index) => (
+                                            {filterQuizzes(quizzes).map((quiz, index) => (
                                                 <div
                                                     key={quiz.id}
                                                     className="bg-white dark:bg-slate-800 rounded-[2.5rem] p-8 shadow-xl border border-slate-100 dark:border-slate-700 hover:shadow-2xl hover:-translate-y-2 transition-all group animate-scale-in"
@@ -287,14 +315,14 @@ export default function DashboardPage() {
                                     )}
 
                                     {/* Upcoming exams */}
-                                    {upcomingQuizzes.length > 0 && (
+                                    {filterQuizzes(upcomingQuizzes).length > 0 && (
                                         <div>
                                             <h3 className="text-sm font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-4 flex items-center gap-2">
                                                 <CalendarClock size={16} />
                                                 Opening Soon
                                             </h3>
                                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                                {upcomingQuizzes.map((quiz) => (
+                                                {filterQuizzes(upcomingQuizzes).map((quiz) => (
                                                     <div
                                                         key={quiz.id}
                                                         className="bg-white dark:bg-slate-800 rounded-3xl p-6 border-2 border-dashed border-slate-200 dark:border-slate-700 flex items-center gap-5"
