@@ -327,6 +327,50 @@ router.get('/export/pdf', authenticate, authorizeAdmin, async (req: AuthRequest,
     }
 });
 
+/**
+ * @openapi
+ * /admin/export/quiz-preview/{quizId}:
+ *   get:
+ *     tags: [Admin Export]
+ *     summary: Export quiz preview with questions and answers
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: quizId
+ *         required: true
+ *         schema:
+ *           type: string
+ *       - in: query
+ *         name: format
+ *         schema:
+ *           type: string
+ *           enum: [pdf]
+ *     responses:
+ *       200:
+ *         description: PDF file buffer
+ */
+router.get('/export/quiz-preview/:quizId', authenticate, authorizeAdmin, async (req: AuthRequest, res) => {
+    try {
+        const quizId = req.params.quizId as string;
+        const format = req.query.format as string;
+        const createdById = req.user?.role === 'ADMIN' ? req.user.userId : undefined;
+
+        if (format !== 'pdf') {
+            return res.status(400).json({ message: 'Only PDF format is supported for quiz preview export' });
+        }
+
+        const { buffer, filename } = await ReportGenerator.generateQuizPreviewPDF(quizId, createdById);
+
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+        res.send(buffer);
+    } catch (error) {
+        console.error('Quiz preview PDF export error:', error);
+        res.status(500).json({ message: 'Failed to generate quiz preview PDF' });
+    }
+});
+
 // Admin: Export quiz report (specific quiz)
 router.get('/export/:quizId', authenticate, authorizeAdmin, async (req: AuthRequest, res) => {
     try {

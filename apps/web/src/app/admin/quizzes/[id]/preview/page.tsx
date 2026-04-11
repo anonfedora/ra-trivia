@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, BookOpen, Clock, ListChecks, Copy, Check } from 'lucide-react';
+import { ArrowLeft, BookOpen, Clock, ListChecks, Copy, Check, Download } from 'lucide-react';
 import { ThemeToggle } from '../../../../../components/ThemeToggle';
 import NotificationBell from '../../../../../components/NotificationBell';
 import { apiFetch } from '../../../../../lib/api';
@@ -44,6 +44,7 @@ export default function AdminQuizPreviewPage() {
     const [isLoading, setIsLoading] = useState(true);
     const [questionTypeStats, setQuestionTypeStats] = useState<any>(null);
     const [isCopied, setIsCopied] = useState(false);
+    const [isExportingPdf, setIsExportingPdf] = useState(false);
     const { toast } = useToast();
 
     useEffect(() => {
@@ -129,6 +130,36 @@ export default function AdminQuizPreviewPage() {
         setTimeout(() => setIsCopied(false), 2000);
     };
 
+    const handleExportPdf = async () => {
+        if (!quiz) return;
+        
+        setIsExportingPdf(true);
+        try {
+            const res = await apiFetch(`admin/export/quiz-preview/${quizId}?format=pdf`);
+            
+            if (!res.ok) {
+                throw new Error('Failed to export PDF');
+            }
+            
+            const blob = await res.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `${quiz.title.toLowerCase().replace(/[^a-z0-9\s]/gi, '_').replace(/\s+/g, '_')}_questions_preview.pdf`;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            window.URL.revokeObjectURL(url);
+            
+            toast('PDF exported successfully!', 'success');
+        } catch (error) {
+            console.error('PDF export error:', error);
+            toast('Failed to export PDF', 'error');
+        } finally {
+            setIsExportingPdf(false);
+        }
+    };
+
     return (
         <main className="min-h-screen bg-slate-50 dark:bg-slate-900 p-6 md:p-12 transition-colors duration-200">
             <div className="max-w-4xl mx-auto space-y-8">
@@ -142,6 +173,14 @@ export default function AdminQuizPreviewPage() {
                         <p className="text-slate-500 dark:text-slate-400 mt-2 font-medium">Read-only preview of what candidates will see.</p>
                     </div>
                     <div className="flex items-center gap-3">
+                        <button
+                            onClick={handleExportPdf}
+                            disabled={isExportingPdf}
+                            className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-xl hover:bg-primary/90 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
+                        >
+                            <Download size={18} />
+                            {isExportingPdf ? 'Exporting...' : 'Export PDF'}
+                        </button>
                         <NotificationBell />
                         <ThemeToggle />
                     </div>
