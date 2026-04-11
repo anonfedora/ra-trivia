@@ -864,14 +864,17 @@ router.post('/trigger-emails', authenticate, authorizeAdmin, async (req: AuthReq
                 });
 
                 const score = session.score || 0;
+                const passMark = session.quiz.passMark ?? 50;
+                const status = score >= passMark ? 'Cleared' : 'Not Cleared - No Certificates';
 
-                // Import sendQuizResultEmail dynamically to avoid circular dependency
-                const { sendQuizResultEmail } = await import('../services/email');
-                const success = await sendQuizResultEmail(
+                // Import sendScoreOnlyEmail dynamically to avoid circular dependency
+                const { sendScoreOnlyEmail } = await import('../services/email');
+                const success = await sendScoreOnlyEmail(
                     session.user.email,
                     session.user.name,
+                    session.quiz.title,
                     score,
-                    answerDetails
+                    status
                 );
 
                 if (success) {

@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { prisma } from 'database';
 import { authenticate, AuthRequest, authorizeAdmin } from '../middlewares/auth';
 import { validateUserTypeAccess, filterQuestionsByUserType } from '../middlewares/userTypeAccess';
-import { sendQuizResultEmail } from '../services/email';
+import { sendScoreOnlyEmail } from '../services/email';
 import { emitNotification, emitToRoom } from '../services/socketService';
 
 const router = Router();

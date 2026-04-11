@@ -1,4 +1,4 @@
-import { sendVerificationEmail, sendQuizResultEmail, generateOTP } from '../services/email';
+import { sendVerificationEmail, sendScoreOnlyEmail, generateOTP } from '../services/email';
 
 type TestResult = { name: string; ok: boolean };
 
@@ -25,11 +25,7 @@ async function main() {
     sendVerificationEmail(email, name, process.env.TEST_VERIFY_URL || 'https://example.com/verify?token=dummy', undefined)
   ));
 
-  const details = [
-    { question: 'What is 2 + 2?', selectedOption: '4', correctOption: '4', isCorrect: true },
-    { question: 'Capital of France?', selectedOption: 'Berlin', correctOption: 'Paris', isCorrect: false },
-  ];
-  results.push(await runCase('result_summary', () => sendQuizResultEmail(email, name, 78.5, details)));
+  results.push(await runCase('result_summary', () => sendScoreOnlyEmail(email, name, 'Test Exam', 78.5, 'Cleared')));
 
   const passed = results.filter(r => r.ok).length;
   console.log(JSON.stringify({ summary: { passed, total: results.length } }));
