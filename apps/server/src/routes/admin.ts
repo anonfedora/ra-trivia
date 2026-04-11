@@ -1143,7 +1143,7 @@ router.post('/sessions/release', authenticate, authorizeAdmin, async (req: AuthR
             data: { resultReleasesAt: new Date() }
         });
 
-        // Notify each candidate their result is ready
+        // Notify each candidate their result is ready and send emails
         if (sessions.length > 0) {
             const notifData = sessions.map(s => ({
                 type: 'RESULT_RELEASED',
@@ -1157,6 +1157,34 @@ router.post('/sessions/release', authenticate, authorizeAdmin, async (req: AuthR
             await prisma.notification.createMany({ data: notifData });
             for (const notif of notifData) {
                 emitNotification(notif.createdById, { ...notif, createdAt: new Date().toISOString() });
+            }
+
+            // Send emails immediately for released sessions
+            const { sendScoreOnlyEmail } = await import('../services/email');
+            for (const session of sessions) {
+                if (session.endTime && session.score !== null) {
+                    const passMark = 50; // Default pass mark, you may want to get this from quiz
+                    const status = session.score >= passMark ? 'Cleared' : 'Not Cleared - No Certificates';
+                    
+                    try {
+                        const success = await sendScoreOnlyEmail(
+                            session.user.email,
+                            session.user.name,
+                            session.quiz.title,
+                            session.score,
+                            status
+                        );
+                        
+                        if (success) {
+                            await prisma.quizSession.update({
+                                where: { id: session.id },
+                                data: { emailSent: true }
+                            });
+                        }
+                    } catch (emailError) {
+                        console.error(`Failed to send email to ${session.user.email}:`, emailError);
+                    }
+                }
             }
         }
 
@@ -1199,7 +1227,7 @@ router.post('/quizzes/:quizId/release-all', authenticate, authorizeAdmin, async 
             data: { resultReleasesAt: new Date() }
         });
 
-        // Notify each candidate
+        // Notify each candidate and send emails
         if (sessions.length > 0) {
             const notifData = sessions.map(s => ({
                 type: 'RESULT_RELEASED',
@@ -1213,6 +1241,34 @@ router.post('/quizzes/:quizId/release-all', authenticate, authorizeAdmin, async 
             await prisma.notification.createMany({ data: notifData });
             for (const notif of notifData) {
                 emitNotification(notif.createdById, { ...notif, createdAt: new Date().toISOString() });
+            }
+
+            // Send emails immediately for released sessions
+            const { sendScoreOnlyEmail } = await import('../services/email');
+            for (const session of sessions) {
+                if (session.score !== null) {
+                    const passMark = 50; // Default pass mark, you may want to get this from quiz
+                    const status = session.score >= passMark ? 'Cleared' : 'Not Cleared - No Certificates';
+                    
+                    try {
+                        const success = await sendScoreOnlyEmail(
+                            session.user.email,
+                            session.user.name,
+                            session.quiz.title,
+                            session.score,
+                            status
+                        );
+                        
+                        if (success) {
+                            await prisma.quizSession.update({
+                                where: { id: session.id },
+                                data: { emailSent: true }
+                            });
+                        }
+                    } catch (emailError) {
+                        console.error(`Failed to send email to ${session.user.email}:`, emailError);
+                    }
+                }
             }
         }
 
