@@ -5,6 +5,7 @@ import path from 'path';
 import fs from 'fs';
 import { PrismaClient } from '@prisma/client';
 import { UserType } from '@prisma/client';
+import * as xlsx from 'xlsx';
 
 const prisma = new PrismaClient();
 
@@ -88,10 +89,91 @@ export class ReportGenerator {
     }
 
     static async generateExcelReport(userType?: UserType, quizId?: string, createdById?: string): Promise<{ buffer: Buffer; filename: string }> {
-        // Implementation would go here
-        const quizTitle = 'exams';
-        const filename = `${quizTitle}_exam_report_${new Date().toISOString().split('T')[0]}.xlsx`;
-        return { buffer: Buffer.from(''), filename };
+        try {
+            console.log('[EXCEL_GENERATION] Starting formatted Excel report generation...');
+            
+            const results = await this.getExamResults(userType, quizId, createdById);
+            const summary = this.calculateSummary(results);
+            
+            // Get quiz title for filename
+            let quizTitle = 'exams';
+            if (quizId && results.length > 0) {
+                quizTitle = results[0].quiz.title.toLowerCase()
+                    .replace(/[^a-z0-9\s]/gi, '_')
+                    .replace(/_+/g, '_')
+                    .replace(/^_+|_+$/g, '')
+                    .substring(0, 50);
+            }
+            
+            const filename = `${quizTitle}_exam_report_${new Date().toISOString().split('T')[0]}.xlsx`;
+            
+            // Create workbook
+            const wb = xlsx.utils.book_new();
+            
+            // Create summary worksheet
+            const summaryData = [
+                ['EXAMINATION SUMMARY REPORT'],
+                [],
+                ['Report Generated:', new Date().toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' })],
+                ['Total Candidates:', summary.totalCandidates],
+                ['Total Sessions:', summary.totalSessions],
+                ['Average Score:', `${summary.averageScore.toFixed(2)}%`],
+                ['Highest Score:', `${summary.highestScore.toFixed(2)}%`],
+                ['Lowest Score:', `${summary.lowestScore.toFixed(2)}%`],
+                ['No Records:', summary.noRecordCount]
+            ];
+            
+            const summaryWs = xlsx.utils.aoa_to_sheet(summaryData);
+            xlsx.utils.book_append_sheet(wb, summaryWs, 'Summary');
+            
+            // Create results worksheet
+            const resultsData = [
+                ['S/N', 'NAME', 'CHURCH', 'ASSOCIATION', 'EXAM SCORE', 'REMARK', 'STATUS']
+            ];
+            
+            results.forEach((result: any, index: number) => {
+                const score = result.score || 0;
+                const passMark = result.quiz.passMark ?? 50;
+                const remark = score >= passMark ? 'Pass' : 'Fail';
+                const status = result.manualStatus || (score >= passMark ? 'Cleared' : 'Not Cleared - No Certificates');
+                
+                resultsData.push([
+                    index + 1,
+                    result.user.name,
+                    result.user.church || 'N/A',
+                    result.user.association || 'N/A',
+                    score.toFixed(2),
+                    remark,
+                    status
+                ]);
+            });
+            
+            const resultsWs = xlsx.utils.aoa_to_sheet(resultsData);
+            
+            // Set column widths
+            const colWidths = [
+                { wch: 8 },  // S/N
+                { wch: 25 }, // NAME
+                { wch: 20 }, // CHURCH
+                { wch: 20 }, // ASSOCIATION
+                { wch: 12 }, // EXAM SCORE
+                { wch: 10 }, // REMARK
+                { wch: 25 }  // STATUS
+            ];
+            resultsWs['!cols'] = colWidths;
+            
+            xlsx.utils.book_append_sheet(wb, resultsWs, 'Results');
+            
+            // Generate buffer
+            const excelBuffer = xlsx.write(wb, { type: 'buffer', bookType: 'xlsx' });
+            
+            console.log('[EXCEL_GENERATION] Excel generation successful');
+            return { buffer: Buffer.from(excelBuffer), filename };
+            
+        } catch (error) {
+            console.error('[EXCEL_GENERATION] Error generating Excel:', error);
+            throw new Error(`Excel generation failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        }
     }
 
     static async generatePDFReport(userType?: UserType, quizId?: string, createdById?: string): Promise<{ buffer: Buffer; filename: string }> {

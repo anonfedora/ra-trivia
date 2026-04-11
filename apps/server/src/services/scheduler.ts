@@ -1,5 +1,5 @@
 import { prisma } from 'database';
-import { sendQuizResultEmail } from './email';
+import { sendScoreOnlyEmail } from './email';
 import { emitNotification } from './socketService';
 
 export const initScheduler = () => {
@@ -105,14 +105,17 @@ async function processResultsRelease() {
                 });
 
                 const score = session.score || 0;
+                const passMark = session.quiz.passMark ?? 50;
+                const status = score >= passMark ? 'Cleared' : 'Not Cleared - No Certificates';
 
                 console.log(`[SCHEDULER] Sending email to ${session.user.email} for session ${session.id} (Score: ${score}%)`);
 
-                const success = await sendQuizResultEmail(
+                const success = await sendScoreOnlyEmail(
                     session.user.email,
                     session.user.name,
+                    session.quiz.title,
                     score,
-                    answerDetails
+                    status
                 );
 
                 if (success) {

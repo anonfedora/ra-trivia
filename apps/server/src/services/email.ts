@@ -69,7 +69,7 @@ interface AnswerDetail {
   isCorrect: boolean;
 }
 
-export const sendQuizResultEmail = async (
+/**export const sendQuizResultEmail = async (
   email: string,
   name: string,
   score: number,
@@ -121,6 +121,7 @@ export const sendQuizResultEmail = async (
   console.log(`[EMAIL] Result email to ${email}: ${ok ? 'OK' : 'FAILED'}`);
   return ok;
 };
+**/
 
 export const sendPasswordResetEmail = async (
   email: string,
@@ -149,6 +150,46 @@ export const sendPasswordResetEmail = async (
 };
 
 export const generateOTP = (): string => {  return Math.floor(100000 + Math.random() * 900000).toString().padStart(6, '0');
+};
+
+export const sendScoreOnlyEmail = async (
+  email: string,
+  name: string,
+  examTitle: string,
+  score: number,
+  status: string
+): Promise<boolean> => {
+  const html = `
+    <div style="font-family: sans-serif; max-width: 600px; margin: auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 10px;">
+      <h1 style="color: #1e293b;">Exam Results</h1>
+      <p style="font-size: 16px; color: #334155;">Hi ${name},</p>
+      <p style="font-size: 16px; color: #334155;">Your results for <strong>${examTitle}</strong> are now available.</p>
+      
+      <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 20px; margin: 20px 0;">
+        <h2 style="color: #1e293b; margin: 0 0 15px 0;">Your Score</h2>
+        <div style="font-size: 24px; font-weight: bold; color: #2563eb; text-align: center; padding: 10px; background-color: #e0f2fe; border-radius: 6px;">
+          ${score.toFixed(2)}%
+        </div>
+      </div>
+      
+      <div style="margin: 20px 0;">
+        <h3 style="color: #334155;">Status</h3>
+        <p style="font-size: 16px; color: #334155;">Your examination status is: <strong>${status}</strong></p>
+      </div>
+      
+      <p style="margin-top: 30px; color: #64748b; font-size: 14px;">
+        This is an automated message. Please contact your administrator if you have any questions about your results.
+      </p>
+    </div>
+  `;
+
+  const text = `Exam Results for ${name}\n\nExam: ${examTitle}\nScore: ${score.toFixed(2)}%\nStatus: ${status}\n\nThis is an automated message.`;
+
+  if (logEmailForDev(email, 'Your Exam Results', html)) return true;
+
+  const ok = await sendMail(email, 'Your Exam Results', html, text);
+  console.log(`[EMAIL] Score-only email to ${email}: ${ok ? 'OK' : 'FAILED'}`);
+  return ok;
 };
 
 export const sendVerificationEmail = async (
