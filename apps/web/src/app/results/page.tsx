@@ -274,7 +274,7 @@ function ResultsContent() {
                             </div>
                             <h3 className="text-xl font-bold text-slate-900 dark:text-slate-50">Breakdown Unavailable</h3>
                             <p className="text-slate-500 dark:text-slate-400 font-medium max-w-md mx-auto">
-                                Reviewing individual questions is disabled for this exam as per the administrator's settings.
+                                Reviewing individual questions is disabled for this exam as per the administrator&apos;s settings.
                             </p>
                         </div>
                     ) : result.breakdown.map((item, idx) => {
