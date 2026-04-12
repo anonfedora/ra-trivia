@@ -42,7 +42,7 @@ async function testDatabaseConnection() {
 
 testDatabaseConnection();
 
-const app = express();
+export const app = express();
 const httpServer = createServer(app);
 const PORT = process.env.PORT || 4000;
 
@@ -152,10 +152,12 @@ const io = new SocketIOServer(httpServer, {
 });
 initSocketIO(io);
 
-httpServer.listen(PORT, () => {
-    console.log(`🚀 Server is running on port ${PORT}`);
-    console.log(`📝 Environment: ${process.env.NODE_ENV || 'development'}`);
-
-    // Initialize scheduled tasks
-    initScheduler();
-});
+if (process.env.NODE_ENV !== 'test' && require.main === module) {
+    httpServer.listen(PORT, () => {
+        console.log(`🚀 Server is running on port ${PORT}`);
+        console.log(`📝 Environment: ${process.env.NODE_ENV || 'development'}`);
+    
+        // Initialize scheduled tasks
+        initScheduler();
+    });
+}

@@ -34,6 +34,8 @@ export default function QuizPage() {
     const [screenshotWarning, setScreenshotWarning] = useState(false);
     const leaveCountRef = useRef(0);
     const { toast } = useToast();
+    const saveTimeoutRef = useRef<Record<string, NodeJS.Timeout>>({});
+    const pendingSavesRef = useRef<Set<string>>(new Set());
 
     const handleSubmit = useCallback(async () => {
         if (isSubmitting) return;
@@ -307,11 +309,35 @@ export default function QuizPage() {
         return () => clearInterval(timer);
     }, [timeLeft, handleSubmit, quiz, session, isSubmitting]);
 
+    const flushPendingSaves = useCallback(async () => {
+        const promises = Object.entries(saveTimeoutRef.current).map(async ([qId, timeout]) => {
+            clearTimeout(timeout);
+            const answer = answers[qId]?.value;
+            if (answer && session?.id) {
+                try {
+                    await apiFetch('quiz/update-answer', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            sessionId: session.id,
+                            questionId: qId,
+                            selectedOption: answer
+                        }),
+                    });
+                } catch (e) { console.error('Flush failed', qId); }
+            }
+        });
+        saveTimeoutRef.current = {};
+        pendingSavesRef.current.clear();
+        await Promise.all(promises);
+    }, [answers, session?.id]);
+
     if (!quizId) {
         return <div>Loading...</div>;
     }
 
     const saveAnswer = async (questionId: string, option: string, poolIndex?: number) => {
+        // Immediate local update for responsive UI
         const newAnswers = { ...answers, [questionId]: { value: option, poolIndex } };
         setAnswers(newAnswers);
 
@@ -324,26 +350,36 @@ export default function QuizPage() {
             localStorage.setItem(`quiz_backup_${session.id}`, JSON.stringify(newAnswers));
         }
 
-        // Auto-save to server
-        try {
-            await apiFetch('quiz/update-answer', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    sessionId: session.id,
-                    questionId,
-                    selectedOption: option
-                }),
-            });
-        } catch (err) {
-            console.error('Auto-save failed');
+        // Debounced Save to Server
+        if (saveTimeoutRef.current[questionId]) {
+            clearTimeout(saveTimeoutRef.current[questionId]);
         }
+
+        pendingSavesRef.current.add(questionId);
+
+        saveTimeoutRef.current[questionId] = setTimeout(async () => {
+            try {
+                await apiFetch('quiz/update-answer', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        sessionId: session.id,
+                        questionId,
+                        selectedOption: option
+                    }),
+                });
+                pendingSavesRef.current.delete(questionId);
+                delete saveTimeoutRef.current[questionId];
+            } catch (err) {
+                console.error('Auto-save failed for', questionId);
+            }
+        }, 800); // 800ms debounce
     };
 
-
     const jumpToQuestion = (index: number) => {
+        flushPendingSaves();
         setCurrentIndex(index);
         setShowReview(false);
     };
@@ -694,14 +730,20 @@ export default function QuizPage() {
 
                 {currentIndex < quiz.questions.length - 1 ? (
                     <button
-                        onClick={() => setCurrentIndex(prev => Math.min(quiz.questions.length - 1, prev + 1))}
+                        onClick={async () => {
+                            await flushPendingSaves();
+                            setCurrentIndex(prev => Math.min(quiz.questions.length - 1, prev + 1));
+                        }}
                         className="w-full sm:w-auto flex-1 px-6 sm:px-8 py-3 sm:py-4 rounded-2xl font-bold text-white bg-slate-900 dark:bg-primary hover:bg-slate-800 dark:hover:bg-primary/90 shadow-lg transition-all"
                     >
                         Next
                     </button>
                 ) : (
                     <button
-                        onClick={() => setShowReview(true)}
+                        onClick={async () => {
+                            await flushPendingSaves();
+                            setShowReview(true);
+                        }}
                         className="w-full sm:w-auto flex-1 px-6 sm:px-8 py-3 sm:py-4 rounded-2xl font-bold text-white bg-slate-900 dark:bg-emerald-600 hover:bg-slate-800 dark:hover:bg-emerald-500 shadow-lg transition-all"
                     >
                         Review Answers
