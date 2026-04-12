@@ -23,9 +23,10 @@ interface SessionResult {
     totalQuestions: number;
     correctCount: number;
     incorrectCount: number;
-    quiz: { 
+    quiz: {
         title: string;
         passMark?: number | null;
+        resultsDisplayMode: 'DETAILED' | 'STUDY' | 'SCORE_ONLY';
     };
     breakdown: QuestionBreakdown[];
 }
@@ -176,8 +177,21 @@ function ResultsContent() {
                         <div className={`w-24 h-24 ${isPassed ? 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-500' : 'bg-rose-50 dark:bg-rose-900/20 text-rose-500'} rounded-full flex items-center justify-center mx-auto mb-6`}>
                             {isPassed ? <Award size={48} /> : <XCircle size={48} />}
                         </div>
-                        <h1 className="text-4xl font-black text-slate-900 dark:text-slate-50">{result.quiz.title}</h1>
-                        <p className="text-slate-500 dark:text-slate-400 font-medium">Detailed results and performance review</p>
+
+                        <div className="flex flex-col gap-1">
+                            <span className="text-[10px] font-black uppercase tracking-[0.2em] text-primary/60 dark:text-primary/40 block">
+                                {result.quiz.resultsDisplayMode === 'DETAILED' && 'Exam Results Mode'}
+                                {result.quiz.resultsDisplayMode === 'STUDY' && 'Study Guide Mode'}
+                                {result.quiz.resultsDisplayMode === 'SCORE_ONLY' && 'Performance Summary'}
+                            </span>
+                            <h1 className="text-4xl font-black text-slate-900 dark:text-slate-50">{result.quiz.title}</h1>
+                        </div>
+
+                        <h2 className="text-slate-500 dark:text-slate-400 font-medium">
+                            {result.quiz.resultsDisplayMode === 'DETAILED' && 'A detailed review of your performance and answers.'}
+                            {result.quiz.resultsDisplayMode === 'STUDY' && 'A comprehensive study guide featuring the correct answers.'}
+                            {result.quiz.resultsDisplayMode === 'SCORE_ONLY' && 'Your final pass/fail status and scoring breakdown.'}
+                        </h2>
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-12">
@@ -198,8 +212,8 @@ function ResultsContent() {
                     <div className="mt-12 pt-12 border-t border-slate-100 dark:border-slate-700">
                         <div className="flex flex-col lg:flex-row gap-8 items-center lg:items-start text-left">
                             <div className="bg-white dark:bg-slate-900 p-4 rounded-3xl shadow-xl border border-slate-100 dark:border-slate-800 shrink-0">
-                                <QRCodeCanvas 
-                                    value={verifyUrl} 
+                                <QRCodeCanvas
+                                    value={verifyUrl}
                                     size={160}
                                     level="H"
                                     includeMargin={false}
@@ -207,7 +221,7 @@ function ResultsContent() {
                                     fgColor="currentColor"
                                 />
                             </div>
-                            
+
                             <div className="flex-1 space-y-6">
                                 <div>
                                     <h3 className="text-xl font-black text-slate-900 dark:text-slate-50 flex items-center gap-2">
@@ -220,21 +234,21 @@ function ResultsContent() {
                                 </div>
 
                                 <div className="flex flex-wrap gap-3">
-                                    <button 
+                                    <button
                                         onClick={shareToWhatsApp}
                                         className="flex items-center gap-2 bg-emerald-500 hover:bg-emerald-600 text-white px-5 py-3 rounded-2xl font-bold transition-all active:scale-95 shadow-lg shadow-emerald-500/20"
                                     >
                                         <MessageCircle size={18} />
                                         Share to WhatsApp
                                     </button>
-                                    <button 
+                                    <button
                                         onClick={handleShare}
                                         className="flex items-center gap-2 bg-slate-900 dark:bg-primary text-white px-5 py-3 rounded-2xl font-bold transition-all active:scale-95 shadow-lg shadow-slate-900/20"
                                     >
                                         <Share2 size={18} />
                                         Share Others
                                     </button>
-                                    <button 
+                                    <button
                                         onClick={handleCopyLink}
                                         className="flex items-center gap-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 px-5 py-3 rounded-2xl font-bold transition-all active:scale-95 hover:bg-slate-50"
                                     >
@@ -253,59 +267,84 @@ function ResultsContent() {
                         Question Breakdown
                     </h2>
 
-                    {result.breakdown.map((item, idx) => (
-                        <div key={item.questionId} className="bg-white dark:bg-slate-800 rounded-3xl p-8 shadow-lg border border-slate-100 dark:border-slate-700 animate-slide-up" style={{ animationDelay: `${idx * 50}ms` }}>
-                            <div className="flex justify-between items-start gap-4 mb-6">
-                                <div className="flex items-start gap-4">
-                                    <span className="w-8 h-8 rounded-xl bg-slate-100 dark:bg-slate-900 flex items-center justify-center text-xs font-black text-slate-400 shrink-0">
-                                        {idx + 1}
-                                    </span>
-                                    <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100 leading-tight">{item.text}</h3>
-                                </div>
-                                <div className={item.isCorrect ? 'text-emerald-500' : 'text-rose-500'}>
-                                    {item.isCorrect ? <CheckCircle2 size={24} /> : <XCircle size={24} />}
-                                </div>
+                    {result.quiz.resultsDisplayMode === 'SCORE_ONLY' ? (
+                        <div className="bg-white dark:bg-slate-800 rounded-3xl p-10 shadow-lg border border-slate-100 dark:border-slate-700 text-center space-y-4 animate-fade-in">
+                            <div className="w-16 h-16 bg-slate-50 dark:bg-slate-900 text-slate-400 rounded-full flex items-center justify-center mx-auto">
+                                <ShieldCheck size={32} />
                             </div>
-
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                {item.options.map(opt => {
-                                    const isSelected = item.selectedOption === opt.key;
-                                    const isCorrect = item.correctOption === opt.key;
-
-                                    let borderColor = 'border-slate-100 dark:border-slate-700';
-                                    let bgColor = 'bg-white dark:bg-slate-800';
-                                    let textColor = 'text-slate-600 dark:text-slate-400';
-
-                                    if (isCorrect) {
-                                        borderColor = 'border-emerald-200 dark:border-emerald-900/50';
-                                        bgColor = 'bg-emerald-50 dark:bg-emerald-900/20';
-                                        textColor = 'text-emerald-700 dark:text-emerald-400 font-bold';
-                                    } else if (isSelected && !isCorrect) {
-                                        borderColor = 'border-rose-200 dark:border-rose-900/50';
-                                        bgColor = 'bg-rose-50 dark:bg-rose-900/20';
-                                        textColor = 'text-rose-700 dark:text-rose-400 font-bold';
-                                    }
-
-                                    return (
-                                        <div key={opt.key} className={`p-4 rounded-2xl border transition-all ${borderColor} ${bgColor} ${textColor} text-sm flex items-center gap-3`}>
-                                            <span className={`w-6 h-6 rounded-lg flex items-center justify-center text-[10px] font-black shrink-0 ${isCorrect ? 'bg-emerald-500 text-white' : isSelected ? 'bg-rose-500 text-white' : 'bg-slate-100 dark:bg-slate-700 text-slate-400'
-                                                }`}>
-                                                {opt.key}
-                                            </span>
-                                            {opt.text}
-                                        </div>
-                                    );
-                                })}
-                            </div>
-
-                            {!item.isCorrect && (
-                                <div className="mt-6 pt-6 border-t border-slate-50 dark:border-slate-700 flex items-center gap-2 text-xs font-bold text-slate-400">
-                                    <TrendingUp size={14} className="text-primary" />
-                                    Correct Answer: <span className="text-emerald-500 uppercase">{item.correctOption}</span>
-                                </div>
-                            )}
+                            <h3 className="text-xl font-bold text-slate-900 dark:text-slate-50">Breakdown Unavailable</h3>
+                            <p className="text-slate-500 dark:text-slate-400 font-medium max-w-md mx-auto">
+                                Reviewing individual questions is disabled for this exam as per the administrator&apos;s settings.
+                            </p>
                         </div>
-                    ))}
+                    ) : result.breakdown.map((item, idx) => {
+                        const isStudyMode = result.quiz.resultsDisplayMode === 'STUDY';
+                        return (
+                            <div key={item.questionId} className="bg-white dark:bg-slate-800 rounded-3xl p-8 shadow-lg border border-slate-100 dark:border-slate-700 animate-slide-up" style={{ animationDelay: `${idx * 50}ms` }}>
+                                <div className="flex justify-between items-start gap-4 mb-6">
+                                    <div className="flex items-start gap-4">
+                                        <span className="w-8 h-8 rounded-xl bg-slate-100 dark:bg-slate-900 flex items-center justify-center text-xs font-black text-slate-400 shrink-0">
+                                            {idx + 1}
+                                        </span>
+                                        <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100 leading-tight">{item.text}</h3>
+                                    </div>
+                                    {!isStudyMode && (
+                                        <div className={item.isCorrect ? 'text-emerald-500' : 'text-rose-500'}>
+                                            {item.isCorrect ? <CheckCircle2 size={24} /> : <XCircle size={24} />}
+                                        </div>
+                                    )}
+                                    {isStudyMode && <div className="text-emerald-500"><CheckCircle2 size={24} /></div>}
+                                </div>
+
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                    {item.options.map(opt => {
+                                        const isSelected = item.selectedOption === opt.key;
+                                        const isCorrect = item.correctOption === opt.key;
+
+                                        let borderColor = 'border-slate-100 dark:border-slate-700';
+                                        let bgColor = 'bg-white dark:bg-slate-800';
+                                        let textColor = 'text-slate-600 dark:text-slate-400';
+
+                                        if (isCorrect) {
+                                            borderColor = 'border-emerald-200 dark:border-emerald-900/50';
+                                            bgColor = 'bg-emerald-50 dark:bg-emerald-900/20';
+                                            textColor = 'text-emerald-700 dark:text-emerald-400 font-bold';
+                                        } else if (isSelected && !isCorrect && !isStudyMode) {
+                                            borderColor = 'border-rose-200 dark:border-rose-900/50';
+                                            bgColor = 'bg-rose-50 dark:bg-rose-900/20';
+                                            textColor = 'text-rose-700 dark:text-rose-400 font-bold';
+                                        }
+
+                                        return (
+                                            <div key={opt.key} className={`p-4 rounded-2xl border transition-all ${borderColor} ${bgColor} ${textColor} text-sm flex items-center gap-3`}>
+                                                <span className={`w-6 h-6 rounded-lg flex items-center justify-center text-[10px] font-black shrink-0 ${isCorrect ? 'bg-emerald-500 text-white' : (isSelected && !isStudyMode) ? 'bg-rose-500 text-white' : 'bg-slate-100 dark:bg-slate-700 text-slate-400'
+                                                    }`}>
+                                                    {opt.key}
+                                                </span>
+                                                {opt.text}
+                                                {isSelected && isStudyMode && !isCorrect && (
+                                                    <span className="ml-auto text-[10px] bg-slate-100 dark:bg-slate-700 px-2 py-1 rounded-full font-bold">Your Choice</span>
+                                                )}
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+
+                                {!item.isCorrect && !isStudyMode && (
+                                    <div className="mt-6 pt-6 border-t border-slate-50 dark:border-slate-700 flex items-center gap-2 text-xs font-bold text-slate-400">
+                                        <TrendingUp size={14} className="text-primary" />
+                                        Correct Answer: <span className="text-emerald-500 uppercase">{item.correctOption}</span>
+                                    </div>
+                                )}
+                                {isStudyMode && (
+                                    <div className="mt-6 pt-6 border-t border-slate-50 dark:border-slate-700 flex items-center gap-2 text-xs font-bold text-slate-400">
+                                        <TrendingUp size={14} className="text-emerald-500" />
+                                        Review: <span className="text-emerald-500 font-bold">The highlighted option is correct.</span>
+                                    </div>
+                                )}
+                            </div>
+                        )
+                    })}
                 </div>
 
                 <div className="pb-8">

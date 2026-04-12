@@ -145,6 +145,7 @@ pnpm --filter server test:coverage
 | POST | `/trigger-emails` | Admin | Manually trigger pending result emails |
 | GET | `/export/formatted-excel` | Admin | Formatted Excel export |
 | GET | `/export/pdf` | Admin | PDF report (Puppeteer) |
+| GET | `/export/quiz-preview/:quizId?format=pdf` | Admin | Quiz preview PDF export with questions & answers |
 | POST | `/bulk-candidates` | Admin | Bulk register candidates via Excel upload |
 | POST | `/announcement` | Admin | Send broadcast message to all/rank candidates |
 | GET | `/candidates` | Admin | List candidates (SUPER_ADMIN: all, ADMIN: uploaded only) |
@@ -242,12 +243,19 @@ The frontend `NotificationBell` listens on the `notification` event and refreshe
 
 ## Security
 
-- **Rate limiting**: 100 req/15min general; 20 req/15min on auth routes
+- **Enhanced Rate Limiting**: User-based rate limiting supporting 40+ concurrent users with IPv6 compatibility
+  - General API: 1000 req/15min (authenticated users)
+  - Quiz operations: 800 req/15min (covers all quiz endpoints including submission)
+  - Registration: 100 req/15min
+  - Authentication: 50 req/15min
+  - **Note**: Quiz submissions protected by business logic (one submission per session) rather than rate limiting
 - **Helmet**: Sets security headers
 - **CORS**: Whitelist via `CORS_ORIGIN` env var + hardcoded Vercel/Render origins
 - **Sanitization**: Custom middleware strips `<script>` tags and HTML from request bodies
 - **JWT**: HS256, expiry configurable via `JWT_EXPIRES_IN`
 - **Password hashing**: bcryptjs with salt rounds 12
+- **Crypto-Secure Randomization**: Question shuffling uses `crypto.randomInt()` for true randomness
+- **Race Condition Prevention**: Retry logic with exponential backoff for database operations
 
 ## Testing
 

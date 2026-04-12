@@ -245,7 +245,7 @@ router.get('/:id/preview', authenticate, authorize(['ADMIN', 'SUPER_ADMIN']), as
  */
 router.post('/', authenticate, authorize(['ADMIN']), async (req: AuthRequest, res) => {
     try {
-        const { title, duration, passMark, examCode } = req.body;
+        const { title, duration, passMark, examCode, resultsDisplayMode } = req.body;
 
         if (!title || !duration) {
             return res.status(400).json({ message: 'Title and duration are required' });
@@ -257,6 +257,7 @@ router.post('/', authenticate, authorize(['ADMIN']), async (req: AuthRequest, re
                 duration: Number(duration),
                 passMark: passMark !== undefined ? Number(passMark) : 50,
                 examCode: examCode || null,
+                resultsDisplayMode: resultsDisplayMode || 'DETAILED',
                 isActive: false,
                 createdById: req.user?.userId // Associate quiz with creator
             }
@@ -309,7 +310,7 @@ router.post('/', authenticate, authorize(['ADMIN']), async (req: AuthRequest, re
 router.patch('/:id', authenticate, authorize(['ADMIN', 'SUPER_ADMIN']), async (req: AuthRequest, res) => {
     try {
         const id = req.params.id as string;
-        const { title, duration, startDate, endDate, retakeLimit, passMark, examCode } = req.body;
+        const { title, duration, startDate, endDate, retakeLimit, passMark, examCode, resultsDisplayMode } = req.body;
         const userRole = req.user?.role;
         const userId = req.user?.userId;
 
@@ -366,7 +367,8 @@ router.patch('/:id', authenticate, authorize(['ADMIN', 'SUPER_ADMIN']), async (r
                 ...(passMark !== undefined ? { passMark: parsedPassMark } : {}),
                 ...(startDate !== undefined ? { startDate: parsedStartDate ?? null } : {}),
                 ...(endDate !== undefined ? { endDate: parsedEndDate ?? null } : {}),
-                ...(examCode !== undefined ? { examCode: examCode || null } : {})
+                ...(examCode !== undefined ? { examCode: examCode || null } : {}),
+                ...(resultsDisplayMode !== undefined ? { resultsDisplayMode } : {})
             }
         });
 

@@ -22,6 +22,7 @@ interface Quiz {
     examCode?: string | null;
     startDate?: string | null;
     endDate?: string | null;
+    resultsDisplayMode: 'DETAILED' | 'STUDY' | 'SCORE_ONLY';
     _count: {
         questions: number;
     };
@@ -78,6 +79,7 @@ export default function AdminDashboard() {
     const [editExamCode, setEditExamCode] = useState('');
     const [editStartDate, setEditStartDate] = useState('');
     const [editEndDate, setEditEndDate] = useState('');
+    const [editResultsDisplayMode, setEditResultsDisplayMode] = useState<'DETAILED' | 'STUDY' | 'SCORE_ONLY'>('DETAILED');
     const [isSavingEdit, setIsSavingEdit] = useState(false);
     const [isNotifying, setIsNotifying] = useState(false);
 
@@ -86,6 +88,7 @@ export default function AdminDashboard() {
     const [newDuration, setNewDuration] = useState('30');
     const [newPassMark, setNewPassMark] = useState('50');
     const [newExamCode, setNewExamCode] = useState('');
+    const [newResultsDisplayMode, setNewResultsDisplayMode] = useState<'DETAILED' | 'STUDY' | 'SCORE_ONLY'>('DETAILED');
     const [isCreating, setIsCreating] = useState(false);
 
     const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
@@ -222,6 +225,7 @@ export default function AdminDashboard() {
             setEditExamCode('');
             setEditStartDate('');
             setEditEndDate('');
+            setEditResultsDisplayMode('DETAILED');
             return;
         }
 
@@ -230,6 +234,7 @@ export default function AdminDashboard() {
         setEditRetakeLimit(String(selected.retakeLimit ?? 2));
         setEditPassMark(String(selected.passMark ?? 50));
         setEditExamCode(selected.examCode ?? '');
+        setEditResultsDisplayMode(selected.resultsDisplayMode ?? 'DETAILED');
 
         const toLocalInput = (iso?: string | null) => {
             if (!iso) return '';
@@ -258,7 +263,8 @@ export default function AdminDashboard() {
                     passMark: editPassMark,
                     examCode: editExamCode || null,
                     startDate: editStartDate ? new Date(editStartDate).toISOString() : null,
-                    endDate: editEndDate ? new Date(editEndDate).toISOString() : null
+                    endDate: editEndDate ? new Date(editEndDate).toISOString() : null,
+                    resultsDisplayMode: editResultsDisplayMode
                 })
             });
 
@@ -340,7 +346,8 @@ export default function AdminDashboard() {
                     title: newTitle, 
                     duration: newDuration,
                     passMark: newPassMark,
-                    examCode: newExamCode || null
+                    examCode: newExamCode || null,
+                    resultsDisplayMode: newResultsDisplayMode
                 }),
             });
 
@@ -348,6 +355,7 @@ export default function AdminDashboard() {
                 setNewTitle('');
                 setNewPassMark('50');
                 setNewExamCode('');
+                setNewResultsDisplayMode('DETAILED');
                 fetchQuizzes();
                 toast('Quiz created successfully', 'success');
             }
@@ -838,6 +846,25 @@ export default function AdminDashboard() {
                                         />
                                     </div>
 
+                                    <div className="space-y-2">
+                                        <label className="text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">Results Display Mode</label>
+                                        <select
+                                            value={editResultsDisplayMode}
+                                            onChange={(e) => setEditResultsDisplayMode(e.target.value as any)}
+                                            disabled={user?.role === 'ADMIN' && selected?.createdBy?.id !== user?.id}
+                                            className="w-full px-5 py-3 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all outline-none text-sm text-slate-900 dark:text-slate-100"
+                                        >
+                                            <option value="DETAILED">Detailed (Show Answers)</option>
+                                            <option value="STUDY">Study Mode (Admin Preview)</option>
+                                            <option value="SCORE_ONLY">Score Only</option>
+                                        </select>
+                                        <p className="text-[10px] text-slate-400 ml-1">
+                                            {editResultsDisplayMode === 'DETAILED' && 'Candidates see their answers vs correct ones.'}
+                                            {editResultsDisplayMode === 'STUDY' && 'Candidates see all correct answers for study.'}
+                                            {editResultsDisplayMode === 'SCORE_ONLY' && 'Candidates only see their final score.'}
+                                        </p>
+                                    </div>
+
                                     <div className="flex flex-wrap justify-end gap-3 pt-2">
                                         <button
                                             type="button"
@@ -926,6 +953,18 @@ export default function AdminDashboard() {
                                         className="w-full px-5 py-3 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all outline-none text-sm text-slate-900 dark:text-slate-100"
                                     />
                                     <p className="text-[10px] text-slate-400 ml-1">Candidates must enter this to start</p>
+                                </div>
+                                <div className="space-y-2">
+                                    <label className="text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">Results Display Mode</label>
+                                    <select
+                                        value={newResultsDisplayMode}
+                                        onChange={(e) => setNewResultsDisplayMode(e.target.value as any)}
+                                        className="w-full px-5 py-3 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all outline-none text-sm text-slate-900 dark:text-slate-100"
+                                    >
+                                        <option value="DETAILED">Detailed (Show Answers)</option>
+                                        <option value="STUDY">Study Mode (Admin Preview)</option>
+                                        <option value="SCORE_ONLY">Score Only</option>
+                                    </select>
                                 </div>
                                 <button
                                     type="submit"

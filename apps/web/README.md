@@ -117,7 +117,7 @@ pnpm --filter web lint
 | `/admin/results` | All candidate results, search, release, export, **Bulk Import** |
 | `/admin/analytics` | Performance charts, **Pass/Fail Breakdown**, Score extremes |
 | `/admin/notifications` | Notifications with Exams / Candidates / Admins filter tabs |
-| `/admin/quizzes/:id/preview` | Preview quiz questions |
+| `/admin/quizzes/:id/preview` | Preview quiz questions with **PDF export** functionality |
 
 ## Admin Features
 
@@ -126,6 +126,11 @@ Admins can now register multiple candidates at once via Excel/CSV.
 - **Template Download**: Get a pre-formatted Excel template with required headers.
 - **Auto-Verification**: Candidates receive a welcome email with their password and a 6-digit verification code.
 - **Status Reporting**: Real-time summary of successful vs. failed registrations with error details.
+
+### Quiz Preview PDF Export
+- **Professional PDF Generation**: Export complete quiz with questions and answers as professionally formatted PDF from admin preview page.
+- **Clean Layout**: Optimized for printing with proper headers, question numbering, and answer highlighting.
+- **One-Click Export**: Simple download button in admin quiz preview header with loading states.
 
 ### Enhanced Analytics
 - **Pass/Fail Breakdown**: Visual distribution based on a 50% score threshold.

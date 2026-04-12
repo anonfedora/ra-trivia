@@ -57,23 +57,30 @@ enum QuestionFormat {
   FILL_IN_THE_GAP
 }
 
+enum ResultsDisplayMode {
+  DETAILED
+  STUDY
+  SCORE_ONLY
+}
+
 model Quiz {
-  id          String        @id @default(uuid())
-  title       String
-  duration    Int
-  isActive    Boolean       @default(false)
-  retakeLimit Int?          @default(2)
-  passMark    Float?        @default(50) // Default pass mark percentage
-  examCode    String?
-  startDate   DateTime?
-  endDate     DateTime?
-  createdById String?
-  createdAt   DateTime      @default(now())
-  updatedAt   DateTime      @updatedAt
-  questions   Question[]
-  sessions    QuizSession[]
-  createdBy   User?         @relation("QuizCreator", fields: [createdById], references: [id])
-  supportMessages SupportMessage[]
+  id                 String             @id @default(uuid())
+  title              String
+  duration           Int
+  isActive           Boolean            @default(false)
+  retakeLimit        Int?               @default(2)
+  passMark           Float?             @default(50) // Default pass mark percentage
+  examCode           String?
+  startDate          DateTime?
+  endDate            DateTime?
+  resultsDisplayMode ResultsDisplayMode @default(DETAILED)
+  createdById        String?
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+  questions          Question[]
+  sessions           QuizSession[]
+  createdBy          User?              @relation("QuizCreator", fields: [createdById], references: [id])
+  supportMessages    SupportMessage[]
 }
 
 model QuizSession {

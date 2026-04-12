@@ -7,7 +7,7 @@ import cors from 'cors';
 import helmet from 'helmet';
 import { Server as SocketIOServer } from 'socket.io';
 import { validateEnv } from './utils/envValidator';
-import { apiLimiter, authLimiter } from './middlewares/rateLimiter';
+import { apiLimiter, authLimiter, registrationLimiter, quizLimiter } from './middlewares/rateLimiter';
 import { globalErrorHandler } from './middlewares/errorHandler';
 import { sanitizeInput } from './middlewares/sanitize';
 import authRoutes from './routes/auth';
@@ -108,10 +108,15 @@ app.use(sanitizeInput); // Prevent XSS attacks with custom sanitization
 
 // Apply rate limiting
 app.use('/api/auth/', authLimiter); // Strict rate limit for auth endpoints
-// General API rate limit (applied to all other /api routes, excluding auth)
+app.use('/api/auth/register', registrationLimiter); // Additional limit for registration
+
+// Quiz-specific rate limiting
+app.use('/api/quiz/', quizLimiter); // Higher limits for quiz operations (submission handled by business logic)
+
+// General API rate limit (applied to all other /api routes, excluding auth and quiz)
 app.use('/api/', (req, res, next) => {
-    // If it's an auth route, it was already handled by authLimiter
-    if (req.path.startsWith('/auth/')) return next();
+    // Skip if already handled by specific limiters
+    if (req.path.startsWith('/auth/') || req.path.startsWith('/quiz/')) return next();
     return apiLimiter(req, res, next);
 });
 

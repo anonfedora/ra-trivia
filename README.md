@@ -122,7 +122,9 @@ pnpm --filter web dev
 - Manually release results per-session or bulk per-quiz
 - Set manual pass/fail status override
 - Export results as formatted Excel or PDF
+- **Quiz Preview PDF Export**: Export complete quiz with questions and answers as professionally formatted PDF from admin preview page
 - **Enhanced Analytics**: Detailed performance metrics (Pass/Fail breakdown, Score extremes) with dynamic summary headers
+- **High-Concurrency Support**: Optimized for 40+ concurrent users with enhanced rate limiting and race condition prevention
 - In-app notifications: exam submissions, new registrations
 
 ### SUPER_ADMIN
@@ -194,6 +196,7 @@ POST  /api/admin/quizzes/:id/release-all
 PATCH /api/admin/sessions/:id/status       # Manual pass/fail
 GET   /api/admin/export/formatted-excel
 GET   /api/admin/export/pdf
+GET   /api/admin/export/quiz-preview/:quizId?format=pdf
 GET   /api/support/admin                   # List threads (admin)
 GET   /api/support/admin/:userId           # History for user
 POST  /api/support/admin/:userId           # Reply to user
@@ -249,7 +252,22 @@ pnpm --filter server test -- --run
 
 ## Version History
 
-### v1.9.1 (Current)
+### v1.9.2 (Current)
+- **Quiz Preview PDF Export**:
+    - **Professional PDF Generation**: Export complete quiz with questions and answers as professionally formatted PDF from admin preview page.
+    - **Clean Layout**: Optimized for printing with proper headers, question numbering, and answer highlighting.
+    - **One-Click Export**: Simple download button in admin quiz preview header with loading states.
+- **Scaling & Performance Improvements**:
+    - **Enhanced Rate Limiting**: User-based rate limiting supporting 40+ concurrent users with IPv6 compatibility. Quiz submissions protected by business logic rather than artificial rate limits.
+    - **Crypto-Secure Randomization**: Question and answer shuffling using `crypto.randomInt()` for true randomness.
+    - **Race Condition Prevention**: Retry logic with exponential backoff for database operations during concurrent access.
+    - **Comprehensive Test Coverage**: 20 new tests covering rate limiting, question shuffling, and scaling features.
+- **Security & Reliability**:
+    - **IPv6 Support**: Proper IP key generation for rate limiting prevents bypass attempts.
+    - **Concurrent Session Handling**: Improved database update logic prevents conflicts during high-load scenarios.
+    - **Error Resilience**: Better error handling and graceful degradation under heavy load.
+
+### v1.9.1
 - **AI-Powered Support Assistant**:
     - **Contextual Analysis**: Uses **Gemini 2.0 Flash** to analyze candidate messages and suggest the most relevant FAQ templates.
     - **AI Auto-Reply**: Automatically responds to common queries (Login, OTP, Results) with high confidence (85%+) matching.
