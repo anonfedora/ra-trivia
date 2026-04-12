@@ -408,25 +408,69 @@ router.post('/update-answer', authenticate, async (req: AuthRequest, res) => {
     try {
         const { sessionId, questionId, selectedOption } = req.body;
 
-        const session = await prisma.quizSession.findUnique({
-            where: { id: sessionId }
-        });
+        const maxRetries = 5;
+        let attempt = 0;
+        let success = false;
+        let lastError = null;
 
-        if (!session || session.endTime) {
-            return res.status(400).json({ message: 'Session not found or already ended' });
+        while (attempt < maxRetries && !success) {
+            try {
+                // 1. Fetch current state including updatedAt for OCC
+                const session = await prisma.quizSession.findUnique({
+                    where: { id: sessionId },
+                    select: { id: true, answers: true, endTime: true, updatedAt: true }
+                });
+
+                if (!session || session.endTime) {
+                    return res.status(400).json({ message: 'Session not found or already ended' });
+                }
+
+                const currentAnswers = (session.answers as Record<string, any>) || {};
+                
+                // 2. Optimization: If the answer is already identical, no need to update
+                if (currentAnswers[questionId] === selectedOption) {
+                    return res.json(session);
+                }
+
+                // 3. Prepare updated state
+                const newAnswers = { ...currentAnswers, [questionId]: selectedOption };
+
+                // 4. Atomic Update with OCC (where updatedAt equals the value we read)
+                const updatedSession = await prisma.quizSession.update({
+                    where: { 
+                        id: sessionId,
+                        updatedAt: session.updatedAt // This is the OCC check
+                    },
+                    data: { answers: newAnswers }
+                });
+
+                success = true;
+                return res.json(updatedSession);
+
+            } catch (error: any) {
+                attempt++;
+                lastError = error;
+                // P2025 is Prisma's error for "Record to update not found" 
+                // In this case, it means the record exists but updatedAt changed
+                if (error.code === 'P2025') {
+                    console.log(`[CONCURRENCY] Collision on session ${sessionId}, attempt ${attempt}/${maxRetries}`);
+                    // Wait a tiny bit before retry to let the other write finish
+                    await new Promise(resolve => setTimeout(resolve, Math.random() * 50));
+                    continue;
+                }
+                throw error; // Other errors should fail
+            }
         }
 
-        const currentAnswers = (session.answers as any) || {};
-        currentAnswers[questionId] = selectedOption;
-
-        const updatedSession = await prisma.quizSession.update({
-            where: { id: sessionId },
-            data: { answers: currentAnswers }
-        });
-
-        res.json(updatedSession);
+        if (!success) {
+            console.error(`[CONCURRENCY] Failed to update session ${sessionId} after ${maxRetries} attempts`);
+            return res.status(500).json({ 
+                message: 'Failed to save answer due to high concurrency. Please try again.',
+                error: lastError?.message 
+            });
+        }
     } catch (error) {
-        console.error(error);
+        console.error(`[UPDATE_ANSWER] Error for session ${req.body.sessionId}:`, error);
         res.status(500).json({ message: 'Internal server error' });
     }
 });

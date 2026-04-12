@@ -21,7 +21,7 @@ export const apiLimiter = rateLimit({
 // Strict rate limiter for authentication endpoints
 export const authLimiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 50, // Increased for better UX during bulk registration
+    max: 300, // Increased to support 100+ concurrent users on shared IP (e.g. testing centers)
     message: 'Too many authentication attempts, please try again after 15 minutes.',
     standardHeaders: true,
     legacyHeaders: false,
@@ -32,7 +32,7 @@ export const authLimiter = rateLimit({
 // Registration-specific rate limiter (more lenient for bulk registration)
 export const registrationLimiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 100, // Allow more registration attempts
+    max: 500, // Allow more registration attempts per IP
     message: 'Too many registration attempts, please try again later.',
     standardHeaders: true,
     legacyHeaders: false,
@@ -43,7 +43,7 @@ export const registrationLimiter = rateLimit({
 // Quiz operations rate limiter (for active quiz sessions)
 export const quizLimiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 800, // Higher limit for quiz operations
+    max: 5000, // Very high limit for authenticated quiz sessions to avoid 429s during exams
     message: 'Too many quiz requests, please slow down.',
     standardHeaders: true,
     legacyHeaders: false,
