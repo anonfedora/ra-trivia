@@ -10,7 +10,9 @@ __tests__/
 ├── unit/                       # Unit tests
 │   ├── validation.test.ts      # Validation utilities
 │   ├── userTypeAccess.test.ts  # User type filtering logic
-│   └── reportGenerator.test.ts # Report generation logic
+│   ├── reportGenerator.test.ts # Report generation logic
+│   ├── rateLimiter.test.ts     # Rate limiting functionality (13 tests)
+│   └── questionShuffling.test.ts # Crypto-secure question shuffling (7 tests)
 └── integration/                # Integration tests
     ├── auth.test.ts            # Authentication endpoints
     └── quiz.test.ts            # Quiz endpoints
@@ -50,6 +52,8 @@ Unit tests focus on testing individual functions and utilities in isolation:
 - **validation.test.ts**: Tests email, password, and name validation
 - **userTypeAccess.test.ts**: Tests question filtering by user type
 - **reportGenerator.test.ts**: Tests report summary calculations
+- **rateLimiter.test.ts**: Tests enhanced rate limiting with IPv6 support and user-based limits (13 tests)
+- **questionShuffling.test.ts**: Tests crypto-secure Fisher-Yates shuffling algorithm and answer remapping (7 tests)
 
 ### Integration Tests
 Integration tests test complete API endpoints with database interactions:

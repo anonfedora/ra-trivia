@@ -266,10 +266,11 @@ router.post('/start', authenticate, validateUserTypeAccess, async (req: AuthRequ
             console.log(`[QUIZ_START_FILTER] Quiz ${quizId}: Total questions: ${quizWithQuestions.questions.length}, Filtered for ${userType}: ${questions.length}`);
         }
 
-        // Randomize question order and shuffle answers
-        // Fisher-Yates shuffle for questions
+        // Randomize question order and shuffle answers using crypto-secure random
+        // Fisher-Yates shuffle for questions with crypto-secure random
+        const crypto = require('crypto');
         for (let i = questions.length - 1; i > 0; i--) {
-            const j = Math.floor(Math.random() * (i + 1));
+            const j = crypto.randomInt(0, i + 1);
             [questions[i], questions[j]] = [questions[j], questions[i]];
         }
 
@@ -283,7 +284,7 @@ router.post('/start', authenticate, validateUserTypeAccess, async (req: AuthRequ
                 };
             }
 
-            // Create array of options and shuffle them using Fisher-Yates
+            // Create array of options and shuffle them using Fisher-Yates with crypto-secure random
             const options = [
                 { key: 'A', text: question.optionA },
                 { key: 'B', text: question.optionB },
@@ -291,9 +292,9 @@ router.post('/start', authenticate, validateUserTypeAccess, async (req: AuthRequ
                 { key: 'D', text: question.optionD }
             ].filter(opt => opt.text); // Remove empty options
 
-            // Fisher-Yates shuffle for truly random ordering
+            // Fisher-Yates shuffle with crypto-secure random for truly random ordering
             for (let i = options.length - 1; i > 0; i--) {
-                const j = Math.floor(Math.random() * (i + 1));
+                const j = crypto.randomInt(0, i + 1);
                 [options[i], options[j]] = [options[j], options[i]];
             }
 
@@ -332,17 +333,36 @@ router.post('/start', authenticate, validateUserTypeAccess, async (req: AuthRequ
         });
 
         // Persist the remap and optmap into the session's answers JSON under reserved keys
+        // Use retry logic to handle potential race conditions during concurrent access
         const currentAnswers = (session.answers as Record<string, string>) || {};
-        await prisma.quizSession.update({
-            where: { id: session.id },
-            data: {
-                answers: {
-                    ...currentAnswers,
-                    __remap__: JSON.stringify(remap),
-                    __optmap__: JSON.stringify(optmap)
+        let retryCount = 0;
+        const maxRetries = 3;
+        
+        while (retryCount < maxRetries) {
+            try {
+                await prisma.quizSession.update({
+                    where: { id: session.id },
+                    data: {
+                        answers: {
+                            ...currentAnswers,
+                            __remap__: JSON.stringify(remap),
+                            __optmap__: JSON.stringify(optmap)
+                        }
+                    }
+                });
+                break; // Success, exit retry loop
+            } catch (error: any) {
+                retryCount++;
+                if (retryCount >= maxRetries) {
+                    console.error(`[QUIZ_START] Failed to update session after ${maxRetries} retries:`, error);
+                    throw new Error('Failed to initialize quiz session. Please try again.');
                 }
+                
+                // Brief delay before retry (exponential backoff)
+                await new Promise(resolve => setTimeout(resolve, Math.pow(2, retryCount) * 100));
+                console.log(`[QUIZ_START] Retry ${retryCount}/${maxRetries} for session update`);
             }
-        });
+        }
 
         const randomizedQuiz = {
             ...quizWithQuestions,
@@ -639,6 +659,7 @@ router.get('/session/:id', authenticate, async (req: AuthRequest, res) => {
                         id: true,
                         title: true,
                         passMark: true,
+                        resultsDisplayMode: true,
                         questions: true
                     }
                 }
