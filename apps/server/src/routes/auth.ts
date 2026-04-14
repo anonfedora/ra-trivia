@@ -5,14 +5,17 @@ import { prisma } from 'database';
 import { body } from 'express-validator';
 import { handleValidationErrors } from '../middlewares/errorHandler';
 import { sendVerificationEmail, generateOTP, sendPasswordResetEmail } from '../services/email';
-import { authenticate, AuthRequest } from '../middlewares/auth';
+import { authenticate, AuthRequest, authorizeAdmin } from '../middlewares/auth';
+import { validateUserTypeAccess, filterQuestionsByUserType } from '../middlewares/userTypeAccess';
+import { sendScoreOnlyEmail } from '../services/email';
+import { auditService } from '../services/auditService';
+import { emitNotification } from '../services/socketService';
 import { generateTokenPair, verifyRefreshToken, blacklistToken, rotateRefreshToken, revokeAllRefreshTokens, generateAccessToken } from '../services/tokenService';
 import {
     passwordValidation,
     emailValidation,
     nameValidation
 } from '../utils/validation';
-import { emitNotification } from '../services/socketService';
 
 const router = Router();
 const WEB_URL = process.env.WEB_URL || 'http://localhost:3000';
@@ -339,6 +342,11 @@ router.post('/login', loginValidation, handleValidationErrors, async (req: Reque
         });
 
         if (!user || !(await bcrypt.compare(password, user.password))) {
+            // Log failed login
+            await auditService.logFromRequest(req, 'FAILED_LOGIN', undefined, { 
+                email, 
+                reason: !user ? 'User not found' : 'Incorrect password' 
+            });
             // Use generic message to prevent user enumeration
             return res.status(401).json({ message: 'Invalid credentials' });
         }
@@ -350,6 +358,12 @@ router.post('/login', loginValidation, handleValidationErrors, async (req: Reque
             const otpExpiresAt = new Date(Date.now() + 1000 * 60 * 10); // 10 minutes
 
             console.log(`[AUTH] Login redirect: Generating new OTP for ${user.email}: ${otp} (Hash: ${otpHash.substring(0, 10)}...)`);
+
+            // Audit record for OTP request
+            await auditService.logFromRequest(req, 'OTP_REQUESTED', user.id, { 
+                email: user.email, 
+                reason: 'Login attempt while unverified' 
+            });
 
             await prisma.user.update({
                 where: { id: user.id },
@@ -382,6 +396,14 @@ router.post('/login', loginValidation, handleValidationErrors, async (req: Reque
             role: user.role, 
             userType: user.userType 
         });
+
+        // Log admin/super-admin logins
+        if (user.role === 'ADMIN' || user.role === 'SUPER_ADMIN') {
+            await auditService.logAdminLogin(req, user);
+        } else {
+            // General login log for candidates
+            await auditService.logFromRequest(req, 'USER_LOGIN', user.id);
+        }
         
         res.json({
             accessToken: tokens.accessToken,
@@ -814,18 +836,24 @@ router.put('/profile', authenticate, [
         });
 
         // Create audit log entry if userType was changed
-        // TODO: Temporarily commented out due to Prisma client generation issue with UserTypeAuditLog model
-        // if (userType !== undefined && userType !== currentUser.userType) {
-        //     await prisma.userTypeAuditLog.create({
-        //         data: {
-        //             userId: userId,
-        //             previousType: currentUser.userType,
-        //             newType: userType,
-        //             ipAddress: req.ip || (req as any).connection?.remoteAddress || null,
-        //             userAgent: req.get('User-Agent') || null
-        //         }
-        //     });
-        // }
+        if (userType !== undefined && userType !== currentUser.userType) {
+            await auditService.logFromRequest(req, 'USER_TYPE_CHANGED', userId, {
+                previousType: currentUser.userType,
+                newType: userType
+            });
+
+            // Fallback: also update the specialized UserTypeAuditLog for backward compatibility if desired
+            // Though the new AuditLog is more flexible. Let's keep both for now if needed.
+            await prisma.userTypeAuditLog.create({
+                data: {
+                    userId: userId,
+                    previousType: currentUser.userType,
+                    newType: userType as any,
+                    ipAddress: req.ip || (req as any).connection?.remoteAddress || null,
+                    userAgent: req.get('User-Agent') || null
+                }
+            }).catch(e => console.error('[AUDIT] Failed to save specialized UserTypeAuditLog:', e));
+        }
 
         // If userType was updated, generate new token pair with the updated userType
         let newTokens = null;

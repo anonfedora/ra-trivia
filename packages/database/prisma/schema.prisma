@@ -32,6 +32,7 @@ model User {
   supportMessages SupportMessage[]
   refreshTokens RefreshToken[]
   notifications Notification[]
+  auditEntries AuditLog[]
   uploadedBy User?         @relation("CandidateUploader", fields: [uploadedById], references: [id])
   uploadedCandidates User[] @relation("CandidateUploader")
 }
@@ -89,6 +90,7 @@ model QuizSession {
   endTime          DateTime?
   score            Float?
   answers          Json?
+  ipAddress        String?
   userId           String
   quizId           String
   resultReleasesAt DateTime?
@@ -128,6 +130,22 @@ model UserTypeAuditLog {
   ipAddress    String?
   userAgent    String?
   user         User     @relation(fields: [userId], references: [id])
+}
+
+model AuditLog {
+  id        String   @id @default(uuid())
+  action    String
+  userId    String?
+  ipAddress String?
+  userAgent String?
+  metadata  Json?
+  createdAt DateTime @default(now())
+
+  user      User?    @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([action])
+  @@index([createdAt])
 }
 
 model Notification {

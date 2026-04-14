@@ -4,6 +4,7 @@ import { authenticate, AuthRequest, authorize } from '../middlewares/auth';
 import { validateQuizListAccess, validateUserTypeAccess } from '../middlewares/userTypeAccess';
 import { emitNotification } from '../services/socketService';
 import { sendExamNotificationEmail } from '../services/email';
+import { auditService } from '../services/auditService';
 
 const router = Router();
 
@@ -372,6 +373,12 @@ router.patch('/:id', authenticate, authorize(['ADMIN', 'SUPER_ADMIN']), async (r
             }
         });
 
+        // Audit quiz update
+        await auditService.logFromRequest(req, 'QUIZ_UPDATED', undefined, { 
+            quizId: id, 
+            title: updatedQuiz.title 
+        });
+
         res.json(updatedQuiz);
     } catch (error) {
         console.error('[QUIZ_UPDATE_ERROR]', error);
@@ -424,6 +431,13 @@ router.patch('/:id/toggle', authenticate, authorize(['ADMIN', 'SUPER_ADMIN']), a
         const updatedQuiz = await prisma.quiz.update({
             where: { id },
             data: { isActive: newIsActive }
+        });
+
+        // Audit quiz toggle
+        await auditService.logFromRequest(req, 'QUIZ_TOGGLED', undefined, { 
+            quizId: id, 
+            title: updatedQuiz.title,
+            isActive: newIsActive
         });
 
         // When a quiz is activated, notify matching candidates
@@ -522,6 +536,12 @@ router.delete('/:id', authenticate, authorize(['ADMIN', 'SUPER_ADMIN']), async (
             prisma.question.deleteMany({ where: { quizId: id } }),
             prisma.quiz.delete({ where: { id } })
         ]);
+
+        // Audit quiz deletion
+        await auditService.logFromRequest(req, 'QUIZ_DELETED', undefined, { 
+            quizId: id, 
+            title: quiz.title 
+        });
 
         res.json({ message: 'Quiz deleted successfully' });
     } catch (error) {

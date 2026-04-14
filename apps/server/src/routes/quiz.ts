@@ -4,8 +4,13 @@ import { authenticate, AuthRequest, authorizeAdmin } from '../middlewares/auth';
 import { validateUserTypeAccess, filterQuestionsByUserType } from '../middlewares/userTypeAccess';
 import { sendScoreOnlyEmail } from '../services/email';
 import { emitNotification, emitToRoom } from '../services/socketService';
+import { auditService } from '../services/auditService';
+import { getClientIp } from '../utils/ip';
 
 const router = Router();
+
+// Concurrency guard to prevent duplicate 'Exam Started' events from rapid clicks
+const pendingStarts = new Set<string>();
 
 let isMaintenanceMode = false;
 
@@ -56,6 +61,11 @@ router.post('/maintenance/toggle', authenticate, authorizeAdmin, (req: AuthReque
     res.json({ 
         message: `Maintenance mode ${isMaintenanceMode ? 'enabled' : 'disabled'}`,
         isMaintenanceMode 
+    });
+
+    // Audit maintenance mode toggle
+    auditService.logFromRequest(req, 'MAINTENANCE_TOGGLED', undefined, { 
+        enabled: isMaintenanceMode 
     });
 });
 
@@ -228,17 +238,35 @@ router.post('/start', authenticate, validateUserTypeAccess, async (req: AuthRequ
         if (session) {
             console.log(`[QUIZ_START] Found existing active session ${session.id} for user ${userId}, quiz ${quizId}`);
         } else {
-            // Create new session only if user hasn't exceeded retake limit
-            console.log(`[QUIZ_START] Creating new session for user ${userId}, quiz ${quizId}. Completed attempts: ${completedSessions}/${retakeLimit}`);
+            // Check concurrency guard to prevent double-logging/double-creation
+            const startKey = `${userId}:${quizId}`;
+            if (pendingStarts.has(startKey)) {
+                console.warn(`[QUIZ_START] Blocking redundant start request for user ${userId}, quiz ${quizId}`);
+                return res.status(409).json({ message: 'Exam start is already in progress. Please wait a moment.' });
+            }
             
-            session = await prisma.quizSession.create({
-                data: {
-                    userId,
-                    quizId,
-                    startTime: new Date(),
-                    answers: {}
-                }
-            });
+            pendingStarts.add(startKey);
+            
+            try {
+                // Create new session only if user hasn't exceeded retake limit
+                console.log(`[QUIZ_START] Creating new session for user ${userId}, quiz ${quizId}. Completed attempts: ${completedSessions}/${retakeLimit}`);
+                
+                session = await prisma.quizSession.create({
+                    data: {
+                        userId,
+                        quizId,
+                        startTime: new Date(),
+                        ipAddress: getClientIp(req),
+                        answers: {}
+                    }
+                });
+
+                // Log exam start
+                await auditService.logExamEvent(req, 'EXAM_STARTED', session.id, quizId);
+            } finally {
+                // Always clear the guard, even on error
+                pendingStarts.delete(startKey);
+            }
         }
 
         // Get quiz with questions and filter by user type for candidates
@@ -593,6 +621,9 @@ router.post('/submit', authenticate, async (req: AuthRequest, res) => {
                 // Don't fail the submission if notification creation fails
             }
         }
+
+        // Log exam submission
+        await auditService.logExamEvent(req, 'EXAM_SUBMITTED', updatedSession.id, updatedSession.quizId);
 
         res.json(updatedSession);
     } catch (error) {

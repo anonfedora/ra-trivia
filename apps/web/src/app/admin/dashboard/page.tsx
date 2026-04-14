@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from 'react';
-import { BookOpen, Clock, PlayCircle, Plus, Upload, Trash2, Power, PowerOff, FileDown, MoreVertical, CheckCircle, BarChart3, Users, MessageCircle, Download, Bell } from 'lucide-react';
+import { BookOpen, Clock, PlayCircle, Plus, Upload, Trash2, Power, PowerOff, FileDown, MoreVertical, CheckCircle, BarChart3, Users, MessageCircle, Download, Bell, Activity } from 'lucide-react';
 import Link from 'next/link';
 import { ThemeToggle } from '../../../components/ThemeToggle';
 import NotificationBell from '../../../components/NotificationBell';
@@ -541,6 +541,10 @@ export default function AdminDashboard() {
                             className="flex items-center gap-2 bg-slate-600 dark:bg-slate-700 text-white px-4 py-2.5 rounded-2xl font-bold shadow-lg hover:bg-slate-700 dark:hover:bg-slate-800 transition-all text-sm">
                             <Users size={16} />
                             {user?.role === 'SUPER_ADMIN' ? 'Candidates' : 'Exam Takers'}
+                        </Link>
+                        <Link href="/admin/audit-logs" className="flex items-center gap-2 bg-slate-600 dark:bg-slate-700 text-white px-4 py-2.5 rounded-2xl font-bold shadow-lg hover:bg-slate-700 dark:hover:bg-slate-800 transition-all text-sm">
+                            <Activity size={16} />
+                            Audit Logs
                         </Link>
                     </div>
                 </header>
