@@ -9,6 +9,7 @@ import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 import multer from 'multer';
 import { sendBulkWelcomeEmail, generateOTP } from '../services/email';
+import { auditService } from '../services/auditService';
 
 const router = Router();
 const upload = multer({ storage: multer.memoryStorage() });
@@ -110,6 +111,13 @@ router.post('/announcement', authenticate, authorizeAdmin, async (req: AuthReque
             message: `Announcement sent successfully to ${candidates.length} candidates.`,
             sentCount: candidates.length,
             emailSuccessCount: successCount
+        });
+
+        // Audit announcement
+        await auditService.logFromRequest(req, 'ANNOUNCEMENT_SENT', undefined, { 
+            subject, 
+            sentCount: candidates.length, 
+            emailSuccessCount: successCount 
         });
 
     } catch (error) {
@@ -528,9 +536,18 @@ router.get('/results', authenticate, authorizeAdmin, async (req: AuthRequest, re
             prisma.quizSession.count({ where }),
             prisma.quizSession.findMany({
                 where,
-                include: {
+                select: {
+                    id: true,
+                    startTime: true,
+                    endTime: true,
+                    score: true,
+                    ipAddress: true,
+                    manualStatus: true,
+                    resultReleasesAt: true,
+                    userId: true,
+                    quizId: true,
                     user: {
-                        select: { name: true, church: true, email: true }
+                        select: { name: true, email: true, church: true }
                     },
                     quiz: {
                         select: { title: true, passMark: true }
@@ -570,6 +587,61 @@ router.get('/results', authenticate, authorizeAdmin, async (req: AuthRequest, re
         res.json({ items, total, page, pageSize, summary });
     } catch (error) {
         console.error(error);
+        res.status(500).json({ message: 'Internal server error' });
+    }
+});
+
+/**
+ * @openapi
+ * /admin/audit-logs:
+ *   get:
+ *     tags: [Admin Auditing]
+ *     summary: Get system audit logs (paginated)
+ *     description: Retrieve logs for administrative actions, logins, and exam events.
+ *     security:
+ *       - BearerAuth: []
+ */
+router.get('/audit-logs', authenticate, authorizeAdmin, async (req: AuthRequest, res) => {
+    try {
+        const page = Math.max(1, parseInt(String(req.query.page ?? '1'), 10) || 1);
+        const pageSizeRaw = parseInt(String(req.query.pageSize ?? '25'), 10) || 25;
+        const pageSize = Math.min(100, Math.max(1, pageSizeRaw));
+        const q = typeof req.query.q === 'string' ? req.query.q.trim() : '';
+        const action = typeof req.query.action === 'string' ? req.query.action : 'all';
+
+        const where: any = {};
+
+        if (action !== 'all') {
+            where.action = action;
+        }
+
+        if (q) {
+            where.OR = [
+                { user: { name: { contains: q, mode: 'insensitive' } } },
+                { user: { email: { contains: q, mode: 'insensitive' } } },
+                { ipAddress: { contains: q, mode: 'insensitive' } },
+                { action: { contains: q, mode: 'insensitive' } }
+            ];
+        }
+
+        const [total, items] = await prisma.$transaction([
+            prisma.auditLog.count({ where }),
+            prisma.auditLog.findMany({
+                where,
+                include: {
+                    user: {
+                        select: { name: true, email: true, role: true }
+                    }
+                },
+                orderBy: { createdAt: 'desc' },
+                skip: (page - 1) * pageSize,
+                take: pageSize
+            })
+        ]);
+
+        res.json({ items, total, page, pageSize });
+    } catch (error) {
+        console.error('[AUDIT_LOGS_FETCH] Error:', error);
         res.status(500).json({ message: 'Internal server error' });
     }
 });
@@ -1089,6 +1161,13 @@ router.post('/bulk-candidates', authenticate, authorizeAdmin, upload.single('fil
         res.json({
             message: `Bulk registration completed: ${results.success} succeeded, ${results.failed} failed.`,
             ...results
+        });
+
+        // Audit bulk registration
+        await auditService.logFromRequest(req as any, 'BULK_CANDIDATES_IMPORTED', undefined, { 
+            successCount: results.success, 
+            failedCount: results.failed,
+            fileName: req.file?.originalname
         });
     } catch (error) {
         console.error('Bulk registration error:', error);

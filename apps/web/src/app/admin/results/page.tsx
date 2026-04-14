@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, Suspense, useMemo } from 'react';
-import { Search, FileDown, ArrowLeft, User, Mail, GraduationCap, Award, Calendar, Activity, CheckSquare, Square, Share2 } from 'lucide-react';
+import { Search, FileDown, ArrowLeft, User, Mail, GraduationCap, Award, Calendar, Activity, CheckSquare, Square, Share2, Globe } from 'lucide-react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { ThemeToggle } from '../../../components/ThemeToggle';
@@ -18,6 +18,7 @@ interface Result {
     score: number | null;
     manualStatus: string | null;
     resultReleasesAt: string | null;
+    ipAddress: string | null;
     user: {
         name: string;
         email: string;
@@ -411,6 +412,7 @@ function AdminResultsContent() {
                                     <th className="px-8 py-6 w-[28%]">Exam</th>
                                     <th className="px-8 py-6 w-[10%]">Score</th>
                                     <th className="px-8 py-6 w-[15%]">Status</th>
+                                    <th className="px-8 py-6 w-[10%]">IP Address</th>
                                     <th className="px-8 py-6 w-[15%]">Timeline</th>
                                     <th className="px-8 py-6 w-[12%]">
                                         <div className="flex items-center gap-2">
@@ -485,6 +487,12 @@ function AdminResultsContent() {
                                                 <option value="Cleared">✅ Cleared</option>
                                                 <option value="Not Cleared - No Certificates">❌ Not Cleared</option>
                                             </select>
+                                        </td>
+                                        <td className="px-8 py-6">
+                                            <div className="flex items-center gap-2 text-xs font-mono text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-900/50 px-2 py-1 rounded-md w-fit">
+                                                <Globe size={12} />
+                                                {result.ipAddress || 'unknown'}
+                                            </div>
                                         </td>
                                         <td className="px-8 py-6">
                                             <div className="flex items-center gap-2 text-slate-600 dark:text-slate-400 text-sm font-medium">

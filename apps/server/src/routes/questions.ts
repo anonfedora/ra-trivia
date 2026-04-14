@@ -3,6 +3,7 @@ import { prisma, UserType } from 'database';
 import multer from 'multer';
 import * as xlsx from 'xlsx';
 import { authenticate, authorizeAdmin } from '../middlewares/auth';
+import { auditService } from '../services/auditService';
 
 // Define locally to avoid linter errors while types catch up
 type QuestionFormat = 'MULTIPLE_CHOICE' | 'FILL_IN_THE_GAP';
@@ -274,6 +275,13 @@ router.post('/import', authenticate, authorizeAdmin, upload.single('file'), asyn
         res.status(201).json({
             message: 'Questions imported successfully',
             count: questionsData.length
+        });
+
+        // Audit question import
+        await auditService.logFromRequest(req, 'QUESTIONS_IMPORTED', undefined, { 
+            quizId, 
+            count: questionsData.length,
+            fileName: req.file?.originalname
         });
     } catch (error) {
         console.error('Import error:', error);
