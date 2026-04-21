@@ -35,6 +35,10 @@ model User {
   auditEntries AuditLog[]
   uploadedBy User?         @relation("CandidateUploader", fields: [uploadedById], references: [id])
   uploadedCandidates User[] @relation("CandidateUploader")
+
+  @@index([uploadedById])
+  @@index([role])
+  @@index([email])
 }
 
 model Question {
@@ -82,6 +86,9 @@ model Quiz {
   sessions           QuizSession[]
   createdBy          User?              @relation("QuizCreator", fields: [createdById], references: [id])
   supportMessages    SupportMessage[]
+
+  @@index([createdById])
+  @@index([isActive])
 }
 
 model QuizSession {
@@ -100,6 +107,12 @@ model QuizSession {
   updatedAt        DateTime  @updatedAt
   quiz             Quiz      @relation(fields: [quizId], references: [id])
   user             User      @relation(fields: [userId], references: [id])
+
+  @@index([quizId])
+  @@index([userId])
+  @@index([endTime])
+  @@index([score])
+  @@index([startTime])
 }
 
 model SupportMessage {

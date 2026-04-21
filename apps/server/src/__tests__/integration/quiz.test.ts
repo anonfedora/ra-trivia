@@ -87,7 +87,7 @@ describe('Quiz API', () => {
           otp: '123456'
         });
 
-      authToken = verifyResponse.body.token;
+      authToken = verifyResponse.body.accessToken;
       userId = user.id;
     }
 
