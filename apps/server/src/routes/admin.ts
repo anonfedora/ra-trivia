@@ -142,67 +142,39 @@ router.post('/announcement', authenticate, authorizeAdmin, async (req: AuthReque
 router.get('/analytics', authenticate, authorizeAdmin, async (req: AuthRequest, res) => {
     try {
         const userRole = req.user?.role;
+        const userId = req.user?.userId;
 
-        // For SUPER_ADMIN, get all quizzes. For regular ADMIN, get only their created quizzes
-        const whereClause: any = userRole === 'SUPER_ADMIN' ? {} : {
-            createdById: req.user?.userId
-        };
+        // Perform optimized aggregation using raw query for performance on large datasets
+        // This avoids fetching thousands of records into Node.js memory
+        const analyticsRaw: any[] = await prisma.$queryRawUnsafe(`
+            SELECT 
+                q.id, 
+                q.title,
+                COUNT(s.id)::int as "totalAttempts",
+                COUNT(CASE WHEN s."endTime" IS NOT NULL THEN 1 END)::int as "completedSessions",
+                COUNT(CASE WHEN s."score" >= COALESCE(q."passMark", 50) AND s."endTime" IS NOT NULL THEN 1 END)::int as "passCount",
+                AVG(s."score")::float as "averageScore",
+                MAX(s."score")::float as "highestScore",
+                MIN(s."score")::float as "lowestScore",
+                AVG(EXTRACT(EPOCH FROM (s."endTime" - s."startTime")) / 60)::float as "averageTime"
+            FROM "Quiz" q
+            LEFT JOIN "QuizSession" s ON q.id = s."quizId"
+            ${userRole === 'SUPER_ADMIN' ? '' : `WHERE q."createdById" = '${userId}'`}
+            GROUP BY q.id, q.title
+        `);
 
-        // Get all quizzes with performance metrics
-        const quizzes = await prisma.quiz.findMany({
-            where: whereClause,
-            include: {
-                _count: {
-                    select: { questions: true }
-                },
-                sessions: {
-                    // Remove where filter to allow calculating total attempts vs completed sessions
-                    select: {
-                        score: true,
-                        startTime: true,
-                        endTime: true
-                    }
-                }
-            }
-        });
-
-        const analytics = quizzes.map((quiz: any) => {
-            const sessions = quiz.sessions || [];
-            const completedSessions = sessions.filter((s: any) => s.endTime !== null);
-            const totalAttempts = sessions.length;
-            const completedScores = completedSessions.map((s: any) => s.score || 0);
-
-            const averageScore = completedSessions.length > 0
-                ? completedScores.reduce((sum: number, score: number) => sum + score, 0) / completedSessions.length
-                : 0;
-
-            const passMark = quiz.passMark ?? 50;
-            const passCount = completedScores.filter((s: number) => s >= passMark).length;
-            const failCount = completedSessions.length - passCount;
-            const highestScore = completedScores.length > 0 ? Math.max(...completedScores) : 0;
-            const lowestScore = completedScores.length > 0 ? Math.min(...completedScores) : 0;
-
-            const completionRate = totalAttempts > 0 ? (completedSessions.length / totalAttempts) * 100 : 0;
-            const averageTime = completedSessions.length > 0
-                ? completedSessions.reduce((sum: number, s: any) => {
-                    const duration = new Date(s.endTime!).getTime() - new Date(s.startTime).getTime();
-                    return sum + duration;
-                }, 0) / completedSessions.length / (1000 * 60) // Convert to minutes
-                : 0;
-
-            return {
-                id: quiz.id,
-                title: quiz.title,
-                totalAttempts,
-                passCount,
-                failCount,
-                highestScore: Math.round(highestScore * 100) / 100,
-                lowestScore: Math.round(lowestScore * 100) / 100,
-                averageScore: Math.round(averageScore * 100) / 100,
-                completionRate: Math.round(completionRate * 100) / 100,
-                averageTime: Math.round(averageTime * 100) / 100
-            };
-        });
+        const analytics = analyticsRaw.map(q => ({
+            id: q.id,
+            title: q.title,
+            totalAttempts: q.totalAttempts,
+            passCount: q.passCount,
+            failCount: q.completedSessions - q.passCount,
+            highestScore: Math.round((q.highestScore || 0) * 100) / 100,
+            lowestScore: Math.round((q.lowestScore || 0) * 100) / 100,
+            averageScore: Math.round((q.averageScore || 0) * 100) / 100,
+            completionRate: q.totalAttempts > 0 ? Math.round((q.completedSessions / q.totalAttempts) * 10000) / 100 : 0,
+            averageTime: Math.round((q.averageTime || 0) * 100) / 100
+        }));
 
         res.json(analytics);
     } catch (error) {
@@ -226,31 +198,24 @@ router.get('/analytics', authenticate, authorizeAdmin, async (req: AuthRequest, 
  */
 router.get('/global-stats', authenticate, authorizeAdmin, async (req: AuthRequest, res) => {
     try {
-        const [totalQuizzes, totalUsers, totalSessions] = await Promise.all([
+        const [totalQuizzes, totalUsers, totalSessions, scoreAgg] = await Promise.all([
             prisma.quiz.count(),
             prisma.user.count(),
-            prisma.quizSession.count()
+            prisma.quizSession.count(),
+            prisma.quizSession.aggregate({
+                _avg: { score: true },
+                where: { score: { not: null } }
+            })
         ]);
-
-        const completedSessions = await prisma.quizSession.count({
-            where: { endTime: { not: null } }
-        });
-
-        const allScores = await prisma.quizSession.findMany({
-            where: { score: { not: null } },
-            select: { score: true }
-        });
-
-        const averageScore = allScores.length > 0
-            ? allScores.reduce((sum, s) => sum + s.score!, 0) / allScores.length
-            : 0;
 
         const globalStats = {
             totalQuizzes,
             totalCandidates: totalUsers,
             totalAttempts: totalSessions,
-            averageScore: Math.round(averageScore * 100) / 100
+            averageScore: Math.round((scoreAgg._avg.score || 0) * 100) / 100
         };
+
+        res.json(globalStats);
 
         res.json(globalStats);
     } catch (error) {
@@ -602,6 +567,9 @@ router.get('/results', authenticate, authorizeAdmin, async (req: AuthRequest, re
  *       - BearerAuth: []
  */
 router.get('/audit-logs', authenticate, authorizeAdmin, async (req: AuthRequest, res) => {
+    if (req.user?.role !== 'SUPER_ADMIN') {
+        return res.status(403).json({ message: 'Forbidden: Super Admin access required' });
+    }
     try {
         const page = Math.max(1, parseInt(String(req.query.page ?? '1'), 10) || 1);
         const pageSizeRaw = parseInt(String(req.query.pageSize ?? '25'), 10) || 25;
