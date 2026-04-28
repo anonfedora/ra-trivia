@@ -38,6 +38,9 @@ export default function LandingPage() {
                         <Link href="/register" className="bg-primary hover:bg-primary/90 text-white px-10 py-5 rounded-[2rem] font-bold shadow-xl shadow-primary/20 transform transition-all hover:scale-105 active:scale-95 text-lg">
                             Get Started
                         </Link>
+                        <Link href="/public-quizzes" className="bg-emerald-500 hover:bg-emerald-600 text-white px-10 py-5 rounded-[2rem] font-bold shadow-xl shadow-emerald-500/20 transform transition-all hover:scale-105 active:scale-95 text-lg">
+                            Try Demo Quiz
+                        </Link>
                         <Link href="/about" className="bg-white dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600 px-10 py-5 rounded-[2rem] font-bold text-slate-600 dark:text-slate-400 transition-all flex items-center justify-center text-lg gap-2 shadow-sm">
                             Learn More <ArrowRight size={20} />
                         </Link>
@@ -135,6 +138,7 @@ export default function LandingPage() {
                 </p>
                 <div className="flex gap-8">
                     <Link href="/about" className="text-slate-400 hover:text-primary transition-colors text-sm font-bold uppercase tracking-wider">About</Link>
+                    <Link href="/public-quizzes" className="text-slate-400 hover:text-primary transition-colors text-sm font-bold uppercase tracking-wider">Try Demo</Link>
                     <Link href="/login" className="text-slate-400 hover:text-primary transition-colors text-sm font-bold uppercase tracking-wider">Support</Link>
                     <Link href="/register" className="text-slate-400 hover:text-primary transition-colors text-sm font-bold uppercase tracking-wider">Join</Link>
                 </div>

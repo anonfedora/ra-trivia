@@ -87,6 +87,8 @@ pnpm --filter web dev
 
 ### Candidates
 - **About Page**: Dedicated informational page for new users to learn about RA Trivia's features and mission.
+- **Public Quiz Demo**: Try sample quizzes without registration at `/public-quizzes` - Multiple Choice and Fill-in-the-Gap formats available.
+- **QR Code Attendance**: Secure attendance verification system for exams with QR code scanning, attendance links, and manual code entry.
 - **Multiple Question Formats**:
   - **Multiple Choice (MCQ)**: Standard 4-option selection.
   - **Fill in the Gap (FITG)**: Interactive Drag & Drop interface (Web) or Tap-to-Select (Mobile) to fill blanks (`___`) in question text from a shuffled answer pool.
@@ -103,6 +105,11 @@ pnpm --filter web dev
 
 ### Admins
 - Create, edit, activate/deactivate, and delete quizzes
+- **QR Code Attendance Management**:
+  - **QR Generation**: Create QR codes with customizable expiration times (2h, 4h, 8h) for exam attendance.
+  - **Attendance Tracking**: Real-time status display showing enabled/disabled state and expiration time.
+  - **Multiple Access Methods**: Candidates can scan QR codes, click attendance links, or enter attendance codes manually.
+  - **Integration**: Seamlessly integrated into quiz admin preview page with one-click generation and management.
 - **Question Management**:
   - Import questions from Excel by user type and format (MCQ/FITG).
   - **Template Downloads**: Specialized Excel templates for each format to ensure valid imports.
@@ -208,14 +215,29 @@ GET   /api/support                         # History + relevant notifications
 GET   /api/support/unread-count            # Get unread message count
 PATCH /api/support/read                    # Mark admin messages as read
 POST  /api/support                         # Submit new message
+
+### Attendance & QR Code
 ```
+POST  /api/attendance/qr/generate         # Generate QR code for quiz attendance
+GET   /api/attendance/qr/status/:quizId   # Get QR attendance status
+POST  /api/attendance/qr/disable          # Disable QR attendance
+POST  /api/attendance/verify              # Verify attendance (candidates)
+GET   /api/attendance/public/:code        # Get public attendance info
+
+### Public Quiz Demo
+```
+GET   /api/public-quiz                    # List available public quizzes
+GET   /api/public-quiz/:id                # Get quiz details
+POST  /api/public-quiz/start              # Start public quiz attempt
+POST  /api/public-quiz/submit             # Submit public quiz answers
+GET   /api/public-quiz/results/:sessionId # Get quiz results
+GET   /api/public-quiz/leaderboard/:id    # Get quiz leaderboard
 
 ### System & Maintenance
 ```
 GET   /api/health/detailed                 # Detailed system health status
 POST  /api/quiz/maintenance/toggle         # Toggle global maintenance mode
-GET   /api/quiz/maintenance/status         # Get maintenance status
-```
+GET  /api/quiz/maintenance/status         # Get maintenance status
 
 ### Notifications
 ```
@@ -252,7 +274,31 @@ pnpm --filter server test -- --run
 
 ## Version History
 
-### v1.9.2 (Current)
+### v1.10.0 (Current)
+- **QR Code Attendance System**:
+    - **Secure Attendance Verification**: Complete QR code-based attendance system for exams with multiple verification methods.
+    - **Admin QR Management**: Generate QR codes with customizable expiration (2h, 4h, 8h) directly from quiz admin preview page.
+    - **Multiple Access Points**: Candidates can scan QR codes, click attendance links, or manually enter attendance codes.
+    - **Real-time Status Tracking**: Live display of QR attendance status, expiration times, and participant counts.
+    - **Seamless Integration**: QR attendance controls embedded in existing quiz admin interface with one-click generation.
+- **Public Quiz Demo Platform**:
+    - **Demo Quiz Access**: Try sample quizzes without registration at `/public-quizzes` - perfect for platform demonstrations.
+    - **Multiple Question Formats**: Support for both Multiple Choice and Fill-in-the-Gap question types in demo mode.
+    - **Interactive Quiz Player**: Full quiz-taking experience with progress tracking, timer, and immediate results.
+    - **Category Filtering**: Browse quizzes by format (MCQ, Fill-in-the-Gap) with search functionality.
+    - **Leaderboard System**: View top scores and compete for best times on public demo quizzes.
+- **Enhanced Frontend Architecture**:
+    - **UI Component Library**: Complete set of reusable components (Button, Card, Input, Label, Badge, Alert, RadioGroup, Progress).
+    - **TypeScript Integration**: Full type safety across all new components with proper interfaces and error handling.
+    - **Responsive Design**: Mobile-optimized layouts for all new features with consistent dark mode support.
+    - **API Service Abstraction**: Clean separation between frontend components and backend API calls.
+- **Navigation & UX Improvements**:
+    - **Demo Access Points**: "Try Demo Quiz" buttons added to landing page and footer for easy public quiz access.
+    - **Admin Workflow**: QR attendance management seamlessly integrated into existing quiz admin workflow.
+    - **Error Handling**: Comprehensive error states and user feedback with toast notifications.
+    - **Loading States**: Proper loading indicators and skeleton screens for better perceived performance.
+
+### v1.9.2
 - **Quiz Preview PDF Export**:
     - **Professional PDF Generation**: Export complete quiz with questions and answers as professionally formatted PDF from admin preview page.
     - **Clean Layout**: Optimized for printing with proper headers, question numbering, and answer highlighting.
