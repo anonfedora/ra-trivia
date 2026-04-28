@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { ArrowLeft, BookOpen, Clock, ListChecks, Copy, Check, Download } from 'lucide-react';
 import { ThemeToggle } from '../../../../../components/ThemeToggle';
 import NotificationBell from '../../../../../components/NotificationBell';
+import { QRCodeDisplay } from '../../../../../components/attendance/QRCodeDisplay';
 import { apiFetch } from '../../../../../lib/api';
 import { getAccessToken, getUser } from '../../../../../lib/auth';
 import { useToast } from '../../../../../contexts/ToastContext';
@@ -252,6 +253,20 @@ export default function AdminQuizPreviewPage() {
                                 </div>
                             )}
                         </div>
+                    </div>
+                </section>
+
+                {/* QR Attendance Section */}
+                <section className="bg-white dark:bg-slate-800 rounded-[2.5rem] shadow-xl border border-slate-100 dark:border-slate-700 overflow-hidden">
+                    <div className="p-8 border-b border-slate-50 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/50">
+                        <h3 className="text-xl font-bold text-slate-800 dark:text-slate-100">QR Code Attendance</h3>
+                        <p className="text-slate-400 dark:text-slate-500 text-sm mt-1">Generate QR codes for candidates to verify their attendance before starting the exam.</p>
+                    </div>
+                    <div className="p-8">
+                        <QRCodeDisplay 
+                            quizId={quiz.id} 
+                            quizTitle={quiz.title}
+                        />
                     </div>
                 </section>
 

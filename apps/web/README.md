@@ -92,12 +92,15 @@ pnpm --filter web lint
 ### Public
 | Route | Description |
 |---|---|
-| `/` | Landing page |
+| `/` | Landing page with demo quiz access |
 | `/login` | Login with forgot password link |
 | `/register` | Candidate registration |
 | `/verify-otp` | 6-digit OTP verification (auto-focuses first input) |
 | `/forgot-password` | Request password reset email |
 | `/reset-password` | Set new password via token from email |
+| `/public-quizzes` | Try demo quizzes without registration |
+| `/attendance` | General attendance verification page |
+| `/attendance/[code]` | Attendance verification for specific code |
 
 ### Candidate (requires auth, role = CANDIDATE)
 | Route | Description |
@@ -117,7 +120,7 @@ pnpm --filter web lint
 | `/admin/results` | All candidate results, search, release, export, **Bulk Import** |
 | `/admin/analytics` | Performance charts, **Pass/Fail Breakdown**, Score extremes |
 | `/admin/notifications` | Notifications with Exams / Candidates / Admins filter tabs |
-| `/admin/quizzes/:id/preview` | Preview quiz questions with **PDF export** functionality |
+| `/admin/quizzes/:id/preview` | Preview quiz questions with **PDF export** and **QR Attendance** functionality |
 
 ## Admin Features
 
@@ -131,6 +134,21 @@ Admins can now register multiple candidates at once via Excel/CSV.
 - **Professional PDF Generation**: Export complete quiz with questions and answers as professionally formatted PDF from admin preview page.
 - **Clean Layout**: Optimized for printing with proper headers, question numbering, and answer highlighting.
 - **One-Click Export**: Simple download button in admin quiz preview header with loading states.
+
+### QR Code Attendance Management
+- **Secure Attendance System**: Complete QR code-based attendance verification for exams with multiple access methods.
+- **Admin QR Generation**: Generate QR codes with customizable expiration times (2h, 4h, 8h) directly from quiz preview page.
+- **Real-time Status Display**: Live tracking of QR attendance status, expiration times, and participant verification counts.
+- **Multiple Verification Methods**: Candidates can scan QR codes, click attendance links, or manually enter attendance codes.
+- **One-Click Management**: Enable/disable QR attendance with instant status updates and copy-to-clipboard functionality.
+
+### Public Quiz Demo Platform
+- **No Registration Required**: Try sample quizzes instantly at `/public-quizzes` - perfect for platform demonstrations.
+- **Multiple Question Formats**: Support for both Multiple Choice and Fill-in-the-Gap question types in demo mode.
+- **Interactive Quiz Experience**: Full quiz-taking interface with progress tracking, timer, and immediate results.
+- **Category Filtering**: Browse quizzes by format (MCQ, Fill-in-the-Gap) with search functionality.
+- **Leaderboard System**: View top scores and compete for best times on public demo quizzes.
+- **Mobile Responsive**: Optimized experience across all devices with consistent dark mode support.
 
 ### Enhanced Analytics
 - **Pass/Fail Breakdown**: Visual distribution based on a 50% score threshold.

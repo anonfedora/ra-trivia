@@ -151,6 +151,28 @@ router.post('/start', authenticate, validateUserTypeAccess, async (req: AuthRequ
             }
         }
 
+        // Check QR attendance requirement for candidates
+        if (quiz.enableQRAttendance && userRole === 'CANDIDATE') {
+            // Check if user has already verified attendance for this quiz
+            const attendanceSession = await prisma.quizSession.findFirst({
+                where: {
+                    userId,
+                    quizId,
+                    attendanceVerifiedAt: { not: null }
+                }
+            });
+
+            if (!attendanceSession) {
+                return res.status(400).json({
+                    message: 'This exam requires QR code or link attendance verification. Please scan the QR code or use the attendance link provided by the admin.',
+                    requiresQRAttendance: true,
+                    qrAttendanceRequired: true
+                });
+            }
+
+            console.log(`[QUIZ_START] User ${userId} has verified attendance for quiz ${quizId} at ${attendanceSession.attendanceVerifiedAt}`);
+        }
+
         const completedSessions = await prisma.quizSession.count({
             where: {
                 userId,

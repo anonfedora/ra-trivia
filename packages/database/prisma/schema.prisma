@@ -79,6 +79,10 @@ model Quiz {
   startDate          DateTime?
   endDate            DateTime?
   resultsDisplayMode ResultsDisplayMode @default(DETAILED)
+  enableQRAttendance Boolean            @default(false) // Enable QR code attendance
+  qrCode             String?            // QR code for attendance
+  qrCodeExpiresAt    DateTime?          // QR code expiration time
+  qrAttendanceCode   String?            // Unique attendance code for QR/link
   createdById        String?
   createdAt          DateTime           @default(now())
   updatedAt          DateTime           @updatedAt
@@ -103,6 +107,8 @@ model QuizSession {
   resultReleasesAt DateTime?
   emailSent        Boolean   @default(false)
   manualStatus     String?   // Admin override: "Cleared", "Not Cleared", or null for auto
+  attendanceVerifiedAt DateTime? // When QR attendance was verified
+  attendanceMethod String?   // "QR_CODE", "LINK_CODE", or null for regular login
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
   quiz             Quiz      @relation(fields: [quizId], references: [id])
@@ -113,6 +119,7 @@ model QuizSession {
   @@index([endTime])
   @@index([score])
   @@index([startTime])
+  @@index([userId, quizId]) // Index for finding attendance sessions
 }
 
 model SupportMessage {
@@ -215,4 +222,73 @@ model BlacklistedToken {
   createdAt DateTime @default(now())
   
   @@index([token])
+}
+
+// Public Quiz System - separate from main exams
+model PublicQuiz {
+  id          String   @id @default(uuid())
+  title       String
+  description String?
+  category    String   // "MCQ" or "FILL_IN_THE_GAP"
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  questions   PublicQuestion[]
+  attempts    PublicAttempt[]
+
+  @@index([category])
+  @@index([isActive])
+}
+
+model PublicQuestion {
+  id            String           @id @default(uuid())
+  text          String
+  optionA       String?
+  optionB       String?
+  optionC       String?
+  optionD       String?
+  correctOption String?
+  correctAnswer String?          // For fill-in-the-gap questions
+  format        QuestionFormat   @default(MULTIPLE_CHOICE)
+  publicQuizId  String
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+  publicQuiz    PublicQuiz       @relation(fields: [publicQuizId], references: [id])
+  attempts      PublicQuestionAttempt[]
+
+  @@index([publicQuizId])
+}
+
+model PublicAttempt {
+  id          String    @id @default(uuid())
+  sessionId   String    @unique // Unique session identifier
+  playerName  String?   // Optional player name
+  startTime   DateTime  @default(now())
+  endTime     DateTime?
+  score       Float?
+  answers     Json?     // Store player answers
+  publicQuizId String
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  publicQuiz  PublicQuiz @relation(fields: [publicQuizId], references: [id])
+  questionAttempts PublicQuestionAttempt[]
+
+  @@index([publicQuizId])
+  @@index([sessionId])
+}
+
+model PublicQuestionAttempt {
+  id               String   @id @default(uuid())
+  publicAttemptId  String
+  publicQuestionId String
+  selectedOption   String?  // For MCQ
+  textAnswer       String?  // For fill-in-the-gap
+  isCorrect        Boolean?
+  createdAt        DateTime @default(now())
+  
+  publicAttempt  PublicAttempt  @relation(fields: [publicAttemptId], references: [id])
+  publicQuestion PublicQuestion @relation(fields: [publicQuestionId], references: [id])
+
+  @@index([publicAttemptId])
+  @@index([publicQuestionId])
 }

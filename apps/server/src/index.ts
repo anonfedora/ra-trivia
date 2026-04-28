@@ -19,6 +19,8 @@ import notificationRoutes from './routes/notifications';
 import supportRoutes from './routes/support';
 import healthRoutes from './routes/health';
 import passwordRequirementsRoutes from './routes/password-requirements';
+import attendanceRoutes from './routes/attendance';
+import publicQuizRoutes from './routes/publicQuiz';
 import { initScheduler } from './services/scheduler';
 import { initSocketIO } from './services/socketService';
 import swaggerUi from 'swagger-ui-express';
@@ -134,6 +136,8 @@ app.use('/api/notifications', notificationRoutes);
 app.use('/api/support', supportRoutes);
 app.use('/api/health', healthRoutes);
 app.use('/api/password-requirements', passwordRequirementsRoutes);
+app.use('/api/attendance', attendanceRoutes);
+app.use('/api/public-quiz', publicQuizRoutes);
 
 app.get('/health', (req, res) => {
     res.json({ status: 'ok', timestamp: new Date().toISOString() });
