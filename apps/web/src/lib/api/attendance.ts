@@ -47,6 +47,67 @@ export interface PublicAttendanceInfo {
   valid: boolean;
 }
 
+export interface CandidateQRResponse {
+  attendanceCode: string;
+  attendanceLink: string;
+  expiresAt: string;
+  qrData: string;
+}
+
+export interface AdminScanRequest {
+  attendanceCode: string;
+  quizId: string;
+}
+
+export interface AdminScanResponse {
+  message: string;
+  attendance: {
+    id: string;
+    candidate: {
+      id: string;
+      email: string;
+      firstName: string;
+      lastName: string;
+    };
+    checkedInAt: string;
+    method: string;
+  };
+}
+
+export interface AttendanceCandidate {
+  id: string;
+  candidate: {
+    id: string;
+    email: string;
+    firstName: string;
+    lastName: string;
+  };
+  checkedInAt: string;
+  checkedInBy?: {
+    firstName: string;
+    lastName: string;
+  };
+  method: string;
+  examStatus: {
+    sessionId: string;
+    startedAt: string;
+    submittedAt?: string;
+    status: string;
+  } | null;
+}
+
+export interface AttendanceDashboardResponse {
+  quiz: {
+    id: string;
+    title: string;
+    totalCandidates: number;
+    checkedInCount: number;
+    startedExamCount: number;
+    submittedExamCount: number;
+  };
+  candidates: AttendanceCandidate[];
+}
+
 class AttendanceAPI {
   private getAuthHeaders() {
     const token = getAccessToken();
@@ -120,6 +181,47 @@ class AttendanceAPI {
     if (!response.ok) {
       const error = await response.json();
       throw new Error(error.message || 'Invalid or expired attendance code');
+    }
+
+    return response.json();
+  }
+
+  async generateCandidateQR(): Promise<CandidateQRResponse> {
+    const response = await fetch(`${API_BASE}/attendance/qr/candidate`, {
+      headers: this.getAuthHeaders(),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.message || 'Failed to generate candidate QR code');
+    }
+
+    return response.json();
+  }
+
+  async scanCandidateQR(data: AdminScanRequest): Promise<AdminScanResponse> {
+    const response = await fetch(`${API_BASE}/attendance/qr/scan`, {
+      method: 'POST',
+      headers: this.getAuthHeaders(),
+      body: JSON.stringify(data),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.message || 'Failed to scan candidate QR code');
+    }
+
+    return response.json();
+  }
+
+  async getAttendanceDashboard(quizId: string): Promise<AttendanceDashboardResponse> {
+    const response = await fetch(`${API_BASE}/attendance/quiz/${quizId}/candidates`, {
+      headers: this.getAuthHeaders(),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.message || 'Failed to get attendance records');
     }
 
     return response.json();

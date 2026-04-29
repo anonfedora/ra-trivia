@@ -35,6 +35,9 @@ model User {
   auditEntries AuditLog[]
   uploadedBy User?         @relation("CandidateUploader", fields: [uploadedById], references: [id])
   uploadedCandidates User[] @relation("CandidateUploader")
+  candidateQrs CandidateQR[]
+  attendanceRecords AttendanceRecord[]
+  adminCheckIns AttendanceRecord[] @relation("AdminCheckIns")
 
   @@index([uploadedById])
   @@index([role])
@@ -90,6 +93,7 @@ model Quiz {
   sessions           QuizSession[]
   createdBy          User?              @relation("QuizCreator", fields: [createdById], references: [id])
   supportMessages    SupportMessage[]
+  attendanceRecords AttendanceRecord[]
 
   @@index([createdById])
   @@index([isActive])
@@ -291,4 +295,42 @@ model PublicQuestionAttempt {
 
   @@index([publicAttemptId])
   @@index([publicQuestionId])
+}
+
+model CandidateQR {
+  id              String   @id @default(uuid())
+  userId          String
+  attendanceCode  String   @unique
+  expiresAt       DateTime
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  user            User     @relation(fields: [userId], references: [id])
+  attendanceRecords AttendanceRecord[]
+
+  @@index([userId])
+  @@index([attendanceCode])
+  @@index([expiresAt])
+}
+
+model AttendanceRecord {
+  id            String   @id @default(uuid())
+  userId        String
+  quizId        String
+  checkedInAt   DateTime @default(now())
+  checkedInBy   String   // Admin who checked in the candidate
+  method        String   @default("QR_SCAN") // QR_SCAN, MANUAL, etc.
+  candidateQRId String?  // Link to the QR code that was used
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  user          User     @relation(fields: [userId], references: [id])
+  checkedInByAdmin User @relation("AdminCheckIns", fields: [checkedInBy], references: [id])
+  candidateQR   CandidateQR? @relation(fields: [candidateQRId], references: [id])
+  quiz          Quiz     @relation(fields: [quizId], references: [id])
+
+  @@index([userId])
+  @@index([quizId])
+  @@index([checkedInBy])
+  @@index([checkedInAt])
+  @@unique([userId, quizId]) // One attendance record per user per quiz
 }

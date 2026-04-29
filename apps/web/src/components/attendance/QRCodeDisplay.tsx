@@ -5,9 +5,10 @@ import { QRCodeSVG } from 'qrcode.react';
 import { Button } from '../ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Badge } from '../ui/badge';
-import { Copy, RefreshCw, Clock, Users } from 'lucide-react';
+import { Copy, RefreshCw, Clock, Users, ArrowRight } from 'lucide-react';
 import { attendanceAPI, QRGenerateResponse, QRStatusResponse } from '@/lib/api/attendance';
 import { useToast } from '@/contexts/ToastContext';
+import Link from 'next/link';
 
 interface QRCodeDisplayProps {
   quizId: string;
@@ -192,41 +193,63 @@ export function QRCodeDisplay({ quizId, quizTitle, onStatusChange }: QRCodeDispl
       {/* Action Buttons */}
       <Card>
         <CardContent className="pt-6">
-          <div className="flex flex-wrap gap-2">
-            <Button 
-              onClick={() => generateQR(2)} 
-              disabled={loading}
-              variant="default"
-            >
-              <RefreshCw className="h-4 w-4 mr-2" />
-              Generate QR (2h)
-            </Button>
+          <div className="space-y-4">
+            {/* New Attendance Management */}
+            <div className="p-3 bg-blue-50 rounded-lg">
+              <p className="text-sm text-blue-800 mb-2">
+                <strong>Updated Process:</strong> Admins now scan candidate QR codes instead of candidates scanning admin QR codes.
+              </p>
+              <Link href={`/admin/quizzes/${quizId}/attendance`}>
+                <Button variant="outline" size="sm" className="bg-white">
+                  <Users className="h-4 w-4 mr-2" />
+                  Manage Attendance
+                  <ArrowRight className="h-4 w-4 ml-2" />
+                </Button>
+              </Link>
+            </div>
             
-            <Button 
-              onClick={() => generateQR(4)} 
-              disabled={loading}
-              variant="outline"
-            >
-              Generate QR (4h)
-            </Button>
-            
-            <Button 
-              onClick={() => generateQR(8)} 
-              disabled={loading}
-              variant="outline"
-            >
-              Generate QR (8h)
-            </Button>
-            
-            {status?.enableQRAttendance && (
-              <Button 
-                onClick={disableQR} 
-                disabled={loading}
-                variant="destructive"
-              >
-                Disable QR
-              </Button>
-            )}
+            {/* Legacy QR Generation */}
+            <div className="space-y-2">
+              <p className="text-sm text-muted-foreground">
+                <strong>Legacy QR Generation:</strong> (No longer recommended - use Manage Attendance above)
+              </p>
+              <div className="flex flex-wrap gap-2">
+                <Button 
+                  onClick={() => generateQR(2)} 
+                  disabled={loading}
+                  variant="default"
+                >
+                  <RefreshCw className="h-4 w-4 mr-2" />
+                  Generate QR (2h)
+                </Button>
+                
+                <Button 
+                  onClick={() => generateQR(4)} 
+                  disabled={loading}
+                  variant="outline"
+                >
+                  Generate QR (4h)
+                </Button>
+                
+                <Button 
+                  onClick={() => generateQR(8)} 
+                  disabled={loading}
+                  variant="outline"
+                >
+                  Generate QR (8h)
+                </Button>
+                
+                {status?.enableQRAttendance && (
+                  <Button 
+                    onClick={disableQR} 
+                    disabled={loading}
+                    variant="destructive"
+                  >
+                    Disable QR
+                  </Button>
+                )}
+              </div>
+            </div>
           </div>
         </CardContent>
       </Card>

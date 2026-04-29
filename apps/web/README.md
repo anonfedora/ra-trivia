@@ -99,6 +99,7 @@ pnpm --filter web lint
 | `/forgot-password` | Request password reset email |
 | `/reset-password` | Set new password via token from email |
 | `/public-quizzes` | Try demo quizzes without registration |
+| `/attendance/my-qr` | Generate personal QR code for attendance check-in |
 | `/attendance` | General attendance verification page |
 | `/attendance/[code]` | Attendance verification for specific code |
 
@@ -121,6 +122,7 @@ pnpm --filter web lint
 | `/admin/analytics` | Performance charts, **Pass/Fail Breakdown**, Score extremes |
 | `/admin/notifications` | Notifications with Exams / Candidates / Admins filter tabs |
 | `/admin/quizzes/:id/preview` | Preview quiz questions with **PDF export** and **QR Attendance** functionality |
+| `/admin/quizzes/:id/attendance` | **Attendance Management** - QR scanner and dashboard for candidate check-ins |
 
 ## Admin Features
 
@@ -136,11 +138,13 @@ Admins can now register multiple candidates at once via Excel/CSV.
 - **One-Click Export**: Simple download button in admin quiz preview header with loading states.
 
 ### QR Code Attendance Management
-- **Secure Attendance System**: Complete QR code-based attendance verification for exams with multiple access methods.
-- **Admin QR Generation**: Generate QR codes with customizable expiration times (2h, 4h, 8h) directly from quiz preview page.
-- **Real-time Status Display**: Live tracking of QR attendance status, expiration times, and participant verification counts.
-- **Multiple Verification Methods**: Candidates can scan QR codes, click attendance links, or manually enter attendance codes.
-- **One-Click Management**: Enable/disable QR attendance with instant status updates and copy-to-clipboard functionality.
+- **Updated Workflow**: Admins now scan candidate QR codes instead of candidates scanning admin QR codes.
+- **Admin QR Scanner**: Scan candidate QR codes to mark them as present for exams with real-time feedback.
+- **Attendance Dashboard**: Comprehensive view of checked-in candidates with exam status tracking (checked in, in progress, submitted).
+- **Candidate QR Generation**: Candidates generate personal QR codes from their profile page (`/attendance/my-qr`).
+- **Real-time Monitoring**: Track when candidates signed in, started exams, and submitted their work.
+- **Check-in History**: Complete audit trail showing who checked in candidates and when.
+- **Multiple Access Methods**: Support for QR scanning, manual code entry, and attendance links.
 
 ### Public Quiz Demo Platform
 - **No Registration Required**: Try sample quizzes instantly at `/public-quizzes` - perfect for platform demonstrations.

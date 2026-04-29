@@ -88,7 +88,7 @@ pnpm --filter web dev
 ### Candidates
 - **About Page**: Dedicated informational page for new users to learn about RA Trivia's features and mission.
 - **Public Quiz Demo**: Try sample quizzes without registration at `/public-quizzes` - Multiple Choice and Fill-in-the-Gap formats available.
-- **QR Code Attendance**: Secure attendance verification system for exams with QR code scanning, attendance links, and manual code entry.
+- **QR Code Attendance**: Secure attendance verification system where admins scan candidate QR codes to mark them as present for exams.
 - **Multiple Question Formats**:
   - **Multiple Choice (MCQ)**: Standard 4-option selection.
   - **Fill in the Gap (FITG)**: Interactive Drag & Drop interface (Web) or Tap-to-Select (Mobile) to fill blanks (`___`) in question text from a shuffled answer pool.
@@ -106,10 +106,12 @@ pnpm --filter web dev
 ### Admins
 - Create, edit, activate/deactivate, and delete quizzes
 - **QR Code Attendance Management**:
-  - **QR Generation**: Create QR codes with customizable expiration times (2h, 4h, 8h) for exam attendance.
-  - **Attendance Tracking**: Real-time status display showing enabled/disabled state and expiration time.
-  - **Multiple Access Methods**: Candidates can scan QR codes, click attendance links, or enter attendance codes manually.
-  - **Integration**: Seamlessly integrated into quiz admin preview page with one-click generation and management.
+  - **Admin QR Scanning**: Scan candidate QR codes to mark them as present for exams (new workflow).
+  - **Candidate QR Generation**: Candidates generate personal QR codes from their profile page for check-in.
+  - **Attendance Dashboard**: Real-time view of checked-in candidates with exam status (checked in, in progress, submitted).
+  - **Check-in Tracking**: Monitor when candidates signed in, when they started exams, and when they submitted.
+  - **Multiple Access Methods**: Support for QR scanning, manual code entry, and attendance links.
+  - **Integration**: Dedicated attendance management page with QR scanner and dashboard views.
 - **Question Management**:
   - Import questions from Excel by user type and format (MCQ/FITG).
   - **Template Downloads**: Specialized Excel templates for each format to ensure valid imports.
@@ -218,11 +220,14 @@ POST  /api/support                         # Submit new message
 
 ### Attendance & QR Code
 ```
-POST  /api/attendance/qr/generate         # Generate QR code for quiz attendance
-GET   /api/attendance/qr/status/:quizId   # Get QR attendance status
-POST  /api/attendance/qr/disable          # Disable QR attendance
-POST  /api/attendance/verify              # Verify attendance (candidates)
-GET   /api/attendance/public/:code        # Get public attendance info
+GET   /api/attendance/qr/candidate        # Generate candidate QR code for check-in
+POST  /api/attendance/qr/scan             # Admin scans candidate QR code for check-in
+GET   /api/attendance/quiz/:quizId/candidates # Get attendance records for a quiz
+POST  /api/attendance/qr/generate         # Generate QR code for quiz attendance (legacy)
+GET   /api/attendance/qr/status/:quizId   # Get QR attendance status (legacy)
+POST  /api/attendance/qr/disable          # Disable QR attendance (legacy)
+POST  /api/attendance/verify              # Verify attendance (candidates, legacy)
+GET   /api/attendance/public/:code        # Get public attendance info (legacy)
 
 ### Public Quiz Demo
 ```

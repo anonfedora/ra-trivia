@@ -10,6 +10,300 @@ const router = Router();
 
 /**
  * @openapi
+ * /attendance/qr/candidate:
+ *   get:
+ *     tags: [Attendance]
+ *     summary: Generate candidate QR code for attendance check-in
+ *     description: Generates a unique QR code for a candidate to be scanned by admin for attendance check-in
+ *     security:
+ *       - BearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Candidate QR code generated successfully
+ *       401:
+ *         description: Unauthorized
+ */
+router.get('/qr/candidate', authenticate, async (req: AuthRequest, res: any) => {
+  try {
+    const userId = req.user!.userId;
+    
+    // Generate unique attendance code for this candidate
+    const attendanceCode = QRService.generateAttendanceCode();
+    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+    
+    // Store candidate QR code in database
+    await prisma.candidateQR.create({
+      data: {
+        userId,
+        attendanceCode,
+        expiresAt,
+        isActive: true
+      }
+    });
+    
+    const attendanceLink = `${process.env.WEB_URL}/attendance/scan/${attendanceCode}`;
+    
+    res.json({
+      attendanceCode,
+      attendanceLink,
+      expiresAt: expiresAt.toISOString(),
+      qrData: JSON.stringify({
+        type: 'candidate_attendance',
+        userId,
+        attendanceCode,
+        expiresAt: expiresAt.toISOString()
+      })
+    });
+  } catch (error) {
+    console.error('Failed to generate candidate QR code:', error);
+    res.status(500).json({ message: 'Failed to generate candidate QR code' });
+  }
+});
+
+/**
+ * @openapi
+ * /attendance/qr/scan:
+ *   post:
+ *     tags: [Attendance]
+ *     summary: Admin scans candidate QR code for attendance check-in
+ *     description: Admin scans candidate QR code to mark them as present for a specific exam
+ *     security:
+ *       - BearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [attendanceCode, quizId]
+ *             properties:
+ *               attendanceCode:
+ *                 type: string
+ *               quizId:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Candidate checked in successfully
+ *       400:
+ *         description: Invalid or expired QR code
+ *       403:
+ *         description: Forbidden - not quiz creator or superadmin
+ */
+router.post('/qr/scan', authenticate, authorizeAdmin, [
+  body('attendanceCode').notEmpty().withMessage('Attendance code is required'),
+  body('quizId').notEmpty().withMessage('Quiz ID is required')
+], handleValidationErrors, async (req: AuthRequest, res: any) => {
+  try {
+    const { attendanceCode, quizId } = req.body;
+    const adminId = req.user!.userId;
+    const adminRole = req.user!.role;
+    
+    // Verify quiz permissions
+    const quiz = await prisma.quiz.findUnique({
+      where: { id: quizId }
+    });
+    
+    if (!quiz) {
+      return res.status(404).json({ message: 'Quiz not found' });
+    }
+    
+    if (quiz.createdById !== adminId && adminRole !== 'SUPER_ADMIN') {
+      return res.status(403).json({ message: 'Only quiz creator or superadmin can check in candidates' });
+    }
+    
+    // Find candidate QR code
+    const candidateQR = await prisma.candidateQR.findFirst({
+      where: {
+        attendanceCode,
+        isActive: true,
+        expiresAt: { gt: new Date() }
+      },
+      include: {
+        user: {
+          select: {
+            id: true,
+            email: true,
+            name: true
+          }
+        }
+      }
+    });
+    
+    if (!candidateQR) {
+      return res.status(400).json({ message: 'Invalid or expired attendance code' });
+    }
+    
+    // Check if candidate already checked in for this quiz
+    const existingAttendance = await prisma.attendanceRecord.findFirst({
+      where: {
+        userId: candidateQR.userId,
+        quizId
+      }
+    });
+    
+    if (existingAttendance) {
+      return res.status(400).json({ message: 'Candidate already checked in for this quiz' });
+    }
+    
+    // Create attendance record
+    const attendanceRecord = await prisma.attendanceRecord.create({
+      data: {
+        userId: candidateQR.userId,
+        quizId,
+        checkedInAt: new Date(),
+        checkedInBy: adminId,
+        method: 'QR_SCAN'
+      }
+    });
+    
+    // Deactivate the QR code after successful check-in
+    await prisma.candidateQR.update({
+      where: { id: candidateQR.id },
+      data: { isActive: false }
+    });
+    
+    // Log the action
+    await auditService.log({
+      userId: adminId,
+      action: 'CANDIDATE_CHECKED_IN',
+      metadata: {
+        details: `Checked in candidate ${candidateQR.user.email} for quiz ${quiz.title}`
+      },
+      ipAddress: req.ip,
+      userAgent: req.get('User-Agent') || undefined
+    });
+    
+    res.json({
+      message: 'Candidate checked in successfully',
+      attendance: {
+        id: attendanceRecord.id,
+        candidate: candidateQR.user,
+        checkedInAt: attendanceRecord.checkedInAt,
+        method: attendanceRecord.method
+      }
+    });
+  } catch (error) {
+    console.error('Failed to scan candidate QR code:', error);
+    res.status(500).json({ message: 'Failed to scan candidate QR code' });
+  }
+});
+
+/**
+ * @openapi
+ * /attendance/quiz/{quizId}/candidates:
+ *   get:
+ *     tags: [Attendance]
+ *     summary: Get attendance records for a quiz
+ *     description: Returns list of candidates checked in for a specific quiz with their exam status
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: quizId
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Attendance records retrieved successfully
+ *       403:
+ *         description: Forbidden - not quiz creator or superadmin
+ *       404:
+ *         description: Quiz not found
+ */
+router.get('/quiz/:quizId/candidates', authenticate, authorizeAdmin, async (req: AuthRequest, res: any) => {
+  try {
+    const quizIdParam = req.params.quizId;
+    const quizId = Array.isArray(quizIdParam) ? quizIdParam[0] : quizIdParam;
+    const adminId = req.user!.userId;
+    const adminRole = req.user!.role;
+    
+    // Verify quiz permissions
+    const quiz = await prisma.quiz.findUnique({
+      where: { id: quizId }
+    });
+    
+    if (!quiz) {
+      return res.status(404).json({ message: 'Quiz not found' });
+    }
+    
+    if (quiz.createdById !== adminId && adminRole !== 'SUPER_ADMIN') {
+      return res.status(403).json({ message: 'Only quiz creator or superadmin can view attendance records' });
+    }
+    
+    // Get attendance records with exam status
+    const attendanceRecords = await prisma.attendanceRecord.findMany({
+      where: { quizId },
+      include: {
+        user: {
+          select: {
+            id: true,
+            email: true,
+            name: true
+          }
+        },
+        checkedInByAdmin: {
+          select: {
+            id: true,
+            name: true,
+            email: true
+          }
+        }
+      },
+      orderBy: { checkedInAt: 'asc' }
+    });
+    
+    // Get exam session status for each candidate
+    const candidatesWithStatus = await Promise.all(
+      attendanceRecords.map(async (record) => {
+        const session = await prisma.quizSession.findFirst({
+          where: {
+            userId: record.userId,
+            quizId
+          },
+          select: {
+            id: true,
+            startTime: true,
+            endTime: true
+          },
+          orderBy: { startTime: 'desc' }
+        });
+        
+        return {
+          id: record.id,
+          candidate: record.user,
+          checkedInAt: record.checkedInAt,
+          checkedInBy: record.checkedInByAdmin,
+          method: record.method,
+          examStatus: session ? {
+            sessionId: session.id,
+            startTime: session.startTime,
+            endTime: session.endTime,
+            status: session.endTime ? 'SUBMITTED' : 'IN_PROGRESS'
+          } : null
+        };
+      })
+    );
+    
+    res.json({
+      quiz: {
+        id: quiz.id,
+        title: quiz.title,
+        totalCandidates: candidatesWithStatus.length,
+        checkedInCount: candidatesWithStatus.length,
+        startedExamCount: candidatesWithStatus.filter(c => c.examStatus?.startTime).length,
+        submittedExamCount: candidatesWithStatus.filter(c => c.examStatus?.endTime).length
+      },
+      candidates: candidatesWithStatus
+    });
+  } catch (error) {
+    console.error('Failed to get attendance records:', error);
+    res.status(500).json({ message: 'Failed to get attendance records' });
+  }
+});
+
+/**
+ * @openapi
  * /attendance/qr/generate:
  *   post:
  *     tags: [Attendance]
@@ -128,12 +422,13 @@ router.post('/qr/generate', authenticate, authorizeAdmin, [
  */
 router.get('/qr/status/:quizId', authenticate, authorizeAdmin, async (req: AuthRequest, res) => {
   try {
-    const { quizId } = req.params;
+    const quizIdParam = req.params.quizId;
+    const quizId = Array.isArray(quizIdParam) ? quizIdParam[0] : quizIdParam;
     const userId = req.user!.userId;
     const userRole = req.user!.role;
 
     const quiz = await prisma.quiz.findUnique({
-      where: { id: quizId as string },
+      where: { id: quizId },
       select: {
         id: true,
         title: true,
@@ -405,7 +700,8 @@ router.post('/verify', [
  */
 router.get('/public/:attendanceCode', async (req, res) => {
   try {
-    const { attendanceCode } = req.params;
+    const attendanceCodeParam = req.params.attendanceCode;
+    const attendanceCode = Array.isArray(attendanceCodeParam) ? attendanceCodeParam[0] : attendanceCodeParam;
 
     // Find quiz with this attendance code
     const quiz = await prisma.quiz.findFirst({
