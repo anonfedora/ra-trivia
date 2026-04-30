@@ -658,8 +658,84 @@ router.post('/:id/notify', authenticate, authorize(['ADMIN', 'SUPER_ADMIN']), as
         });
 
     } catch (error) {
-        console.error('Notify candidates error:', error);
+        console.error('[NOTIFY] Notification error:', error);
         res.status(500).json({ message: 'Failed to send notifications' });
+    }
+});
+
+/**
+ * @openapi
+ * /quizzes/{quizId}/candidate-qr-toggle:
+ *   post:
+ *     tags: [Admin Quizzes]
+ *     summary: Toggle candidate QR codes for a quiz
+ *     description: Enable or disable candidate QR code generation for attendance check-in
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: quizId
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [enabled]
+ *             properties:
+ *               enabled:
+ *                 type: boolean
+ *     responses:
+ *       200:
+ *         description: Candidate QR settings updated successfully
+ *       403:
+ *         description: Forbidden - not quiz creator or superadmin
+ *       404:
+ *         description: Quiz not found
+ */
+router.post('/:quizId/candidate-qr-toggle', authenticate, authorize(['ADMIN', 'SUPER_ADMIN']), async (req: AuthRequest, res) => {
+    try {
+        const quizIdParam = req.params.quizId;
+        const quizId = Array.isArray(quizIdParam) ? quizIdParam[0] : quizIdParam;
+        const { enabled } = req.body;
+        const adminId = req.user!.userId;
+        const adminRole = req.user!.role;
+
+        // Check if admin has access to this quiz
+        const quiz = await prisma.quiz.findFirst({
+            where: {
+                id: quizId,
+                ...(adminRole === 'ADMIN' ? { createdById: adminId } : {})
+            }
+        });
+
+        if (!quiz) {
+            return res.status(404).json({ message: 'Quiz not found or access denied' });
+        }
+
+        // Update candidate QR setting
+        await prisma.quiz.update({
+            where: { id: quizId },
+            data: { enableCandidateQR: enabled }
+        });
+
+        // Log the action
+        await auditService.logFromRequest(req, 'CANDIDATE_QR_TOGGLED', quizId, {
+            enabled,
+            quizTitle: quiz.title
+        });
+
+        res.json({
+            message: `Candidate QR codes ${enabled ? 'enabled' : 'disabled'} successfully`,
+            enabled
+        });
+
+    } catch (error) {
+        console.error('[QUIZ] Candidate QR toggle error:', error);
+        res.status(500).json({ message: 'Failed to update candidate QR settings' });
     }
 });
 

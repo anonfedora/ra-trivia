@@ -5,7 +5,7 @@ import { QRCodeSVG } from 'qrcode.react';
 import { Button } from '../ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Badge } from '../ui/badge';
-import { Copy, RefreshCw, Clock, Users, ArrowRight } from 'lucide-react';
+import { Copy, RefreshCw, Clock, Users, ArrowRight, Settings } from 'lucide-react';
 import { attendanceAPI, QRGenerateResponse, QRStatusResponse } from '@/lib/api/attendance';
 import { useToast } from '@/contexts/ToastContext';
 import Link from 'next/link';
@@ -20,6 +20,7 @@ export function QRCodeDisplay({ quizId, quizTitle, onStatusChange }: QRCodeDispl
   const [qrData, setQrData] = useState<QRGenerateResponse | null>(null);
   const [status, setStatus] = useState<QRStatusResponse | null>(null);
   const [loading, setLoading] = useState(false);
+  const [candidateQREnabled, setCandidateQREnabled] = useState(false);
   const { toast } = useToast();
 
   const loadStatus = async () => {
@@ -71,6 +72,31 @@ export function QRCodeDisplay({ quizId, quizTitle, onStatusChange }: QRCodeDispl
     if (qrData?.attendanceCode) {
       navigator.clipboard.writeText(qrData.attendanceCode);
       toast('Attendance code copied to clipboard', 'success');
+    }
+  };
+
+  const toggleCandidateQR = async () => {
+    try {
+      const response = await fetch(`/api/quizzes/${quizId}/candidate-qr-toggle`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify({ enabled: !candidateQREnabled })
+      });
+
+      if (response.ok) {
+        setCandidateQREnabled(!candidateQREnabled);
+        toast(
+          !candidateQREnabled ? 'Candidate QR codes enabled' : 'Candidate QR codes disabled',
+          'success'
+        );
+      } else {
+        throw new Error('Failed to update candidate QR settings');
+      }
+    } catch (error: any) {
+      toast(error.message || 'Failed to update settings', 'error');
     }
   };
 
@@ -189,6 +215,47 @@ export function QRCodeDisplay({ quizId, quizTitle, onStatusChange }: QRCodeDispl
           </CardContent>
         </Card>
       )}
+
+      {/* Candidate QR Toggle */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Settings className="h-5 w-5" />
+            Candidate QR Code Settings
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h4 className="font-medium">Enable Candidate QR Codes</h4>
+                <p className="text-sm text-muted-foreground">
+                  Allow candidates to generate personal QR codes for attendance check-in
+                </p>
+              </div>
+              <button
+                onClick={toggleCandidateQR}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                  candidateQREnabled ? 'bg-primary' : 'bg-gray-200'
+                }`}
+              >
+                <span
+                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                    candidateQREnabled ? 'translate-x-6' : 'translate-x-1'
+                  }`}
+                />
+              </button>
+            </div>
+            {candidateQREnabled && (
+              <div className="p-3 bg-green-50 rounded-lg">
+                <p className="text-sm text-green-800">
+                  <strong>Enabled:</strong> Candidates can generate QR codes from their dashboard and from the exam start page.
+                </p>
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Action Buttons */}
       <Card>

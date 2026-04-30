@@ -83,6 +83,7 @@ model Quiz {
   endDate            DateTime?
   resultsDisplayMode ResultsDisplayMode @default(DETAILED)
   enableQRAttendance Boolean            @default(false) // Enable QR code attendance
+  enableCandidateQR  Boolean            @default(false) // Enable candidate QR codes for check-in
   qrCode             String?            // QR code for attendance
   qrCodeExpiresAt    DateTime?          // QR code expiration time
   qrAttendanceCode   String?            // Unique attendance code for QR/link

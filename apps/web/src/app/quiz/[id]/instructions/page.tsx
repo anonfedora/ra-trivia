@@ -14,6 +14,7 @@ interface Quiz {
     endDate?: string | null;
     retakeLimit?: number | null;
     completedAttempts?: number;
+    enableCandidateQR?: boolean;
     _count: {
         questions: number;
     };
@@ -269,6 +270,33 @@ export default function InstructionsPage() {
                             </ul>
                         </div>
                     </div>
+
+                    {/* QR Code Section */}
+                    {quiz?.enableCandidateQR && (
+                        <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-900/40 rounded-2xl p-5 mt-6">
+                            <h3 className="text-lg font-bold text-blue-900 dark:text-blue-100 flex items-center gap-2 mb-4">
+                                <Info size={18} className="text-blue-500" />
+                                Attendance QR Code Required
+                            </h3>
+                            <div className="space-y-4">
+                                <p className="text-blue-700 dark:text-blue-300 text-sm">
+                                    Before starting your exam, please generate and show your QR code to the administrator for attendance check-in.
+                                </p>
+                                <div className="flex justify-center">
+                                    <button
+                                        onClick={() => router.push('/attendance/my-qr')}
+                                        className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-xl font-semibold transition-colors flex items-center gap-2"
+                                    >
+                                        <Info size={16} />
+                                        Generate My QR Code
+                                    </button>
+                                </div>
+                                <p className="text-blue-600 dark:text-blue-400 text-xs text-center">
+                                    Click the button above, then show your QR code to the administrator
+                                </p>
+                            </div>
+                        </div>
+                    )}
 
                     <button
                         onClick={handleStartExam}
