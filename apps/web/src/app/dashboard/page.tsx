@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
-import { BookOpen, Clock, PlayCircle, LogOut, Calendar, Repeat, User, CalendarClock, Search } from 'lucide-react';
+import { BookOpen, Clock, PlayCircle, LogOut, Calendar, Repeat, User, CalendarClock, Search, QrCode } from 'lucide-react';
 import { ThemeToggle, SupportButton } from '../../components';
 import NotificationBell from '../../components/NotificationBell';
 import { useToast } from '../../contexts/ToastContext';
@@ -184,6 +184,13 @@ export default function DashboardPage() {
                     </div>
                     <div className="flex items-center gap-3">
                         <NotificationBell />
+                        <Link
+                            href="/attendance/my-qr"
+                            className="hidden md:flex items-center gap-2 px-6 py-3 bg-primary text-white rounded-2xl font-semibold hover:bg-primary/90 transition-all shadow-sm"
+                        >
+                            <QrCode size={18} />
+                            My QR Code
+                        </Link>
                         <Link
                             href="/profile"
                             className="hidden md:flex items-center gap-2 px-6 py-3 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-2xl font-semibold border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700 transition-all shadow-sm"

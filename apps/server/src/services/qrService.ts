@@ -13,7 +13,13 @@ export class QRService {
    * Generate a unique attendance code for QR/link access
    */
   static generateAttendanceCode(): string {
-    return crypto.randomBytes(16).toString('hex').toUpperCase();
+    // Generate 5-character code with numbers and capital letters
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    let result = '';
+    for (let i = 0; i < 5; i++) {
+      result += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return result;
   }
 
   /**
