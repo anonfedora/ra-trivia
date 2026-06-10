@@ -3,6 +3,7 @@ import { prisma } from 'database';
 import { authenticate, AuthRequest, authorizeAdmin } from '../middlewares/auth';
 import { QRService } from '../services/qrService';
 import { auditService } from '../services/auditService';
+import { GoogleSheetsService } from '../services/googleSheets';
 import { body } from 'express-validator';
 import { handleValidationErrors } from '../middlewares/errorHandler';
 
@@ -737,6 +738,141 @@ router.get('/public/:attendanceCode', async (req, res) => {
   } catch (error) {
     console.error('[ATTENDANCE] Public info error:', error);
     res.status(500).json({ message: 'Internal server error' });
+  }
+});
+
+// Manual Attendance Endpoints
+router.post('/manual', authenticate, authorizeAdmin, [
+  body('fullName').notEmpty().withMessage('Full name is required'),
+  body('church').optional(),
+  body('checkInTime').optional(),
+  body('method').optional().default('MANUAL_ENTRY'),
+  body('checkedInBy').optional(),
+  body('eventName').optional(),
+  body('notes').optional()
+], handleValidationErrors, async (req: AuthRequest, res: any) => {
+  try {
+    const { fullName, church, checkInTime, method, checkedInBy, eventName, notes } = req.body;
+    const userId = req.user?.userId;
+
+    // Fetch user from database to get their name
+    let adminName: string | undefined = checkedInBy;
+    if (!adminName && userId) {
+      const user = await prisma.user.findUnique({ where: { id: userId } });
+      adminName = user?.name;
+    }
+
+    const attendance = await prisma.manualAttendance.create({
+      data: {
+        fullName,
+        church,
+        checkInTime: checkInTime ? new Date(checkInTime) : new Date(),
+        method: method || 'MANUAL_ENTRY',
+        checkedInBy: adminName,
+        eventName,
+        notes
+      }
+    });
+
+    // Append to Google Sheets
+    await GoogleSheetsService.appendAttendance({
+      timestamp: new Date().toISOString(),
+      fullName,
+      church: church || undefined,
+      checkInTime: attendance.checkInTime.toISOString(),
+      method: attendance.method,
+      checkedInBy: attendance.checkedInBy || undefined,
+      eventName: attendance.eventName || undefined,
+      notes: attendance.notes || undefined
+    });
+
+    // Log the action
+    await auditService.logFromRequest(req, 'MANUAL_ATTENDANCE_CREATED', undefined, {
+      attendanceId: attendance.id,
+      fullName
+    });
+
+    res.json({
+      message: 'Manual attendance recorded successfully',
+      attendance
+    });
+  } catch (error) {
+    console.error('Failed to record manual attendance:', error);
+    res.status(500).json({ message: 'Failed to record manual attendance' });
+  }
+});
+
+router.get('/manual', authenticate, authorizeAdmin, async (req: AuthRequest, res: any) => {
+  try {
+    const { startDate, endDate, church, eventName } = req.query;
+    
+    const where: any = {};
+    
+    if (startDate && endDate) {
+      where.checkInTime = {
+        gte: new Date(startDate as string),
+        lte: new Date(endDate as string)
+      };
+    }
+    
+    if (church) {
+      where.church = church;
+    }
+    
+    if (eventName) {
+      where.eventName = eventName;
+    }
+
+    const attendanceRecords = await prisma.manualAttendance.findMany({
+      where,
+      orderBy: { checkInTime: 'desc' }
+    });
+
+    res.json({
+      attendanceRecords
+    });
+  } catch (error) {
+    console.error('Failed to fetch manual attendance:', error);
+    res.status(500).json({ message: 'Failed to fetch manual attendance' });
+  }
+});
+
+router.get('/manual/:id', authenticate, authorizeAdmin, async (req: AuthRequest, res: any) => {
+  try {
+    const idParam = req.params.id;
+    const id = Array.isArray(idParam) ? idParam[0] : idParam;
+    const attendance = await prisma.manualAttendance.findUnique({
+      where: { id }
+    });
+
+    if (!attendance) {
+      return res.status(404).json({ message: 'Attendance record not found' });
+    }
+
+    res.json({ attendance });
+  } catch (error) {
+    console.error('Failed to fetch manual attendance:', error);
+    res.status(500).json({ message: 'Failed to fetch manual attendance' });
+  }
+});
+
+router.delete('/manual/:id', authenticate, authorizeAdmin, async (req: AuthRequest, res: any) => {
+  try {
+    const idParam = req.params.id;
+    const id = Array.isArray(idParam) ? idParam[0] : idParam;
+    await prisma.manualAttendance.delete({
+      where: { id }
+    });
+
+    // Log the action
+    await auditService.logFromRequest(req, 'MANUAL_ATTENDANCE_DELETED', undefined, {
+      attendanceId: id
+    });
+
+    res.json({ message: 'Attendance record deleted successfully' });
+  } catch (error) {
+    console.error('Failed to delete manual attendance:', error);
+    res.status(500).json({ message: 'Failed to delete manual attendance' });
   }
 });
 

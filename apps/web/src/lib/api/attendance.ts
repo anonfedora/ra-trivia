@@ -108,6 +108,36 @@ export interface AttendanceDashboardResponse {
   candidates: AttendanceCandidate[];
 }
 
+export interface ManualAttendanceRequest {
+  fullName: string;
+  church?: string;
+  checkInTime?: string;
+  method?: string;
+  checkedInBy?: string;
+  eventName?: string;
+  notes?: string;
+}
+
+export interface ManualAttendanceResponse {
+  message: string;
+  attendance: {
+    id: string;
+    fullName: string;
+    church?: string;
+    checkInTime: string;
+    method: string;
+    checkedInBy?: string;
+    eventName?: string;
+    notes?: string;
+    createdAt: string;
+    updatedAt: string;
+  };
+}
+
+export interface ManualAttendanceListResponse {
+  attendanceRecords: ManualAttendanceResponse['attendance'][];
+}
+
 class AttendanceAPI {
   private getAuthHeaders() {
     const token = getAccessToken();
@@ -222,6 +252,60 @@ class AttendanceAPI {
     if (!response.ok) {
       const error = await response.json();
       throw new Error(error.message || 'Failed to get attendance records');
+    }
+
+    return response.json();
+  }
+
+  async createManualAttendance(data: ManualAttendanceRequest): Promise<ManualAttendanceResponse> {
+    const response = await fetch(`${API_BASE}/attendance/manual`, {
+      method: 'POST',
+      headers: this.getAuthHeaders(),
+      body: JSON.stringify(data),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.message || 'Failed to record manual attendance');
+    }
+
+    return response.json();
+  }
+
+  async getManualAttendanceRecords(params?: {
+    startDate?: string;
+    endDate?: string;
+    church?: string;
+    eventName?: string;
+  }): Promise<ManualAttendanceListResponse> {
+    const searchParams = new URLSearchParams();
+    if (params?.startDate) searchParams.set('startDate', params.startDate);
+    if (params?.endDate) searchParams.set('endDate', params.endDate);
+    if (params?.church) searchParams.set('church', params.church);
+    if (params?.eventName) searchParams.set('eventName', params.eventName);
+
+    const url = `${API_BASE}/attendance/manual${searchParams.toString() ? `?${searchParams.toString()}` : ''}`;
+    const response = await fetch(url, {
+      headers: this.getAuthHeaders(),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.message || 'Failed to fetch manual attendance');
+    }
+
+    return response.json();
+  }
+
+  async deleteManualAttendance(id: string): Promise<{ message: string }> {
+    const response = await fetch(`${API_BASE}/attendance/manual/${id}`, {
+      method: 'DELETE',
+      headers: this.getAuthHeaders(),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.message || 'Failed to delete attendance');
     }
 
     return response.json();

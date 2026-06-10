@@ -23,6 +23,7 @@ import attendanceRoutes from './routes/attendance';
 import publicQuizRoutes from './routes/publicQuiz';
 import { initScheduler } from './services/scheduler';
 import { initSocketIO } from './services/socketService';
+import { GoogleSheetsService } from './services/googleSheets';
 import swaggerUi from 'swagger-ui-express';
 import { swaggerSpec } from './config/swagger';
 
@@ -163,5 +164,8 @@ if (process.env.NODE_ENV !== 'test' && require.main === module) {
     
         // Initialize scheduled tasks
         initScheduler();
+        
+        // Initialize Google Sheets service
+        GoogleSheetsService.initialize();
     });
 }
