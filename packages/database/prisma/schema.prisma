@@ -335,3 +335,20 @@ model AttendanceRecord {
   @@index([checkedInAt])
   @@unique([userId, quizId]) // One attendance record per user per quiz
 }
+
+// Manual Attendance Entry (for events without requiring users to be registered)
+model ManualAttendance {
+  id           String   @id @default(uuid())
+  fullName     String
+  church       String?
+  checkInTime  DateTime @default(now())
+  method       String   @default("MANUAL_ENTRY") // MANUAL_ENTRY, QR_CODE, etc.
+  checkedInBy  String?  // Name/ID of volunteer/admin
+  eventName    String?  // Name of the event
+  notes        String?  // Optional notes
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([checkInTime])
+  @@index([church])
+}
