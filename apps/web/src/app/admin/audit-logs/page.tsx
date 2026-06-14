@@ -1,5 +1,7 @@
 "use client";
 
+export const dynamic = 'force-dynamic';
+
 import { useState, useEffect, useCallback, Suspense } from 'react';
 import { Search, ArrowLeft, User, Globe, Activity, Shield, Clock, Info, Smartphone, Monitor } from 'lucide-react';
 import Link from 'next/link';
@@ -56,6 +58,7 @@ function AuditLogsContent() {
         }
     }, [page, pageSize, searchTerm, actionFilter, toast]);
 
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     useEffect(() => {
         fetchLogs();
     }, [fetchLogs]);

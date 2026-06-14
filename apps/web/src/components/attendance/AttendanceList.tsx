@@ -1,45 +1,34 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { attendanceAPI } from '@/lib/api/attendance';
 import { useToast } from '@/contexts/ToastContext';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { Trash2, Download, ExternalLink, RefreshCw } from 'lucide-react';
+import { Download, ExternalLink, RefreshCw } from 'lucide-react';
+import { AttendanceRecord } from '@/lib/api/attendance';
 
 export function AttendanceList() {
-  const [attendance, setAttendance] = useState<any[]>([]);
+  const [attendance, setAttendance] = useState<AttendanceRecord[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const { toast } = useToast();
   const googleSheetId = process.env.NEXT_PUBLIC_GOOGLE_SHEET_ID;
 
-  useEffect(() => {
-    fetchAttendance();
-  }, []);
-
-  const fetchAttendance = async () => {
+  const fetchAttendance = useCallback(async () => {
     try {
-      const response = await attendanceAPI.getManualAttendanceRecords();
+      const response = await attendanceAPI.getAttendanceRecords();
       setAttendance(response.attendanceRecords);
     } catch (error) {
       toast(error instanceof Error ? error.message : 'Failed to load attendance', 'error');
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [setAttendance, toast, setIsLoading]);
 
-  const handleDelete = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this attendance record?')) return;
-    
-    try {
-      await attendanceAPI.deleteManualAttendance(id);
-      toast('Attendance record deleted successfully!', 'success');
-      fetchAttendance();
-    } catch (error) {
-      toast(error instanceof Error ? error.message : 'Failed to delete attendance', 'error');
-    }
-  };
+  useEffect(() => {
+    fetchAttendance();
+  }, [fetchAttendance]);
 
   const downloadCSV = () => {
     if (attendance.length === 0) {
@@ -47,16 +36,18 @@ export function AttendanceList() {
       return;
     }
 
-    const headers = ['Full Name', 'Church', 'Event Name', 'Notes', 'Check In Time', 'Checked In By'];
+    const headers = ['Full Name', 'Email', 'Church', 'Event Name', 'Quiz ID', 'Check In Time', 'Checked In By', 'Method'];
     const csvContent = [
       headers.join(','),
       ...attendance.map(record => [
         `"${record.fullName?.replace(/"/g, '""') || ''}"`,
+        `"${record.email?.replace(/"/g, '""') || ''}"`,
         `"${record.church?.replace(/"/g, '""') || ''}"`,
         `"${record.eventName?.replace(/"/g, '""') || ''}"`,
-        `"${record.notes?.replace(/"/g, '""') || ''}"`,
+        `"${record.quizId?.replace(/"/g, '""') || ''}"`,
         new Date(record.checkInTime).toLocaleString(),
         `"${record.checkedInBy?.replace(/"/g, '""') || ''}"`,
+        record.method
       ].join(','))
     ].join('\n');
 
@@ -91,9 +82,14 @@ export function AttendanceList() {
   return (
     <div className="max-w-7xl mx-auto p-6">
       <div className="flex flex-wrap justify-between items-center mb-6 gap-4">
-        <h2 className="text-2xl font-bold text-slate-900 dark:text-slate-100">
-          Attendance Records
-        </h2>
+        <div>
+          <h2 className="text-2xl font-bold text-slate-900 dark:text-slate-100 mb-2">
+            Attendance Records
+          </h2>
+          <p className="text-slate-500 dark:text-slate-400">
+            {attendance.length} records found
+          </p>
+        </div>
         <div className="flex flex-wrap gap-3">
           <Button onClick={fetchAttendance} className="bg-primary hover:bg-primary/90 flex items-center gap-2">
             <RefreshCw size={16} />
@@ -125,6 +121,9 @@ export function AttendanceList() {
               <thead className="bg-slate-50 dark:bg-slate-700">
                 <tr>
                   <th className="px-6 py-4 text-sm font-bold text-slate-700 dark:text-slate-300 border-b border-slate-200 dark:border-slate-600">
+                    Type
+                  </th>
+                  <th className="px-6 py-4 text-sm font-bold text-slate-700 dark:text-slate-300 border-b border-slate-200 dark:border-slate-600">
                     Full Name
                   </th>
                   <th className="px-6 py-4 text-sm font-bold text-slate-700 dark:text-slate-300 border-b border-slate-200 dark:border-slate-600">
@@ -139,44 +138,37 @@ export function AttendanceList() {
                   <th className="px-6 py-4 text-sm font-bold text-slate-700 dark:text-slate-300 border-b border-slate-200 dark:border-slate-600">
                     Checked In By
                   </th>
-                  <th className="px-6 py-4 text-sm font-bold text-slate-700 dark:text-slate-300 border-b border-slate-200 dark:border-slate-600">
-                    Notes
-                  </th>
-                  <th className="px-6 py-4 text-sm font-bold text-slate-700 dark:text-slate-300 border-b border-slate-200 dark:border-slate-600">
-                    Actions
-                  </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-200 dark:divide-slate-600">
                 {attendance.map((record) => (
                   <tr key={record.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors">
+                    <td className="px-6 py-4 text-sm">
+                      <span className={`px-2 py-1 rounded-full text-[10px] font-bold ${
+                        record.type === 'QR_SCAN' 
+                          ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400' 
+                          : 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400'
+                      }`}>
+                        {record.type}
+                      </span>
+                    </td>
                     <td className="px-6 py-4 text-sm font-medium text-slate-900 dark:text-slate-100">
                       {record.fullName}
+                      {record.email && (
+                        <div className="text-[10px] text-slate-400 font-normal">{record.email}</div>
+                      )}
                     </td>
                     <td className="px-6 py-4 text-sm text-slate-600 dark:text-slate-400">
                       {record.church || '-'}
                     </td>
                     <td className="px-6 py-4 text-sm text-slate-600 dark:text-slate-400">
-                      {record.eventName || '-'}
+                      {record.eventName || record.quizId || '-'}
                     </td>
                     <td className="px-6 py-4 text-sm text-slate-600 dark:text-slate-400">
                       {new Date(record.checkInTime).toLocaleString()}
                     </td>
                     <td className="px-6 py-4 text-sm text-slate-600 dark:text-slate-400">
                       {record.checkedInBy || '-'}
-                    </td>
-                    <td className="px-6 py-4 text-sm text-slate-600 dark:text-slate-400">
-                      {record.notes || '-'}
-                    </td>
-                    <td className="px-6 py-4">
-                      <Button
-                        variant="destructive"
-                        onClick={() => handleDelete(record.id)}
-                        className="text-sm p-2"
-                        title="Delete"
-                      >
-                        <Trash2 size={16} />
-                      </Button>
                     </td>
                   </tr>
                 ))}

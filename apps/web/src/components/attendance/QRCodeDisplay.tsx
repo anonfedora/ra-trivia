@@ -9,6 +9,7 @@ import { Copy, RefreshCw, Clock, Users, ArrowRight, Settings } from 'lucide-reac
 import { attendanceAPI, QRGenerateResponse, QRStatusResponse } from '@/lib/api/attendance';
 import { useToast } from '@/contexts/ToastContext';
 import Link from 'next/link';
+import { getAccessToken } from '@/lib/auth';
 
 interface QRCodeDisplayProps {
   quizId: string;
@@ -81,7 +82,7 @@ export function QRCodeDisplay({ quizId, quizTitle, onStatusChange }: QRCodeDispl
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+          'Authorization': `Bearer ${getAccessToken()}`
         },
         body: JSON.stringify({ enabled: !candidateQREnabled })
       });

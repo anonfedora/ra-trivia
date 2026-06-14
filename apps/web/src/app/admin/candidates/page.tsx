@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from 'react';
-import { Search, ArrowLeft, UserPlus, Megaphone } from 'lucide-react';
+import { Search, ArrowLeft, UserPlus, Megaphone, Printer } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { ThemeToggle } from '../../../components/ThemeToggle';
@@ -38,7 +38,7 @@ export default function CandidatesPage() {
             const res = await apiFetch(`admin/candidates?${params}`);
             if (res.ok) {
                 const data = await res.json();
-                setCandidates(data.items);
+                setCandidates(data.items || []);
                 setTotal(data.total);
             } else if (res.status === 403) {
                 router.replace('/admin/my-exam-takers');
@@ -74,6 +74,20 @@ export default function CandidatesPage() {
                         <p className="text-slate-500 dark:text-slate-400 mt-2 font-medium">All registered candidates across the platform.</p>
                     </div>
                     <div className="flex gap-3 items-center">
+                        <Link href="/admin/candidates/register">
+                            <button 
+                                className="flex items-center gap-2 px-6 py-3 bg-emerald-600 text-white rounded-2xl font-bold shadow-lg shadow-emerald-600/20 hover:bg-emerald-700 transition-all transform hover:-translate-y-0.5"
+                            >
+                                <UserPlus size={18} /> Register Single
+                            </button>
+                        </Link>
+                        <Link href="/admin/candidates/print-qrs">
+                            <button 
+                                className="flex items-center gap-2 px-6 py-3 bg-slate-800 text-white rounded-2xl font-bold shadow-lg shadow-slate-800/20 hover:bg-slate-900 transition-all transform hover:-translate-y-0.5"
+                            >
+                                <Printer size={18} /> Print IDs
+                            </button>
+                        </Link>
                         <button 
                             onClick={() => setIsAnnouncementModalOpen(true)}
                             className="flex items-center gap-2 px-6 py-3 bg-amber-500 text-white rounded-2xl font-bold shadow-lg shadow-amber-500/20 hover:bg-amber-600 transition-all transform hover:-translate-y-0.5"
