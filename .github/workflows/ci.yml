@@ -125,6 +125,9 @@ jobs:
       - name: Generate Prisma Client
         run: pnpm --filter database exec prisma generate
 
+      - name: Build database package
+        run: pnpm --filter database build
+
       - name: Type check server
         run: pnpm --filter server exec tsc --noEmit
 
