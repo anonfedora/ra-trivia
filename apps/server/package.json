@@ -5,7 +5,7 @@
   "main": "index.js",
   "scripts": {
     "dev": "ts-node-dev --respawn --transpile-only src/index.ts",
-    "build": "prisma generate --schema=../../packages/database/prisma/schema.prisma && tsc",
+    "build": "pnpm --filter database build && prisma generate --schema=../../packages/database/prisma/schema.prisma && tsc",
     "build:ci": "prisma generate --schema=../../packages/database/prisma/schema.prisma && tsc",
     "build:migrate": "prisma generate --schema=../../packages/database/prisma/schema.prisma && prisma migrate deploy --schema=../../packages/database/prisma/schema.prisma && tsc",
     "start": "node dist/index.js",
