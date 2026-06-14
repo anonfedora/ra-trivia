@@ -19,9 +19,10 @@ export class GoogleSheetsService {
     if (this.isInitialized) return;
 
     try {
+      console.log('[GoogleSheetsService] Initializing...');
       let credentials = process.env.GOOGLE_SERVICE_ACCOUNT_KEY;
       if (!credentials) {
-        console.warn('GOOGLE_SERVICE_ACCOUNT_KEY not set, Google Sheets integration disabled');
+        console.warn('[GoogleSheetsService] GOOGLE_SERVICE_ACCOUNT_KEY not set, Google Sheets integration disabled');
         return;
       }
 
@@ -39,6 +40,7 @@ export class GoogleSheetsService {
 
       // Try to parse as JSON
       const parsedCredentials = JSON.parse(credentials);
+      console.log('[GoogleSheetsService] Credentials parsed successfully.');
 
       const auth = new google.auth.JWT({
         email: parsedCredentials.client_email,
@@ -50,9 +52,9 @@ export class GoogleSheetsService {
 
       this.sheetsClient = google.sheets({ version: 'v4', auth });
       this.isInitialized = true;
-      console.log('Google Sheets service initialized');
+      console.log('[GoogleSheetsService] Google Sheets service initialized successfully.');
     } catch (error) {
-      console.error('Failed to initialize Google Sheets service:', error);
+      console.error('[GoogleSheetsService] Failed to initialize Google Sheets service:', error);
     }
   }
 
@@ -60,10 +62,17 @@ export class GoogleSheetsService {
    * Ensure that a sheet (tab) exists with the given name, and has the correct headers
    */
   private static async ensureSheetAndHeaders(sheetName: string): Promise<void> {
-    if (!this.sheetsClient) return;
+    if (!this.sheetsClient) {
+      console.warn(`[GoogleSheetsService] sheetsClient not available for sheet "${sheetName}", skipping ensureSheetAndHeaders.`);
+      return;
+    }
 
     const spreadsheetId = process.env.GOOGLE_SHEET_ID;
-    if (!spreadsheetId) return;
+    if (!spreadsheetId) {
+      console.warn(`[GoogleSheetsService] GOOGLE_SHEET_ID not set for sheet "${sheetName}", skipping ensureSheetAndHeaders.`);
+      return;
+    }
+    console.log(`[GoogleSheetsService] Ensuring sheet and headers for spreadsheetId: ${spreadsheetId}, sheetName: "${sheetName}"`);
 
     try {
       // First, get all sheet titles to see if our target sheet exists
@@ -77,12 +86,14 @@ export class GoogleSheetsService {
       for (const sheet of sheets) {
         if (sheet.properties?.title === sheetName) {
           targetSheetId = sheet.properties.sheetId;
+          console.log(`[GoogleSheetsService] Sheet "${sheetName}" found with ID: ${targetSheetId}`);
           break;
         }
       }
 
       // If sheet doesn't exist, create it
       if (!targetSheetId) {
+        console.log(`[GoogleSheetsService] Sheet "${sheetName}" not found, creating new sheet.`);
         const createRequest = await this.sheetsClient.spreadsheets.batchUpdate({
           spreadsheetId,
           requestBody: {
@@ -99,6 +110,7 @@ export class GoogleSheetsService {
         });
 
         targetSheetId = createRequest.data.replies?.[0]?.addSheet?.properties?.sheetId;
+        console.log(`[GoogleSheetsService] Sheet "${sheetName}" created with ID: ${targetSheetId}`);
       }
 
       // Now check if headers are present in this sheet
@@ -110,6 +122,7 @@ export class GoogleSheetsService {
 
       const headers = headerResponse.data.values;
       if (!headers || headers.length === 0) {
+        console.log(`[GoogleSheetsService] Headers not found for sheet "${sheetName}", writing headers.`);
         // Write headers
         const headerValues = [
           [
@@ -133,31 +146,36 @@ export class GoogleSheetsService {
           },
         });
 
-        console.log(`Headers created for sheet: ${sheetName}`);
+        console.log(`[GoogleSheetsService] Headers created for sheet: ${sheetName}`);
+      } else {
+        console.log(`[GoogleSheetsService] Headers already present for sheet: ${sheetName}`);
       }
     } catch (error) {
-      console.error(`Failed to ensure sheet or headers for "${sheetName}":`, error);
+      console.error(`[GoogleSheetsService] Failed to ensure sheet or headers for "${sheetName}":`, error);
     }
   }
 
   static async appendAttendance(data: AttendanceData): Promise<void> {
+    console.log('[GoogleSheetsService] Attempting to append attendance data:', data);
     if (!this.isInitialized) {
+      console.log('[GoogleSheetsService] Service not initialized, calling initialize().');
       await this.initialize();
     }
 
     if (!this.sheetsClient) {
-      console.warn('Google Sheets client not available, skipping append');
+      console.warn('[GoogleSheetsService] Google Sheets client not available after initialization, skipping append.');
       return;
     }
 
     const spreadsheetId = process.env.GOOGLE_SHEET_ID;
     if (!spreadsheetId) {
-      console.warn('GOOGLE_SHEET_ID not set, skipping append');
+      console.warn('[GoogleSheetsService] GOOGLE_SHEET_ID not set, skipping append.');
       return;
     }
 
     // Use event name as sheet name, default to "Attendance"
     const sheetName = data.eventName?.trim() || 'Attendance';
+    console.log(`[GoogleSheetsService] Appending to spreadsheetId: ${spreadsheetId}, sheetName: "${sheetName}"`);
 
     try {
       // First ensure the sheet exists and has headers
@@ -175,6 +193,7 @@ export class GoogleSheetsService {
           data.notes || '',
         ],
       ];
+      console.log('[GoogleSheetsService] Values to append:', values);
 
       await this.sheetsClient.spreadsheets.values.append({
         spreadsheetId,
@@ -186,9 +205,9 @@ export class GoogleSheetsService {
         },
       });
 
-      console.log(`Attendance data appended to sheet: ${sheetName}`);
+      console.log(`[GoogleSheetsService] Attendance data appended to sheet: ${sheetName}`);
     } catch (error) {
-      console.error(`Failed to append attendance to sheet "${sheetName}":`, error);
+      console.error(`[GoogleSheetsService] Failed to append attendance to sheet "${sheetName}":`, error);
     }
   }
 }

@@ -843,4 +843,53 @@ export class ReportGenerator {
             }
         }
     }
+
+    /**
+     * Generate Excel report for attendance
+     */
+    static async attendanceToExcel(attendanceRecords: any[]): Promise<Buffer> {
+        try {
+            // Create workbook
+            const wb = xlsx.utils.book_new();
+            
+            // Create attendance worksheet
+            const attendanceData = [
+                ['S/N', 'FULL NAME', 'CHURCH', 'CHECK-IN TIME', 'METHOD', 'EVENT NAME']
+            ];
+            
+            attendanceRecords.forEach((record: any, index: number) => {
+                attendanceData.push([
+                    index + 1,
+                    record.fullName,
+                    record.church || 'N/A',
+                    record.checkInTime ? new Date(record.checkInTime).toLocaleString() : '',
+                    record.method || 'MANUAL',
+                    record.eventName || 'N/A'
+                ]);
+            });
+            
+            const attendanceWs = xlsx.utils.aoa_to_sheet(attendanceData);
+            
+            // Set column widths
+            const colWidths = [
+                { wch: 8 },  // S/N
+                { wch: 30 }, // FULL NAME
+                { wch: 25 }, // CHURCH
+                { wch: 22 }, // CHECK-IN TIME
+                { wch: 15 }, // METHOD
+                { wch: 25 }  // EVENT NAME
+            ];
+            attendanceWs['!cols'] = colWidths;
+            
+            xlsx.utils.book_append_sheet(wb, attendanceWs, 'Attendance');
+            
+            // Generate buffer
+            const excelBuffer = xlsx.write(wb, { type: 'buffer', bookType: 'xlsx' });
+            
+            return Buffer.from(excelBuffer);
+        } catch (error) {
+            console.error('[ATTENDANCE_EXCEL] Error:', error);
+            throw new Error('Failed to generate attendance Excel');
+        }
+    }
 }

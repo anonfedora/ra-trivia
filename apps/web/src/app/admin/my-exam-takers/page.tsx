@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from 'react';
-import { Search, ArrowLeft, UserPlus } from 'lucide-react';
+import { Search, ArrowLeft, UserPlus, Printer } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { ThemeToggle } from '../../../components/ThemeToggle';
@@ -77,6 +77,20 @@ export default function MyExamTakersPage() {
                         <p className="text-slate-500 dark:text-slate-400 mt-2 font-medium">Candidates who have attempted your exams.</p>
                     </div>
                     <div className="flex gap-3 items-center">
+                        <Link href="/admin/candidates/register">
+                            <button 
+                                className="flex items-center gap-2 px-6 py-3 bg-emerald-600 text-white rounded-2xl font-bold shadow-lg shadow-emerald-600/20 hover:bg-emerald-700 transition-all transform hover:-translate-y-0.5"
+                            >
+                                <UserPlus size={18} /> Register Single
+                            </button>
+                        </Link>
+                        <Link href="/admin/candidates/print-qrs">
+                            <button 
+                                className="flex items-center gap-2 px-6 py-3 bg-slate-800 text-white rounded-2xl font-bold shadow-lg shadow-slate-800/20 hover:bg-slate-900 transition-all transform hover:-translate-y-0.5"
+                            >
+                                <Printer size={18} /> Print IDs
+                            </button>
+                        </Link>
                         <button 
                             onClick={() => setIsImportModalOpen(true)}
                             className="flex items-center gap-2 px-6 py-3 bg-primary text-white rounded-2xl font-bold shadow-lg shadow-primary/20 hover:bg-primary/90 transition-all transform hover:-translate-y-0.5"

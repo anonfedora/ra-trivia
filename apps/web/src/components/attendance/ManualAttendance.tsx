@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select } from '@/components/ui/select';
+import { ArrowLeft, QrCode, Printer } from 'lucide-react';
 
 const CHURCHES = [
   'Aniya Baptist Church',
@@ -37,7 +38,7 @@ export function ManualAttendance() {
     setIsSubmitting(true);
 
     try {
-      await attendanceAPI.createManualAttendance(formData);
+      await attendanceAPI.recordManualAttendance(formData);
       toast('Attendance recorded successfully!', 'success');
       setFormData({
         fullName: '',
@@ -53,17 +54,39 @@ export function ManualAttendance() {
   };
 
   return (
-    <div className="max-w-2xl mx-auto p-6 bg-white dark:bg-slate-800 rounded-xl shadow-lg">
-      <div className="flex justify-between items-center mb-6">
-        <h2 className="text-2xl font-bold text-slate-900 dark:text-slate-100">
-          Manual Attendance Entry
-        </h2>
-        <Link href="/attendance/list">
-          <Button className="bg-blue-600 hover:bg-blue-700 text-sm">
-            View Records
-          </Button>
-        </Link>
-      </div>
+    <div className="max-w-2xl mx-auto space-y-4">
+      <Link 
+        href="/attendance" 
+        className="flex items-center gap-2 text-primary font-bold hover:gap-3 transition-all w-fit"
+      >
+        <ArrowLeft size={18} /> Back to Scanner
+      </Link>
+      
+      <div className="p-6 bg-white dark:bg-slate-800 rounded-xl shadow-lg border border-slate-200 dark:border-slate-700">
+        <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4 mb-6">
+          <h2 className="text-2xl font-bold text-slate-900 dark:text-slate-100">
+            Manual Attendance Entry
+          </h2>
+          <div className="flex flex-wrap gap-2">
+            <Link href="/admin/candidates/register">
+              <Button variant="outline" className="text-xs flex items-center gap-1.5 h-9">
+                <QrCode size={14} />
+                Register Single
+              </Button>
+            </Link>
+            <Link href="/admin/candidates/print-qrs">
+              <Button variant="outline" className="text-xs flex items-center gap-1.5 h-9">
+                <Printer size={14} />
+                Print IDs
+              </Button>
+            </Link>
+            <Link href="/attendance/list">
+              <Button className="bg-blue-600 hover:bg-blue-700 text-xs h-9">
+                View Records
+              </Button>
+            </Link>
+          </div>
+        </div>
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
           <Label htmlFor="fullName" className="text-sm font-medium">
@@ -133,5 +156,6 @@ export function ManualAttendance() {
         </Button>
       </form>
     </div>
+  </div>
   );
 }

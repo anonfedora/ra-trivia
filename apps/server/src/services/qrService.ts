@@ -47,6 +47,31 @@ export class QRService {
   }
 
   /**
+   * Generate QR code data URL for candidate identity
+   */
+  static async generateCandidateQRCode(identityCode: string, fullName: string): Promise<string> {
+    // The data to be encoded in the QR code
+    const qrContent = JSON.stringify({
+      identityCode,
+      fullName,
+    });
+    
+    try {
+      return await QRCode.toDataURL(qrContent, {
+        width: 300,
+        margin: 2,
+        color: {
+          dark: '#000000',
+          light: '#FFFFFF'
+        }
+      });
+    } catch (error) {
+      console.error('[QR_SERVICE] Failed to generate candidate QR code:', error);
+      throw new Error('Failed to generate candidate QR code');
+    }
+  }
+
+  /**
    * Generate attendance link (URL) for sharing
    */
   static generateAttendanceLink(attendanceCode: string): string {

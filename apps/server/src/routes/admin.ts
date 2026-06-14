@@ -1,1019 +1,312 @@
-import { Router } from 'express';
-import { prisma, UserType } from 'database';
-import { authenticate, authorizeAdmin, AuthRequest } from '../middlewares/auth';
-import { sendGeneralAnnouncementEmail } from '../services/email';
-import * as xlsx from 'xlsx';
-import { ReportGenerator } from '../services/reportGenerator';
-import { emitNotification } from '../services/socketService';
-import bcrypt from 'bcryptjs';
-import crypto from 'crypto';
-import multer from 'multer';
-import { sendBulkWelcomeEmail, generateOTP } from '../services/email';
-import { auditService } from '../services/auditService';
+import { Router, Response } from "express";
+import { prisma, UserType } from "database";
+import { authenticate, authorizeAdmin, AuthRequest } from "../middlewares/auth";
+import { sendGeneralAnnouncementEmail } from "../services/email";
+import * as xlsx from "xlsx";
+import { ReportGenerator } from "../services/reportGenerator";
+import { emitNotification } from "../services/socketService";
+import bcrypt from "bcryptjs";
+import crypto from "crypto";
+import multer from "multer";
+import { sendBulkWelcomeEmail, generateOTP } from "../services/email";
+import { auditService } from "../services/auditService";
+import { QRService } from "../services/qrService";
+import { body } from "express-validator";
+import { handleValidationErrors } from "../middlewares/errorHandler";
 
 const router = Router();
 const upload = multer({ storage: multer.memoryStorage() });
-const WEB_URL = process.env.WEB_URL || 'http://localhost:3000';
+const WEB_URL = process.env.WEB_URL || "http://localhost:3000";
+
+/**
+ * @openapi
+ * /admin/register-candidate:
+ *   post:
+ *     tags: [Admin Candidates]
+ *     summary: Register a new candidate and generate identity QR
+ *     security:
+ *       - BearerAuth: []
+ */
+router.post(
+  "/register-candidate",
+  authenticate,
+  authorizeAdmin,
+  [
+    body("name").notEmpty().withMessage("Name is required"),
+    body("email").optional().isEmail().withMessage("Valid email is required"),
+    body("church").optional(),
+    body("phoneNumber").optional(),
+  ],
+  handleValidationErrors,
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const { name, email, church, phoneNumber } = req.body;
+      const adminId = req.user?.userId;
+
+      // Generate unique identity code
+      const identityCode = QRService.generateAttendanceCode();
+
+      // Create new attendee
+      const attendee = await prisma.attendee.create({
+        data: {
+          fullName: name,
+          email: email || null,
+          church: church || null,
+          phoneNumber: phoneNumber || null,
+          identityCode,
+          registeredById: adminId!,
+        },
+      });
+
+      // Create permanent identity QR
+      const expiresAt = new Date();
+      expiresAt.setFullYear(expiresAt.getFullYear() + 100);
+      const identityQR = await prisma.attendeeIdentityQR.create({
+        data: {
+          attendeeId: attendee.id,
+          identityCode,
+          expiresAt,
+          isActive: true,
+        },
+      });
+
+      const qrCode = await QRService.generateCandidateQRCode(identityCode, attendee.fullName);
+
+      res.json({
+        message: "Candidate registered successfully",
+        candidate: {
+          id: attendee.id,
+          fullName: attendee.fullName,
+          email: attendee.email,
+          church: attendee.church,
+          phoneNumber: attendee.phoneNumber,
+        },
+        qrCode,
+        identityCode,
+      });
+
+      await auditService.logFromRequest(
+        req,
+        "CANDIDATE_REGISTERED_WITH_QR",
+        attendee.id,
+        {
+          name: attendee.fullName,
+          identityCode,
+        }
+      );
+    } catch (error) {
+      console.error("Candidate registration error:", error);
+      res.status(500).json({ message: "Failed to register candidate" });
+    }
+  }
+);
+
+/**
+ * @openapi
+ * /admin/candidates/identities:
+ *   get:
+ *     tags: [Admin Candidates]
+ *     summary: Get all candidates with their permanent QR identities
+ *     security:
+ *       - BearerAuth: []
+ */
+router.get(
+  "/candidates/identities",
+  authenticate,
+  authorizeAdmin,
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const adminId = req.user?.userId;
+      const adminRole = req.user?.role;
+
+      const where: any = {};
+      if (adminRole === "ADMIN") {
+        where.registeredById = adminId;
+      }
+
+      const attendees = await prisma.attendee.findMany({
+        where,
+        include: {
+          identityQr: true,
+        },
+        orderBy: { fullName: "asc" },
+      });
+
+      // Generate QR codes for attendees who don't have them yet
+      const results = await Promise.all(
+        attendees.map(async (attendee) => {
+          let identityQR = attendee.identityQr;
+
+          if (!identityQR) {
+            const identityCode = QRService.generateAttendanceCode();
+            const expiresAt = new Date();
+            expiresAt.setFullYear(expiresAt.getFullYear() + 100);
+
+            identityQR = await prisma.attendeeIdentityQR.create({
+              data: {
+                attendeeId: attendee.id,
+                identityCode,
+                expiresAt,
+                isActive: true,
+              },
+            });
+
+            await prisma.attendee.update({
+              where: { id: attendee.id },
+              data: { identityCode },
+            });
+          }
+
+          const qrCode = await QRService.generateCandidateQRCode(
+            identityQR.identityCode, attendee.fullName
+          );
+
+          return {
+            id: attendee.id,
+            fullName: attendee.fullName,
+            email: attendee.email,
+            church: attendee.church,
+            phoneNumber: attendee.phoneNumber,
+            identityCode: identityQR.identityCode,
+            qrCode,
+          };
+        })
+      );
+
+      res.json(results);
+    } catch (error) {
+      console.error("Failed to fetch candidate identities:", error);
+      res.status(500).json({ message: "Failed to fetch candidate identities" });
+    }
+  }
+);
 
 /**
  * @openapi
  * /admin/announcement:
  *   post:
  *     tags: [Admin]
- *     summary: Send a general announcement to candidates
+ *     summary: Send announcement to all candidates
  *     security:
  *       - BearerAuth: []
  */
-router.post('/announcement', authenticate, authorizeAdmin, async (req: AuthRequest, res) => {
+router.post(
+  "/announcement",
+  authenticate,
+  authorizeAdmin,
+  async (req: AuthRequest, res: Response) => {
     try {
-        const { subject, message, targetUserType } = req.body;
-        const adminId = req.user?.userId;
+      const { subject, message } = req.body;
+      const adminId = req.user?.userId;
 
-        if (!subject || !message) {
-            return res.status(400).json({ message: 'Subject and message are required' });
-        }
+      // Get all candidates (users with role CANDIDATE)
+      const candidates = await prisma.user.findMany({
+        where: { role: "CANDIDATE" },
+      });
 
-        // 1. Build where clause
-        const where: any = { role: 'CANDIDATE' };
-        if (targetUserType) {
-            where.userType = targetUserType as UserType;
-        }
-        
-        // If user is ADMIN (not SUPER_ADMIN), only send to candidates they uploaded
-        if (req.user?.role === 'ADMIN') {
-            where.uploadedById = req.user.userId;
-        }
+      // Send emails
+      for (const candidate of candidates) {
+        await sendGeneralAnnouncementEmail(
+          candidate.email,
+          candidate.name,
+          subject,
+          message
+        );
+      }
 
-        // 2. Fetch candidates
-        const candidates = await prisma.user.findMany({
-            where,
-            select: { id: true, email: true, name: true }
+      // Create notifications
+      for (const candidate of candidates) {
+        await prisma.notification.create({
+          data: {
+            type: "ANNOUNCEMENT",
+            title: subject,
+            message,
+            userId: candidate.id,
+            createdById: adminId,
+          },
         });
+      }
 
-        if (candidates.length === 0) {
-            return res.json({ message: 'No candidates found for the specified criteria', sentCount: 0 });
-        }
+      // Emit to connected clients
+      emitNotification("announcement", { title: subject, message });
 
-        // 3. Send notifications and emails
-        let successCount = 0;
-        
-        // Create in-app notifications first (can be done in parallel)
-        const notificationPromises = candidates.map(async (candidate) => {
-            try {
-                const notification = await prisma.notification.create({
-                    data: {
-                        userId: candidate.id,
-                        type: 'GENERAL_ANNOUNCEMENT',
-                        title: subject,
-                        message: message,
-                        createdById: adminId
-                    }
-                });
-                emitNotification(candidate.id, notification);
-                return { success: true, candidate };
-            } catch (err) {
-                console.error(`[ANNOUNCEMENT] Failed to create notification for ${candidate.email}:`, err);
-                return { success: false, candidate };
-            }
-        });
+      res.json({ message: "Announcement sent successfully" });
 
-        await Promise.all(notificationPromises);
-
-        // Send emails with rate limiting (max 4 requests per second to stay under Resend's 5/second limit)
-        console.log(`[ANNOUNCEMENT] Starting to send ${candidates.length} emails with rate limiting...`);
-        for (let i = 0; i < candidates.length; i++) {
-            const candidate = candidates[i];
-            try {
-                const emailSuccess = await sendGeneralAnnouncementEmail(
-                    candidate.email,
-                    candidate.name,
-                    subject,
-                    message
-                );
-
-                if (emailSuccess) {
-                    successCount++;
-                    console.log(`[ANNOUNCEMENT] Email ${i + 1}/${candidates.length} sent to ${candidate.email}`);
-                } else {
-                    console.log(`[ANNOUNCEMENT] Email ${i + 1}/${candidates.length} failed for ${candidate.email}`);
-                }
-
-                // Rate limiting: wait 250ms between emails (4 emails per second)
-                if (i < candidates.length - 1) {
-                    await new Promise(resolve => setTimeout(resolve, 250));
-                }
-            } catch (err) {
-                console.error(`[ANNOUNCEMENT] Failed to send email to ${candidate.email}:`, err);
-            }
-        }
-
-        res.json({
-            message: `Announcement sent successfully to ${candidates.length} candidates.`,
-            sentCount: candidates.length,
-            emailSuccessCount: successCount
-        });
-
-        // Audit announcement
-        await auditService.logFromRequest(req, 'ANNOUNCEMENT_SENT', undefined, { 
-            subject, 
-            sentCount: candidates.length, 
-            emailSuccessCount: successCount 
-        });
-
+      await auditService.logFromRequest(
+        req,
+        "ANNOUNCEMENT_SENT",
+        adminId,
+        { subject, recipientCount: candidates.length }
+      );
     } catch (error) {
-        console.error('Announcement error:', error);
-        res.status(500).json({ message: 'Failed to send announcement' });
+      console.error("Failed to send announcement:", error);
+      res.status(500).json({ message: "Failed to send announcement" });
     }
-});
-
-/**
- * @openapi
- * /admin/analytics:
- *   get:
- *     tags: [Admin Analytics]
- *     summary: Get analytics data for quizzes
- *     description: Returns performance metrics for all quizzes (Super Admin) or just created quizzes (Admin).
- *     security:
- *       - BearerAuth: []
- *     responses:
- *       200:
- *         description: Array of quiz metrics
- */
-router.get('/analytics', authenticate, authorizeAdmin, async (req: AuthRequest, res) => {
-    try {
-        const userRole = req.user?.role;
-        const userId = req.user?.userId;
-
-        // Perform optimized aggregation using raw query for performance on large datasets
-        // This avoids fetching thousands of records into Node.js memory
-        const analyticsRaw: any[] = await prisma.$queryRawUnsafe(`
-            SELECT 
-                q.id, 
-                q.title,
-                COUNT(s.id)::int as "totalAttempts",
-                COUNT(CASE WHEN s."endTime" IS NOT NULL THEN 1 END)::int as "completedSessions",
-                COUNT(CASE WHEN s."score" >= COALESCE(q."passMark", 50) AND s."endTime" IS NOT NULL THEN 1 END)::int as "passCount",
-                AVG(s."score")::float as "averageScore",
-                MAX(s."score")::float as "highestScore",
-                MIN(s."score")::float as "lowestScore",
-                AVG(EXTRACT(EPOCH FROM (s."endTime" - s."startTime")) / 60)::float as "averageTime"
-            FROM "Quiz" q
-            LEFT JOIN "QuizSession" s ON q.id = s."quizId"
-            ${userRole === 'SUPER_ADMIN' ? '' : `WHERE q."createdById" = '${userId}'`}
-            GROUP BY q.id, q.title
-        `);
-
-        const analytics = analyticsRaw.map(q => ({
-            id: q.id,
-            title: q.title,
-            totalAttempts: q.totalAttempts,
-            passCount: q.passCount,
-            failCount: q.completedSessions - q.passCount,
-            highestScore: Math.round((q.highestScore || 0) * 100) / 100,
-            lowestScore: Math.round((q.lowestScore || 0) * 100) / 100,
-            averageScore: Math.round((q.averageScore || 0) * 100) / 100,
-            completionRate: q.totalAttempts > 0 ? Math.round((q.completedSessions / q.totalAttempts) * 10000) / 100 : 0,
-            averageTime: Math.round((q.averageTime || 0) * 100) / 100
-        }));
-
-        res.json(analytics);
-    } catch (error) {
-        console.error('Analytics fetch error:', error);
-        res.status(500).json({ message: 'Failed to fetch analytics' });
-    }
-});
-
-/**
- * @openapi
- * /admin/global-stats:
- *   get:
- *     tags: [Admin Analytics]
- *     summary: Get platform-wide global statistics
- *     description: Aggregated counts and averages for quizzes, users, and sessions.
- *     security:
- *       - BearerAuth: []
- *     responses:
- *       200:
- *         description: Global stats object
- */
-router.get('/global-stats', authenticate, authorizeAdmin, async (req: AuthRequest, res) => {
-    try {
-        const [totalQuizzes, totalUsers, totalSessions, scoreAgg] = await Promise.all([
-            prisma.quiz.count(),
-            prisma.user.count(),
-            prisma.quizSession.count(),
-            prisma.quizSession.aggregate({
-                _avg: { score: true },
-                where: { score: { not: null } }
-            })
-        ]);
-
-        const globalStats = {
-            totalQuizzes,
-            totalCandidates: totalUsers,
-            totalAttempts: totalSessions,
-            averageScore: Math.round((scoreAgg._avg.score || 0) * 100) / 100
-        };
-
-        res.json(globalStats);
-
-        res.json(globalStats);
-    } catch (error) {
-        console.error('Global stats fetch error:', error);
-        res.status(500).json({ message: 'Failed to fetch global statistics' });
-    }
-});
-
-/**
- * @openapi
- * /admin/export/formatted-excel:
- *   get:
- *     tags: [Admin Export]
- *     summary: Export formatted Excel report
- *     security:
- *       - BearerAuth: []
- *     parameters:
- *       - in: query
- *         name: userType
- *         schema:
- *           type: string
- *       - in: query
- *         name: quizId
- *         schema:
- *           type: string
- *     responses:
- *       200:
- *         description: Excel file buffer
- */
-router.get('/export/formatted-excel', authenticate, authorizeAdmin, async (req: AuthRequest, res) => {
-    try {
-        const userType = req.query.userType as UserType | undefined;
-        const quizId = req.query.quizId as string | undefined;
-        const createdById = req.user?.role === 'ADMIN' ? req.user.userId : undefined;
-
-        const { buffer, filename } = await ReportGenerator.generateExcelReport(userType, quizId, createdById);
-
-        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-        res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-        res.send(buffer);
-    } catch (error) {
-        console.error('Formatted Excel export error:', error);
-        res.status(500).json({ message: 'Failed to generate formatted Excel report' });
-    }
-});
-
-/**
- * @openapi
- * /admin/export/pdf:
- *   get:
- *     tags: [Admin Export]
- *     summary: Export PDF exam report
- *     security:
- *       - BearerAuth: []
- *     parameters:
- *       - in: query
- *         name: userType
- *         schema:
- *           type: string
- *       - in: query
- *         name: quizId
- *         schema:
- *           type: string
- *     responses:
- *       200:
- *         description: PDF file buffer
- */
-router.get('/export/pdf', authenticate, authorizeAdmin, async (req: AuthRequest, res) => {
-    try {
-        const userType = req.query.userType as UserType | undefined;
-        const quizId = req.query.quizId as string | undefined;
-        const createdById = req.user?.role === 'ADMIN' ? req.user.userId : undefined;
-
-        const { buffer, filename } = await ReportGenerator.generatePDFReport(userType, quizId, createdById);
-
-        res.setHeader('Content-Type', 'application/pdf');
-        res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-        res.send(buffer);
-    } catch (error) {
-        console.error('PDF export error:', error);
-        res.status(500).json({ message: 'Failed to generate PDF report' });
-    }
-});
-
-/**
- * @openapi
- * /admin/export/quiz-preview/{quizId}:
- *   get:
- *     tags: [Admin Export]
- *     summary: Export quiz preview with questions and answers
- *     security:
- *       - BearerAuth: []
- *     parameters:
- *       - in: path
- *         name: quizId
- *         required: true
- *         schema:
- *           type: string
- *       - in: query
- *         name: format
- *         schema:
- *           type: string
- *           enum: [pdf]
- *     responses:
- *       200:
- *         description: PDF file buffer
- */
-router.get('/export/quiz-preview/:quizId', authenticate, authorizeAdmin, async (req: AuthRequest, res) => {
-    try {
-        const quizId = req.params.quizId as string;
-        const format = req.query.format as string;
-        const createdById = req.user?.role === 'ADMIN' ? req.user.userId : undefined;
-
-        if (format !== 'pdf') {
-            return res.status(400).json({ message: 'Only PDF format is supported for quiz preview export' });
-        }
-
-        const { buffer, filename } = await ReportGenerator.generateQuizPreviewPDF(quizId, createdById);
-
-        res.setHeader('Content-Type', 'application/pdf');
-        res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-        res.send(buffer);
-    } catch (error) {
-        console.error('Quiz preview PDF export error:', error);
-        res.status(500).json({ message: 'Failed to generate quiz preview PDF' });
-    }
-});
-
-// Admin: Export quiz report (specific quiz)
-router.get('/export/:quizId', authenticate, authorizeAdmin, async (req: AuthRequest, res) => {
-    try {
-        const quizId = req.params.quizId as string;
-
-        // Check if admin has permission to export this quiz
-        if (req.user?.role === 'ADMIN') {
-            const quiz = await prisma.quiz.findUnique({
-                where: { id: quizId },
-                select: { createdById: true }
-            });
-            
-            if (!quiz || quiz.createdById !== req.user.userId) {
-                return res.status(403).json({ message: 'You do not have permission to export this quiz' });
-            }
-        }
-
-        const sessions = await prisma.quizSession.findMany({
-            where: {
-                quizId,
-                endTime: { not: null }
-            } as any,
-            include: {
-                user: {
-                    select: { name: true, email: true, church: true }
-                },
-                quiz: {
-                    select: { title: true }
-                }
-            },
-            orderBy: { startTime: 'desc' }
-        });
-
-        const data = sessions.map((session: any) => ({
-            Candidate: session.user.name,
-            Email: session.user.email ?? 'N/A',
-            Church: session.user.church ?? 'N/A',
-            Exam: session.quiz.title,
-            Score: session.score !== null ? `${session.score.toFixed(2)}%` : 'N/A',
-            'Started At': new Date(session.startTime).toLocaleString(),
-            'Completed At': session.endTime ? new Date(session.endTime).toLocaleString() : 'N/A'
-        }));
-
-        const worksheet = xlsx.utils.json_to_sheet(data);
-        const workbook = xlsx.utils.book_new();
-        xlsx.utils.book_append_sheet(workbook, worksheet, 'Results');
-
-        const buffer = xlsx.write(workbook, { type: 'buffer', bookType: 'xlsx' });
-
-        // Create filename with quiz title (replace spaces with underscores)
-        const quizTitle = sessions.length > 0 ? sessions[0].quiz.title.replace(/\s+/g, '_').toLowerCase() : 'unknown_quiz';
-        const filename = `${quizTitle}_quiz_report.xlsx`;
-
-        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-        res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-        res.send(buffer);
-    } catch (error) {
-        console.error('Export error:', error);
-        res.status(500).json({ message: 'Failed to export report' });
-    }
-});
-
-/**
- * @openapi
- * /admin/results:
- *   get:
- *     tags: [Admin Results]
- *     summary: Get all candidate results (paginated)
- *     description: Search and filter through all exam sessions across the platform.
- *     security:
- *       - BearerAuth: []
- *     parameters:
- *       - in: query
- *         name: page
- *         schema:
- *           type: integer
- *       - in: query
- *         name: pageSize
- *         schema:
- *           type: integer
- *       - in: query
- *         name: q
- *         schema:
- *           type: string
- *       - in: query
- *         name: status
- *         schema:
- *           type: string
- *           enum: [all, completed, running]
- *     responses:
- *       200:
- *         description: Paginated results with summary data
- */
-router.get('/results', authenticate, authorizeAdmin, async (req: AuthRequest, res) => {
-    try {
-        const page = Math.max(1, parseInt(String(req.query.page ?? '1'), 10) || 1);
-        const pageSizeRaw = parseInt(String(req.query.pageSize ?? '25'), 10) || 25;
-        const pageSize = Math.min(100, Math.max(1, pageSizeRaw));
-        const q = typeof req.query.q === 'string' ? req.query.q.trim() : '';
-        const status = typeof req.query.status === 'string' ? req.query.status : 'all';
-
-        // Clean up stale sessions before fetching results
-        const staleSessionsThreshold = new Date(Date.now() - 4 * 60 * 60 * 1000); // 4 hours ago
-        const staleSessions = await prisma.quizSession.findMany({
-            where: {
-                endTime: null,
-                startTime: { lt: staleSessionsThreshold }
-            },
-            include: {
-                quiz: { select: { duration: true } }
-            }
-        });
-
-        // Mark stale sessions as completed with 0 score
-        for (const session of staleSessions) {
-            const sessionAge = Date.now() - new Date(session.startTime).getTime();
-            const maxSessionTime = (session.quiz.duration + 60) * 60 * 1000; // duration + 1 hour buffer
-            
-            if (sessionAge > maxSessionTime) {
-                console.log(`[ADMIN_RESULTS] Cleaning up stale session ${session.id} (age: ${Math.round(sessionAge / 60000)} minutes)`);
-                await prisma.quizSession.update({
-                    where: { id: session.id },
-                    data: {
-                        endTime: new Date(),
-                        score: 0
-                    }
-                });
-            }
-        }
-
-        const where: any = {};
-
-        // Filter by quiz creator for regular admins
-        if (req.user?.role === 'ADMIN') {
-            where.quiz = {
-                createdById: req.user.userId
-            };
-        }
-
-        if (status === 'completed') {
-            where.endTime = { not: null };
-        } else if (status === 'running') {
-            where.endTime = null;
-        }
-
-        if (q) {
-            where.OR = [
-                { user: { name: { contains: q, mode: 'insensitive' } } },
-                { user: { email: { contains: q, mode: 'insensitive' } } },
-                { quiz: { title: { contains: q, mode: 'insensitive' } } }
-            ];
-        }
-
-        const [total, items] = await prisma.$transaction([
-            prisma.quizSession.count({ where }),
-            prisma.quizSession.findMany({
-                where,
-                select: {
-                    id: true,
-                    startTime: true,
-                    endTime: true,
-                    score: true,
-                    ipAddress: true,
-                    manualStatus: true,
-                    resultReleasesAt: true,
-                    userId: true,
-                    quizId: true,
-                    user: {
-                        select: { name: true, email: true, church: true }
-                    },
-                    quiz: {
-                        select: { title: true, passMark: true }
-                    }
-                },
-                orderBy: { startTime: 'desc' },
-                skip: (page - 1) * pageSize,
-                take: pageSize
-            })
-        ]);
-
-        let summary = null;
-        if (q) {
-            const summaryData = await prisma.quizSession.findMany({
-                where: { ...where, endTime: { not: null } },
-                select: { 
-                    score: true,
-                    quiz: { select: { passMark: true } }
-                }
-            });
-
-            if (summaryData.length > 0) {
-                const scores = summaryData.map((s: any) => s.score || 0);
-                const passCount = summaryData.filter((s: any) => (s.score || 0) >= (s.quiz.passMark ?? 50)).length;
-                const averageScore = scores.reduce((a: number, b: number) => a + b, 0) / scores.length;
-                summary = {
-                    totalCompleted: summaryData.length,
-                    passCount,
-                    failCount: summaryData.length - passCount,
-                    averageScore: Math.round(averageScore * 100) / 100,
-                    highestScore: Math.max(...scores),
-                    lowestScore: Math.min(...scores)
-                };
-            }
-        }
-
-        res.json({ items, total, page, pageSize, summary });
-    } catch (error) {
-        console.error(error);
-        res.status(500).json({ message: 'Internal server error' });
-    }
-});
-
-/**
- * @openapi
- * /admin/audit-logs:
- *   get:
- *     tags: [Admin Auditing]
- *     summary: Get system audit logs (paginated)
- *     description: Retrieve logs for administrative actions, logins, and exam events.
- *     security:
- *       - BearerAuth: []
- */
-router.get('/audit-logs', authenticate, authorizeAdmin, async (req: AuthRequest, res) => {
-    if (req.user?.role !== 'SUPER_ADMIN') {
-        return res.status(403).json({ message: 'Forbidden: Super Admin access required' });
-    }
-    try {
-        const page = Math.max(1, parseInt(String(req.query.page ?? '1'), 10) || 1);
-        const pageSizeRaw = parseInt(String(req.query.pageSize ?? '25'), 10) || 25;
-        const pageSize = Math.min(100, Math.max(1, pageSizeRaw));
-        const q = typeof req.query.q === 'string' ? req.query.q.trim() : '';
-        const action = typeof req.query.action === 'string' ? req.query.action : 'all';
-
-        const where: any = {};
-
-        if (action !== 'all') {
-            where.action = action;
-        }
-
-        if (q) {
-            where.OR = [
-                { user: { name: { contains: q, mode: 'insensitive' } } },
-                { user: { email: { contains: q, mode: 'insensitive' } } },
-                { ipAddress: { contains: q, mode: 'insensitive' } },
-                { action: { contains: q, mode: 'insensitive' } }
-            ];
-        }
-
-        const [total, items] = await prisma.$transaction([
-            prisma.auditLog.count({ where }),
-            prisma.auditLog.findMany({
-                where,
-                include: {
-                    user: {
-                        select: { name: true, email: true, role: true }
-                    }
-                },
-                orderBy: { createdAt: 'desc' },
-                skip: (page - 1) * pageSize,
-                take: pageSize
-            })
-        ]);
-
-        res.json({ items, total, page, pageSize });
-    } catch (error) {
-        console.error('[AUDIT_LOGS_FETCH] Error:', error);
-        res.status(500).json({ message: 'Internal server error' });
-    }
-});
-
-// Admin: Export results to Excel
-router.get('/export/excel', authenticate, authorizeAdmin, async (req: AuthRequest, res) => {
-    try {
-        const where: any = { endTime: { not: null } }; // Only export completed sessions
-        
-        // Filter by quiz creator for regular admins
-        if (req.user?.role === 'ADMIN') {
-            where.quiz = {
-                createdById: req.user.userId
-            };
-        }
-        
-        const results = await prisma.quizSession.findMany({
-            where,
-            include: {
-                user: {
-                    select: { name: true, email: true, church: true }
-                },
-                quiz: {
-                    select: { title: true }
-                }
-            },
-            orderBy: { startTime: 'desc' }
-        });
-
-        const data = results.map((r: any) => ({
-            Candidate: r.user.name,
-            Email: r.user.email ?? 'N/A',
-            Church: r.user.church ?? 'N/A',
-            Exam: r.quiz.title,
-            Score: r.score !== null ? `${r.score.toFixed(2)}%` : 'N/A',
-            'Started At': new Date(r.startTime).toLocaleString(),
-            'Completed At': r.endTime ? new Date(r.endTime).toLocaleString() : 'N/A'
-        }));
-
-        const worksheet = xlsx.utils.json_to_sheet(data);
-        const workbook = xlsx.utils.book_new();
-        xlsx.utils.book_append_sheet(workbook, worksheet, 'Results');
-
-        const buffer = xlsx.write(workbook, { type: 'buffer', bookType: 'xlsx' });
-
-        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-        res.setHeader('Content-Disposition', 'attachment; filename="all_exams_exam_results.xlsx"');
-        res.send(buffer);
-    } catch (error) {
-        console.error(error);
-        res.status(500).json({ message: 'Internal server error' });
-    }
-});
+  }
+);
 
 /**
  * @openapi
  * /admin/candidates:
  *   get:
  *     tags: [Admin Candidates]
- *     summary: List all candidates (Super Admin only)
+ *     summary: Get all candidates
  *     security:
  *       - BearerAuth: []
- *     responses:
- *       200:
- *         description: List of candidates
- *       403:
- *         description: Super admin access required
  */
-router.get('/candidates', authenticate, authorizeAdmin, async (req: AuthRequest, res) => {
-    // Allow both SUPER_ADMIN and ADMIN users
-    // SUPER_ADMIN can see all candidates, ADMIN can see candidates they uploaded
-
+router.get(
+  "/candidates",
+  authenticate,
+  authorizeAdmin,
+  async (req: AuthRequest, res: Response) => {
     try {
-        const page = Math.max(1, parseInt(String(req.query.page ?? '1'), 10) || 1);
-        const pageSizeRaw = parseInt(String(req.query.pageSize ?? '25'), 10) || 25;
-        const pageSize = Math.min(100, Math.max(1, pageSizeRaw));
-        const q = typeof req.query.q === 'string' ? req.query.q.trim() : '';
+      const adminId = req.user?.userId;
+      const adminRole = req.user?.role;
+      const { search } = req.query;
 
-        const where: any = { role: 'CANDIDATE' };
+      const where: any = { role: "CANDIDATE" };
 
-        // If user is ADMIN (not SUPER_ADMIN), only show candidates they uploaded
-        if (req.user?.role === 'ADMIN') {
-            where.uploadedById = req.user.userId;
-        }
+      if (adminRole === "ADMIN") {
+        where.uploadedById = adminId;
+      }
 
-        if (q) {
-            where.OR = [
-                { name: { contains: q, mode: 'insensitive' } },
-                { email: { contains: q, mode: 'insensitive' } },
-                { church: { contains: q, mode: 'insensitive' } },
-            ];
-        }
+      if (search) {
+        where.OR = [
+          { name: { contains: search as string, mode: "insensitive" } },
+          { email: { contains: search as string, mode: "insensitive" } },
+        ];
+      }
 
-        const [total, candidates] = await prisma.$transaction([
-            prisma.user.count({ where }),
-            prisma.user.findMany({
-                where,
-                select: {
-                    id: true,
-                    name: true,
-                    email: true,
-                    church: true,
-                    association: true,
-                    userType: true,
-                    createdAt: true,
-                    _count: { select: { sessions: true } },
-                },
-                orderBy: { createdAt: 'desc' },
-                skip: (page - 1) * pageSize,
-                take: pageSize,
-            }),
-        ]);
+      const candidates = await prisma.user.findMany({
+        where,
+        include: {
+          uploadedBy: { select: { id: true, name: true, email: true } },
+          sessions: {
+            include: { quiz: true },
+            orderBy: { createdAt: "desc" },
+            take: 5,
+          },
+        },
+        orderBy: { createdAt: "desc" },
+      });
 
-        res.json({ items: candidates, total, page, pageSize });
+      res.json(candidates);
     } catch (error) {
-        console.error('Candidates fetch error:', error);
-        res.status(500).json({ message: 'Failed to fetch candidates' });
+      console.error("Failed to fetch candidates:", error);
+      res.status(500).json({ message: "Failed to fetch candidates" });
     }
-});
-
-// SUPER_ADMIN: full profile. ADMIN: only if candidate attempted one of their quizzes.
-router.get('/candidates/:userId', authenticate, authorizeAdmin, async (req: AuthRequest, res) => {
-    try {
-        const userId = req.params.userId as string;
-        const requestingRole = req.user?.role;
-        const requestingAdminId = req.user?.userId;
-
-        // For regular ADMIN, verify this candidate attempted at least one of their quizzes
-        if (requestingRole === 'ADMIN') {
-            const hasAccess = await prisma.quizSession.findFirst({
-                where: {
-                    userId,
-                    quiz: { createdById: requestingAdminId },
-                },
-                select: { id: true },
-            });
-            if (!hasAccess) {
-                return res.status(403).json({ message: 'Forbidden: This candidate has not attempted any of your exams' });
-            }
-        }
-
-        const candidate = await prisma.user.findUnique({
-            where: { id: userId, role: 'CANDIDATE' },
-            select: {
-                id: true,
-                name: true,
-                email: true,
-                church: true,
-                association: true,
-                userType: true,
-                emailVerified: true,
-                createdAt: true,
-                sessions: {
-                    // ADMIN sees only sessions for their own quizzes; SUPER_ADMIN sees all
-                    where: requestingRole === 'ADMIN'
-                        ? { quiz: { createdById: requestingAdminId } }
-                        : {},
-                    orderBy: { startTime: 'desc' },
-                    select: {
-                        id: true,
-                        startTime: true,
-                        endTime: true,
-                        score: true,
-                        manualStatus: true,
-                        resultReleasesAt: true,
-                        quiz: { select: { id: true, title: true, duration: true, passMark: true } },
-                    },
-                },
-            },
-        });
-
-        if (!candidate) {
-            return res.status(404).json({ message: 'Candidate not found' });
-        }
-
-        res.json(candidate);
-    } catch (error) {
-        console.error('Candidate detail fetch error:', error);
-        res.status(500).json({ message: 'Failed to fetch candidate' });
-    }
-});
+  }
+);
 
 /**
  * @openapi
- * /admin/my-exam-takers:
- *   get:
+ * /admin/candidates/import:
+ *   post:
  *     tags: [Admin Candidates]
- *     summary: List candidates who attempted admin's quizzes
- *     security:
- *       - BearerAuth: []
- *     responses:
- *       200:
- *         description: List of candidates
- */
-router.get('/my-exam-takers', authenticate, authorizeAdmin, async (req: AuthRequest, res) => {
-    if (req.user?.role !== 'ADMIN') {
-        return res.status(403).json({ message: 'Forbidden: Admin access only' });
-    }
-
-    try {
-        const adminId = req.user.userId;
-        const page = Math.max(1, parseInt(String(req.query.page ?? '1'), 10) || 1);
-        const pageSizeRaw = parseInt(String(req.query.pageSize ?? '25'), 10) || 25;
-        const pageSize = Math.min(100, Math.max(1, pageSizeRaw));
-        const q = typeof req.query.q === 'string' ? req.query.q.trim() : '';
-
-        // Find distinct users who have sessions on this admin's quizzes
-        const sessionWhere: any = {
-            quiz: { createdById: adminId },
-            user: { role: 'CANDIDATE' },
-        };
-
-        if (q) {
-            sessionWhere.user.OR = [
-                { name: { contains: q, mode: 'insensitive' } },
-                { email: { contains: q, mode: 'insensitive' } },
-                { church: { contains: q, mode: 'insensitive' } },
-            ];
-        }
-
-        // Get distinct userIds
-        const distinctUsers = await prisma.quizSession.findMany({
-            where: sessionWhere,
-            select: { userId: true },
-            distinct: ['userId'],
-        });
-
-        const userIds = distinctUsers.map((s: { userId: string }) => s.userId);
-        const total = userIds.length;
-
-        // Paginate
-        const pagedIds = userIds.slice((page - 1) * pageSize, page * pageSize);
-
-        const candidates = await prisma.user.findMany({
-            where: { id: { in: pagedIds } },
-            select: {
-                id: true,
-                name: true,
-                email: true,
-                church: true,
-                association: true,
-                userType: true,
-                createdAt: true,
-                sessions: {
-                    where: { quiz: { createdById: adminId } },
-                    select: { id: true },
-                },
-            },
-            orderBy: { name: 'asc' },
-        });
-
-        // Map session count
-        const items = candidates.map((c: any) => ({
-            ...c,
-            _count: { sessions: c.sessions.length },
-            sessions: undefined,
-        }));
-
-        res.json({ items, total, page, pageSize });
-    } catch (error) {
-        console.error('My exam takers fetch error:', error);
-        res.status(500).json({ message: 'Failed to fetch exam takers' });
-    }
-});
-
-export default router;
-
-
-/**
- * @openapi
- * /admin/trigger-emails:
- *   post:
- *     tags: [Admin Results]
- *     summary: Manually trigger result emails
- *     description: Forces immediate delivery of pending result notification emails.
- *     security:
- *       - BearerAuth: []
- *     responses:
- *       200:
- *         description: Email processing results
- */
-router.post('/trigger-emails', authenticate, authorizeAdmin, async (req: AuthRequest, res) => {
-    try {
-        const now = new Date();
-        
-        // Find sessions that should have been sent but haven't
-        const pendingSessions = await prisma.quizSession.findMany({
-            where: {
-                endTime: { not: null },
-                resultReleasesAt: { 
-                    not: null,
-                    lte: now 
-                },
-                emailSent: false
-            },
-            include: {
-                user: true,
-                quiz: {
-                    include: { questions: true }
-                }
-            }
-        });
-
-        if (pendingSessions.length === 0) {
-            return res.json({ 
-                message: 'No pending emails to send',
-                processed: 0,
-                failed: 0
-            });
-        }
-
-        let processedCount = 0;
-        let failedCount = 0;
-        const results = [];
-
-        for (const session of pendingSessions) {
-            try {
-                const answers = (session.answers as Record<string, string>) || {};
-                const questions = session.quiz.questions;
-
-                const remapRaw = (answers as any).__remap__;
-                const remap: Record<string, string> = remapRaw ? JSON.parse(remapRaw) : {};
-
-                let correctCount = 0;
-                const answerDetails = questions.map((q: any) => {
-                    const selectedOption = answers[q.id];
-                    const correctOption = remap[q.id] ?? q.correctOption;
-                    const isCorrect = selectedOption === correctOption;
-                    if (isCorrect) correctCount++;
-                    return {
-                        question: q.text,
-                        selectedOption: selectedOption || 'No answer',
-                        correctOption,
-                        isCorrect
-                    };
-                });
-
-                const score = session.score || 0;
-                const passMark = session.quiz.passMark ?? 50;
-                const status = score >= passMark ? 'Cleared' : 'Not Cleared - No Certificates';
-
-                // Import sendScoreOnlyEmail dynamically to avoid circular dependency
-                const { sendScoreOnlyEmail } = await import('../services/email');
-                const success = await sendScoreOnlyEmail(
-                    session.user.email,
-                    session.user.name,
-                    session.quiz.title,
-                    score,
-                    status
-                );
-
-                if (success) {
-                    await prisma.quizSession.update({
-                        where: { id: session.id },
-                        data: { emailSent: true }
-                    });
-                    processedCount++;
-                    results.push({
-                        sessionId: session.id,
-                        email: session.user.email,
-                        status: 'success'
-                    });
-                } else {
-                    failedCount++;
-                    results.push({
-                        sessionId: session.id,
-                        email: session.user.email,
-                        status: 'failed'
-                    });
-                }
-            } catch (err) {
-                failedCount++;
-                results.push({
-                    sessionId: session.id,
-                    email: session.user.email,
-                    status: 'error',
-                    error: err instanceof Error ? err.message : 'Unknown error'
-                });
-            }
-        }
-
-        res.json({
-            message: `Processed ${processedCount + failedCount} emails`,
-            processed: processedCount,
-            failed: failedCount,
-            total: pendingSessions.length,
-            results
-        });
-    } catch (error) {
-        console.error('Trigger release error:', error);
-        res.status(500).json({ message: 'Failed to manually trigger release' });
-    }
-});
-
-/**
- * @openapi
- * /admin/bulk-candidates:
- *   post:
- *     tags: [Admin Bulk]
- *     summary: Bulk register candidates from Excel
+ *     summary: Import candidates from Excel file
  *     security:
  *       - BearerAuth: []
  *     requestBody:
- *       required: true
  *       content:
  *         multipart/form-data:
  *           schema:
@@ -1022,350 +315,197 @@ router.post('/trigger-emails', authenticate, authorizeAdmin, async (req: AuthReq
  *               file:
  *                 type: string
  *                 format: binary
- *     responses:
- *       200:
- *         description: Bulk registration results
- */
-router.post('/bulk-candidates', authenticate, authorizeAdmin, upload.single('file'), async (req: AuthRequest, res) => {
-    try {
-        if (!req.file) {
-            return res.status(400).json({ message: 'No file uploaded' });
-        }
-
-        const workbook = xlsx.read(req.file.buffer, { type: 'buffer' });
-        const sheetName = workbook.SheetNames[0];
-        const worksheet = workbook.Sheets[sheetName];
-        const data = xlsx.utils.sheet_to_json(worksheet) as any[];
-
-        const results = {
-            success: 0,
-            failed: 0,
-            errors: [] as string[]
-        };
-
-        for (const row of data) {
-            try {
-                const email = row['Email Address']?.toString().trim();
-                const name = row['Full Name']?.toString().trim();
-                const church = row['Church']?.toString().trim();
-                const association = row['Association']?.toString().trim();
-                const rawUserType = row['Examination Type']?.toString().trim();
-                const password = row['Password']?.toString().trim();
-
-                if (!email || !name || !password || !rawUserType) {
-                    results.failed++;
-                    results.errors.push(`Missing required fields for ${email || 'unknown user'}`);
-                    continue;
-                }
-
-                // Map "Examination Type" to UserType enum
-                let userType: UserType;
-                const normalizedType = rawUserType.toUpperCase().replace(/\s+/g, '_');
-                if (normalizedType.includes('AMBASSADOR')) {
-                    userType = 'AMBASSADOR_RANK_EXAMS';
-                } else if (normalizedType.includes('EXTRAORDINARY')) {
-                    userType = 'EXTRAORDINARY_RANK_EXAMS';
-                } else if (normalizedType.includes('PRE_PLENIPOTENTIARY') || normalizedType.includes('PRE-PLENIPOTENTIARY')) {
-                    userType = 'PRE_PLENIPOTENTIARY_EXAMS';
-                } else if (normalizedType.includes('PLENIPOTENTIARY')) {
-                    userType = 'PLENIPOTENTIARY_RANK_EXAMS';
-                } else {
-                    results.failed++;
-                    results.errors.push(`Invalid Examination Type: ${rawUserType} for ${email}`);
-                    continue;
-                }
-
-                const existingUser = await prisma.user.findUnique({ where: { email } });
-                if (existingUser) {
-                    results.failed++;
-                    results.errors.push(`User already exists: ${email}`);
-                    continue;
-                }
-
-                const hashedPassword = await bcrypt.hash(password, 12);
-                const otp = generateOTP();
-                const otpHash = crypto.createHash('sha256').update(otp).digest('hex');
-                const otpExpiresAt = new Date(Date.now() + 1000 * 60 * 60 * 48); // 48 hours for bulk imports
-
-                const user = await prisma.user.create({
-                    data: {
-                        email,
-                        name,
-                        password: hashedPassword,
-                        church: church || null,
-                        association: association || null,
-                        role: 'CANDIDATE',
-                        userType,
-                        emailVerified: false,
-                        emailOtpHash: otpHash,
-                        emailOtpExpiresAt: otpExpiresAt,
-                        uploadedById: req.user?.userId // Track which admin uploaded this candidate
-                    }
-                });
-
-                const protocol = (req.header('x-forwarded-proto') || req.protocol || 'http').toString();
-                const host = (req.header('x-forwarded-host') || req.get('host') || 'localhost:4000').toString();
-                const frontendUrl = WEB_URL || `${protocol}://${host.replace('4000', '3000')}`;
-                const verifyUrl = `${frontendUrl}/verify-otp?email=${encodeURIComponent(email)}`;
-
-                await sendBulkWelcomeEmail(
-                    email,
-                    name,
-                    password,
-                    church || 'N/A',
-                    association || 'N/A',
-                    userType,
-                    verifyUrl,
-                    otp
-                );
-
-                results.success++;
-            } catch (err: any) {
-                results.failed++;
-                results.errors.push(`Error registering ${row['Email Address']}: ${err.message}`);
-            }
-        }
-
-        res.json({
-            message: `Bulk registration completed: ${results.success} succeeded, ${results.failed} failed.`,
-            ...results
-        });
-
-        // Audit bulk registration
-        await auditService.logFromRequest(req as any, 'BULK_CANDIDATES_IMPORTED', undefined, { 
-            successCount: results.success, 
-            failedCount: results.failed,
-            fileName: req.file?.originalname
-        });
-    } catch (error) {
-        console.error('Bulk registration error:', error);
-        res.status(500).json({ message: 'Bulk registration failed' });
-    }
-});
-
-/**
- * @openapi
- * /admin/sessions/{sessionId}/status:
- *   patch:
- *     tags: [Admin Results]
- *     summary: Update manual session status
- *     parameters:
- *       - in: path
- *         name: sessionId
- *         required: true
- *         schema:
- *           type: string
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               manualStatus:
+ *               userType:
  *                 type: string
- *                 nullable: true
- *                 enum: [Cleared, Not Cleared - No Certificates]
- *     responses:
- *       200:
- *         description: Status updated
  */
-router.patch('/sessions/:sessionId/status', authenticate, authorizeAdmin, async (req: AuthRequest, res) => {
+router.post(
+  "/candidates/import",
+  authenticate,
+  authorizeAdmin,
+  upload.single("file"),
+  async (req: AuthRequest, res: Response) => {
     try {
-        const sessionId = req.params.sessionId as string;
-        const { manualStatus } = req.body;
+      const adminId = req.user?.userId;
+      const { userType } = req.body;
 
-        // Validate manualStatus
-        if (manualStatus !== null && manualStatus !== 'Cleared' && manualStatus !== 'Not Cleared - No Certificates') {
-            return res.status(400).json({ message: 'Invalid status. Must be "Cleared", "Not Cleared - No Certificates", or null' });
+      if (!req.file) {
+        return res.status(400).json({ message: "No file uploaded" });
+      }
+
+      const workbook = xlsx.read(req.file.buffer, { type: "buffer" });
+      const sheetName = workbook.SheetNames[0];
+      const data = xlsx.utils.sheet_to_json(workbook.Sheets[sheetName]);
+
+      const imported: any[] = [];
+      const errors: any[] = [];
+
+      for (let i = 0; i < data.length; i++) {
+        const row = data[i] as any;
+        const name = row.Name || row.name || row["Full Name"];
+        const email = row.Email || row.email;
+        const church = row.Church || row.church || null;
+        const association = row.Association || row.association || null;
+        const importedUserType = row.UserType || row.userType || userType || UserType.AMBASSADOR_RANK_EXAMS;
+
+        if (!name || !email) {
+          errors.push({
+            row: i + 2,
+            message: "Name and email are required",
+          });
+          continue;
         }
 
-        const updatedSession = await prisma.quizSession.update({
-            where: { id: sessionId },
-            data: { manualStatus } as any // Type assertion until schema is pushed
-        });
+        try {
+          const existingUser = await prisma.user.findUnique({
+            where: { email },
+          });
 
-        res.json({ message: 'Status updated successfully', session: updatedSession });
+          if (existingUser) {
+            errors.push({
+              row: i + 2,
+              email,
+              message: "User already exists",
+            });
+            continue;
+          }
+
+          const password = crypto.randomBytes(8).toString("hex");
+          const hashedPassword = await bcrypt.hash(password, 10);
+          const otp = generateOTP();
+          const verifyUrl = `${process.env.WEB_URL || "http://localhost:3000"}/verify-email`;
+
+          const user = await prisma.user.create({
+            data: {
+              name,
+              email,
+              password: hashedPassword,
+              role: "CANDIDATE",
+              userType: importedUserType,
+              uploadedById: adminId,
+              church,
+              association,
+              emailVerified: false,
+              emailOtpHash: await bcrypt.hash(otp, 10),
+              emailOtpExpiresAt: new Date(Date.now() + 48 * 60 * 60 * 1000), // 48 hours
+            },
+          });
+
+          imported.push({
+            id: user.id,
+            name,
+            email,
+            password,
+            church,
+            association,
+            userType: importedUserType,
+            verifyUrl,
+            otp,
+          });
+        } catch (e) {
+          errors.push({
+            row: i + 2,
+            email,
+            message: "Failed to create user",
+          });
+        }
+      }
+
+      // Send welcome emails
+      for (const candidate of imported) {
+        try {
+          await sendBulkWelcomeEmail(
+            candidate.email,
+            candidate.name,
+            candidate.password,
+            candidate.church || "N/A",
+            candidate.association || "N/A",
+            candidate.userType,
+            candidate.verifyUrl,
+            candidate.otp
+          );
+        } catch (e) {
+          console.error(
+            `Failed to send welcome email to ${candidate.email}:`,
+            e
+          );
+        }
+      }
+
+      res.json({
+        message: `Import completed: ${imported.length} imported, ${errors.length} errors`,
+        imported,
+        errors,
+      });
+
+      await auditService.logFromRequest(
+        req,
+        "CANDIDATES_IMPORTED",
+        adminId,
+        { importedCount: imported.length, errorCount: errors.length }
+      );
     } catch (error) {
-        console.error('Status update error:', error);
-        res.status(500).json({ message: 'Failed to update status' });
+      console.error("Failed to import candidates:", error);
+      res.status(500).json({ message: "Failed to import candidates" });
     }
-});
+  }
+);
 
 /**
  * @openapi
- * /admin/sessions/release:
- *   post:
- *     tags: [Admin Results]
- *     summary: Bulk release results
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required: [sessionIds]
- *             properties:
- *               sessionIds:
- *                 type: array
- *                 items:
- *                   type: string
- *     responses:
- *       200:
- *         description: Results released
+ * /admin/reports/attendance:
+ *   get:
+ *     tags: [Admin Reports]
+ *     summary: Generate attendance report
+ *     security:
+ *       - BearerAuth: []
  */
-router.post('/sessions/release', authenticate, authorizeAdmin, async (req: AuthRequest, res) => {
+router.get(
+  "/reports/attendance",
+  authenticate,
+  authorizeAdmin,
+  async (req: AuthRequest, res: Response) => {
     try {
-        const { sessionIds } = req.body;
+      const { startDate, endDate, format } = req.query;
 
-        if (!Array.isArray(sessionIds) || sessionIds.length === 0) {
-            return res.status(400).json({ message: 'sessionIds must be a non-empty array' });
+      let where: any = {};
+
+      if (startDate || endDate) {
+        where.createdAt = {};
+        if (startDate) {
+          where.createdAt.gte = new Date(startDate as string);
         }
-
-        // Fetch sessions with user + quiz info before updating
-        const sessions = await prisma.quizSession.findMany({
-            where: { id: { in: sessionIds } },
-            include: { user: true, quiz: { select: { title: true } } }
-        });
-
-        // Set resultReleasesAt to now for all specified sessions
-        const updated = await prisma.quizSession.updateMany({
-            where: { id: { in: sessionIds } },
-            data: { resultReleasesAt: new Date() }
-        });
-
-        // Notify each candidate their result is ready and send emails
-        if (sessions.length > 0) {
-            const notifData = sessions.map(s => ({
-                type: 'RESULT_RELEASED',
-                title: 'Your Result is Ready',
-                message: `Your result for "${s.quiz.title}" has been released. Check your results now.`,
-                quizId: s.quizId,
-                sessionId: s.id,
-                isRead: false,
-                createdById: s.userId,
-            }));
-            await prisma.notification.createMany({ data: notifData });
-            for (const notif of notifData) {
-                emitNotification(notif.createdById, { ...notif, createdAt: new Date().toISOString() });
-            }
-
-            // Send emails immediately for released sessions
-            const { sendScoreOnlyEmail } = await import('../services/email');
-            for (const session of sessions) {
-                if (session.endTime && session.score !== null) {
-                    const passMark = 50; // Default pass mark, you may want to get this from quiz
-                    const status = session.score >= passMark ? 'Cleared' : 'Not Cleared - No Certificates';
-                    
-                    try {
-                        const success = await sendScoreOnlyEmail(
-                            session.user.email,
-                            session.user.name,
-                            session.quiz.title,
-                            session.score,
-                            status
-                        );
-                        
-                        if (success) {
-                            await prisma.quizSession.update({
-                                where: { id: session.id },
-                                data: { emailSent: true }
-                            });
-                        }
-                    } catch (emailError) {
-                        console.error(`Failed to send email to ${session.user.email}:`, emailError);
-                    }
-                }
-            }
+        if (endDate) {
+          const end = new Date(endDate as string);
+          end.setHours(23, 59, 59, 999);
+          where.createdAt.lte = end;
         }
+      }
 
-        res.json({ message: `Released ${updated.count} result(s) successfully`, count: updated.count });
+      const attendanceRecords = await prisma.manualAttendance.findMany({
+        where,
+        orderBy: { checkInTime: "desc" },
+      });
+
+      if (format === "xlsx") {
+        const buffer = await ReportGenerator.attendanceToExcel(attendanceRecords);
+
+        res.setHeader(
+          "Content-Type",
+          "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        );
+        res.setHeader(
+          "Content-Disposition",
+          "attachment; filename=attendance_report.xlsx"
+        );
+        return res.send(buffer);
+      }
+
+      res.json(attendanceRecords);
     } catch (error) {
-        console.error('Result release error:', error);
-        res.status(500).json({ message: 'Failed to release results' });
+      console.error("Failed to generate attendance report:", error);
+      res.status(500).json({ message: "Failed to generate report" });
     }
-});
+  }
+);
 
-/**
- * @openapi
- * /admin/quizzes/{quizId}/release-all:
- *   post:
- *     tags: [Admin Results]
- *     summary: Release all results for a quiz
- *     parameters:
- *       - in: path
- *         name: quizId
- *         required: true
- *         schema:
- *           type: string
- *     responses:
- *       200:
- *         description: All results released
- */
-router.post('/quizzes/:quizId/release-all', authenticate, authorizeAdmin, async (req: AuthRequest, res) => {
-    try {
-        const quizId = req.params.quizId as string;
-
-        // Fetch sessions before updating so we have user info
-        const sessions = await prisma.quizSession.findMany({
-            where: { quizId, endTime: { not: null } },
-            include: { user: true, quiz: { select: { title: true } } }
-        });
-
-        // Set resultReleasesAt to now for all sessions of this quiz
-        const updated = await prisma.quizSession.updateMany({
-            where: { quizId, endTime: { not: null } },
-            data: { resultReleasesAt: new Date() }
-        });
-
-        // Notify each candidate and send emails
-        if (sessions.length > 0) {
-            const notifData = sessions.map(s => ({
-                type: 'RESULT_RELEASED',
-                title: 'Your Result is Ready',
-                message: `Your result for "${s.quiz.title}" has been released. Check your results now.`,
-                quizId: s.quizId,
-                sessionId: s.id,
-                isRead: false,
-                createdById: s.userId,
-            }));
-            await prisma.notification.createMany({ data: notifData });
-            for (const notif of notifData) {
-                emitNotification(notif.createdById, { ...notif, createdAt: new Date().toISOString() });
-            }
-
-            // Send emails immediately for released sessions
-            const { sendScoreOnlyEmail } = await import('../services/email');
-            for (const session of sessions) {
-                if (session.score !== null) {
-                    const passMark = 50; // Default pass mark, you may want to get this from quiz
-                    const status = session.score >= passMark ? 'Cleared' : 'Not Cleared - No Certificates';
-                    
-                    try {
-                        const success = await sendScoreOnlyEmail(
-                            session.user.email,
-                            session.user.name,
-                            session.quiz.title,
-                            session.score,
-                            status
-                        );
-                        
-                        if (success) {
-                            await prisma.quizSession.update({
-                                where: { id: session.id },
-                                data: { emailSent: true }
-                            });
-                        }
-                    } catch (emailError) {
-                        console.error(`Failed to send email to ${session.user.email}:`, emailError);
-                    }
-                }
-            }
-        }
-
-        res.json({ message: `Released ${updated.count} result(s) for this quiz`, count: updated.count });
-    } catch (error) {
-        console.error('Quiz result release error:', error);
-        res.status(500).json({ message: 'Failed to release quiz results' });
-    }
-});
+export default router;

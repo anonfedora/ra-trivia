@@ -528,7 +528,7 @@ export default function AdminDashboard() {
                         </Link>
                         <NotificationBell />
                         <ThemeToggle />
-                        <Link href="/attendance/manual" className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2.5 rounded-2xl font-bold shadow-lg hover:shadow-xl transition-all text-sm">
+                        <Link href="/attendance" className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2.5 rounded-2xl font-bold shadow-lg hover:shadow-xl transition-all text-sm">
                             <CheckCircle size={16} />
                             Attendance
                         </Link>

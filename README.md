@@ -279,10 +279,22 @@ pnpm --filter server test -- --run
 
 ## Version History
 
+### v1.10.1
+- **QR Code Attendance System Enhancements**:
+    - **Camera-based QR Scanning**: Integrated camera-based QR code scanning directly into the Admin QR Scanner for seamless check-ins.
+    - **Enhanced QR Code Content**: QR codes now embed both the candidate's full name and a 5-character alphanumeric identity code.
+- **Bug Fixes & Stability Improvements**:
+    - Resolved `TypeError: Cannot read properties of undefined (reading 'length')` in `CandidateTable.tsx`.
+    - Fixed Next.js hydration errors in `ThemeToggle.tsx`.
+    - Addressed unescaped apostrophe linting errors in `AdminQRScanner.tsx`.
+    - Replaced `<img>` tags with `next/image` component for optimized image handling.
+    - Fixed Next.js prerendering errors for `/admin/audit-logs` and `/login` pages.
+    - Ensured robust Google Sheets integration for attendance recording.
+
 ### v1.10.0 (Current)
 - **QR Code Attendance System**:
-    - **Secure Attendance Verification**: Complete QR code-based attendance system for exams with multiple verification methods.
-    - **Admin QR Management**: Generate QR codes with customizable expiration (2h, 4h, 8h) directly from quiz admin preview page.
+    - **Secure Attendance Verification**: Complete QR code-based attendance system for exams with multiple verification methods, including camera-based scanning.
+    - **Admin QR Management**: Generate QR codes with customizable expiration (2h, 4h, 8h) directly from quiz admin preview page, now embedding candidate name and a 5-character alphanumeric code.
     - **Multiple Access Points**: Candidates can scan QR codes, click attendance links, or manually enter attendance codes.
     - **Real-time Status Tracking**: Live display of QR attendance status, expiration times, and participant counts.
     - **Seamless Integration**: QR attendance controls embedded in existing quiz admin interface with one-click generation.

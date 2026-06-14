@@ -1,6 +1,6 @@
-import { getAccessToken } from '../auth';
+import { getAccessToken } from "../auth";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000/api";
 
 export interface QRGenerateRequest {
   quizId: string;
@@ -56,7 +56,8 @@ export interface CandidateQRResponse {
 
 export interface AdminScanRequest {
   attendanceCode: string;
-  quizId: string;
+  quizId?: string;
+  eventName?: string;
 }
 
 export interface AdminScanResponse {
@@ -65,9 +66,10 @@ export interface AdminScanResponse {
     id: string;
     candidate: {
       id: string;
-      email: string;
-      firstName: string;
-      lastName: string;
+      email?: string;
+      name: string;
+      church?: string;
+      isAttendee?: boolean;
     };
     checkedInAt: string;
     method: string;
@@ -108,6 +110,53 @@ export interface AttendanceDashboardResponse {
   candidates: AttendanceCandidate[];
 }
 
+export interface CandidateRegisterRequest {
+  name: string;
+  email?: string;
+  church?: string;
+  phoneNumber?: string;
+}
+
+export interface CandidateRegisterResponse {
+  message: string;
+  candidate: {
+    id: string;
+    fullName: string;
+    email?: string;
+    church?: string;
+    phoneNumber?: string;
+  };
+  qrCode: string;
+  identityCode: string;
+}
+
+export interface CandidateIdentity {
+  id: string;
+  fullName: string;
+  email?: string;
+  church?: string;
+  phoneNumber?: string;
+  identityCode: string;
+  qrCode: string;
+}
+
+export interface AttendanceRecord {
+  id: string;
+  fullName: string;
+  email?: string | null;
+  church?: string | null;
+  checkInTime: string;
+  method: string;
+  checkedInBy: string;
+  eventName?: string | null;
+  quizId?: string | null;
+  type: "QR_SCAN" | "MANUAL";
+}
+
+export interface AttendanceRecordsResponse {
+  attendanceRecords: AttendanceRecord[];
+}
+
 export interface ManualAttendanceRequest {
   fullName: string;
   church?: string;
@@ -142,21 +191,21 @@ class AttendanceAPI {
   private getAuthHeaders() {
     const token = getAccessToken();
     return {
-      'Content-Type': 'application/json',
-      ...(token && { Authorization: `Bearer ${token}` }),
+      "Content-Type": "application/json",
+      Authorization: token ? `Bearer ${token}` : "",
     };
   }
 
   async generateQRCode(data: QRGenerateRequest): Promise<QRGenerateResponse> {
     const response = await fetch(`${API_BASE}/attendance/qr/generate`, {
-      method: 'POST',
+      method: "POST",
       headers: this.getAuthHeaders(),
       body: JSON.stringify(data),
     });
 
     if (!response.ok) {
       const error = await response.json();
-      throw new Error(error.message || 'Failed to generate QR code');
+      throw new Error(error.message || "Failed to generate QR code");
     }
 
     return response.json();
@@ -169,7 +218,7 @@ class AttendanceAPI {
 
     if (!response.ok) {
       const error = await response.json();
-      throw new Error(error.message || 'Failed to get QR status');
+      throw new Error(error.message || "Failed to get QR status");
     }
 
     return response.json();
@@ -177,14 +226,14 @@ class AttendanceAPI {
 
   async disableQRAttendance(quizId: string): Promise<{ message: string; enableQRAttendance: boolean }> {
     const response = await fetch(`${API_BASE}/attendance/qr/disable`, {
-      method: 'POST',
+      method: "POST",
       headers: this.getAuthHeaders(),
       body: JSON.stringify({ quizId }),
     });
 
     if (!response.ok) {
       const error = await response.json();
-      throw new Error(error.message || 'Failed to disable QR attendance');
+      throw new Error(error.message || "Failed to disable QR attendance");
     }
 
     return response.json();
@@ -192,14 +241,14 @@ class AttendanceAPI {
 
   async verifyAttendance(data: AttendanceVerifyRequest): Promise<AttendanceVerifyResponse> {
     const response = await fetch(`${API_BASE}/attendance/verify`, {
-      method: 'POST',
+      method: "POST",
       headers: this.getAuthHeaders(),
       body: JSON.stringify(data),
     });
 
     if (!response.ok) {
       const error = await response.json();
-      throw new Error(error.message || 'Failed to verify attendance');
+      throw new Error(error.message || "Failed to verify attendance");
     }
 
     return response.json();
@@ -210,7 +259,7 @@ class AttendanceAPI {
 
     if (!response.ok) {
       const error = await response.json();
-      throw new Error(error.message || 'Invalid or expired attendance code');
+      throw new Error(error.message || "Invalid or expired attendance code");
     }
 
     return response.json();
@@ -223,7 +272,7 @@ class AttendanceAPI {
 
     if (!response.ok) {
       const error = await response.json();
-      throw new Error(error.message || 'Failed to generate candidate QR code');
+      throw new Error(error.message || "Failed to generate candidate QR code");
     }
 
     return response.json();
@@ -231,14 +280,14 @@ class AttendanceAPI {
 
   async scanCandidateQR(data: AdminScanRequest): Promise<AdminScanResponse> {
     const response = await fetch(`${API_BASE}/attendance/qr/scan`, {
-      method: 'POST',
+      method: "POST",
       headers: this.getAuthHeaders(),
       body: JSON.stringify(data),
     });
 
     if (!response.ok) {
       const error = await response.json();
-      throw new Error(error.message || 'Failed to scan candidate QR code');
+      throw new Error(error.message || "Failed to scan candidate QR code");
     }
 
     return response.json();
@@ -251,7 +300,7 @@ class AttendanceAPI {
 
     if (!response.ok) {
       const error = await response.json();
-      throw new Error(error.message || 'Failed to get attendance records');
+      throw new Error(error.message || "Failed to get attendance records");
     }
 
     return response.json();
@@ -259,17 +308,21 @@ class AttendanceAPI {
 
   async createManualAttendance(data: ManualAttendanceRequest): Promise<ManualAttendanceResponse> {
     const response = await fetch(`${API_BASE}/attendance/manual`, {
-      method: 'POST',
+      method: "POST",
       headers: this.getAuthHeaders(),
       body: JSON.stringify(data),
     });
 
     if (!response.ok) {
       const error = await response.json();
-      throw new Error(error.message || 'Failed to record manual attendance');
+      throw new Error(error.message || "Failed to record manual attendance");
     }
 
     return response.json();
+  }
+
+  async recordManualAttendance(data: ManualAttendanceRequest): Promise<ManualAttendanceResponse> {
+    return this.createManualAttendance(data);
   }
 
   async getManualAttendanceRecords(params?: {
@@ -279,19 +332,19 @@ class AttendanceAPI {
     eventName?: string;
   }): Promise<ManualAttendanceListResponse> {
     const searchParams = new URLSearchParams();
-    if (params?.startDate) searchParams.set('startDate', params.startDate);
-    if (params?.endDate) searchParams.set('endDate', params.endDate);
-    if (params?.church) searchParams.set('church', params.church);
-    if (params?.eventName) searchParams.set('eventName', params.eventName);
+    if (params?.startDate) searchParams.set("startDate", params.startDate);
+    if (params?.endDate) searchParams.set("endDate", params.endDate);
+    if (params?.church) searchParams.set("church", params.church);
+    if (params?.eventName) searchParams.set("eventName", params.eventName);
 
-    const url = `${API_BASE}/attendance/manual${searchParams.toString() ? `?${searchParams.toString()}` : ''}`;
+    const url = `${API_BASE}/attendance/manual${searchParams.toString() ? `?${searchParams.toString()}` : ""}`;
     const response = await fetch(url, {
       headers: this.getAuthHeaders(),
     });
 
     if (!response.ok) {
       const error = await response.json();
-      throw new Error(error.message || 'Failed to fetch manual attendance');
+      throw new Error(error.message || "Failed to fetch manual attendance");
     }
 
     return response.json();
@@ -299,13 +352,68 @@ class AttendanceAPI {
 
   async deleteManualAttendance(id: string): Promise<{ message: string }> {
     const response = await fetch(`${API_BASE}/attendance/manual/${id}`, {
-      method: 'DELETE',
+      method: "DELETE",
       headers: this.getAuthHeaders(),
     });
 
     if (!response.ok) {
       const error = await response.json();
-      throw new Error(error.message || 'Failed to delete attendance');
+      throw new Error(error.message || "Failed to delete attendance");
+    }
+
+    return response.json();
+  }
+
+  async registerCandidate(data: CandidateRegisterRequest): Promise<CandidateRegisterResponse> {
+    const response = await fetch(`${API_BASE}/admin/register-candidate`, {
+      method: "POST",
+      headers: this.getAuthHeaders(),
+      body: JSON.stringify(data),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.message || "Failed to register candidate");
+    }
+
+    return response.json();
+  }
+
+  async getCandidateIdentities(): Promise<CandidateIdentity[]> {
+    const response = await fetch(`${API_BASE}/admin/candidates/identities`, {
+      headers: this.getAuthHeaders(),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.message || "Failed to fetch candidate identities");
+    }
+
+    return response.json();
+  }
+
+  async getAttendanceRecords(params?: {
+    startDate?: string;
+    endDate?: string;
+    church?: string;
+    eventName?: string;
+  }): Promise<AttendanceRecordsResponse> {
+    const searchParams = new URLSearchParams();
+    if (params?.startDate) searchParams.set("startDate", params.startDate);
+    if (params?.endDate) searchParams.set("endDate", params.endDate);
+    if (params?.church) searchParams.set("church", params.church);
+    if (params?.eventName) searchParams.set("eventName", params.eventName);
+
+    const url = `${API_BASE}/attendance/records${
+      searchParams.toString() ? `?${searchParams.toString()}` : ""
+    }`;
+    const response = await fetch(url, {
+      headers: this.getAuthHeaders(),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.message || "Failed to fetch attendance records");
     }
 
     return response.json();
