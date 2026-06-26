@@ -39,11 +39,17 @@ async function testDatabaseConnection() {
         console.log('✅ Database connected successfully');
     } catch (error) {
         console.error('❌ Database connection failed:', error);
-        process.exit(1);
+        // Don't exit in serverless environments - log and continue
+        if (process.env.NODE_ENV !== 'production' || !process.env.VERCEL) {
+            process.exit(1);
+        }
     }
 }
 
-testDatabaseConnection();
+// Only test connection in non-serverless environments
+if (!process.env.VERCEL) {
+    testDatabaseConnection();
+}
 
 export const app = express();
 export default app;
