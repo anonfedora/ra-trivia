@@ -18,6 +18,14 @@ const nextConfig = {
   images: {
     domains: [],
   },
+  async rewrites() {
+    return [
+      {
+        source: '/api/:path*',
+        destination: 'https://ra-trivia.onrender.com/api/:path*',
+      },
+    ];
+  },
 };
 
 module.exports = nextConfig;
