@@ -46,6 +46,7 @@ async function testDatabaseConnection() {
 testDatabaseConnection();
 
 export const app = express();
+export default app;
 const httpServer = createServer(app);
 const PORT = process.env.PORT || 4000;
 
