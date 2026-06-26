@@ -9,8 +9,8 @@ import { auditService } from '../services/auditService';
 type QuestionFormat = 'MULTIPLE_CHOICE' | 'FILL_IN_THE_GAP';
 
 const router = Router();
-const upload = multer({ 
-    dest: 'uploads/',
+const upload = multer({
+    storage: multer.memoryStorage(),
     limits: {
         fileSize: 5 * 1024 * 1024, // 5MB limit
     },
@@ -197,7 +197,7 @@ router.post('/import', authenticate, authorizeAdmin, upload.single('file'), asyn
             }
         }
 
-        const workbook = xlsx.readFile(req.file.path);
+        const workbook = xlsx.read(req.file.buffer);
         const sheetName = workbook.SheetNames[0];
         const sheet = workbook.Sheets[sheetName];
         const data = xlsx.utils.sheet_to_json(sheet);
