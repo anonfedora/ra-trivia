@@ -69,6 +69,7 @@ const allowedOrigins = [
     'http://localhost:8081',
     'http://10.113.159.193:8081',
     'https://ra-trivia.vercel.app',
+    'https://ra-trivia-web.vercel.app',
     'https://ra-trivia.onrender.com'
 ].filter(Boolean);
 
