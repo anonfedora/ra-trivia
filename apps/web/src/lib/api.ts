@@ -1,14 +1,21 @@
 import axios, { AxiosRequestConfig, AxiosError, AxiosResponse, InternalAxiosRequestConfig } from 'axios';
 import { getAccessToken, getRefreshToken, updateAccessToken, updateRefreshToken, clearAuth } from './auth';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
+// In production, use relative path to leverage Next.js rewrites
+// In development, use localhost
+const API_URL = process.env.NODE_ENV === 'production'
+  ? '/api'
+  : (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api');
+
+// Ensure API_URL ends with /api for development
+const BASE_URL = API_URL.endsWith('/api') ? API_URL : `${API_URL}/api`;
 
 /**
  * Global Axios Instance
  */
 export const axiosInstance = axios.create({
-  baseURL: API_URL,
-  // We do NOT set a global Content-Type here. 
+  baseURL: BASE_URL,
+  // We do NOT set a global Content-Type here.
   // Axios will automatically set 'application/json' when passing an object to 'data',
   // and will correctly OMIT it when passing FormData (allowing the browser to set the boundary).
 });
