@@ -8,7 +8,8 @@ import { ThemeToggle } from '../../../components/ThemeToggle';
 import NotificationBell from '../../../components/NotificationBell';
 import { useToast } from '../../../contexts/ToastContext';
 import { format, formatDistanceToNow } from 'date-fns';
-import { io, Socket } from 'socket.io-client';
+import { Socket } from 'socket.io-client';
+import { createSocket } from '../../../lib/socket';
 import { apiFetch } from '../../../lib/api';
 import { getAccessToken } from '../../../lib/auth';
 
@@ -180,11 +181,7 @@ export default function AdminSupportPage() {
         // Socket for real-time updates from candidates
         const token = getAccessToken();
         if (token) {
-            const socketUrl = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api').replace('/api', '');
-            const socket = io(socketUrl, {
-                auth: { token },
-                transports: ['websocket', 'polling'],
-            });
+            const socket = createSocket(token);
 
             socket.on('notification', (notif) => {
                 if (notif.type === 'SUPPORT_REQUEST') {
@@ -393,7 +390,7 @@ export default function AdminSupportPage() {
                                 <option value="">All Types</option>
                                 <option value="AMBASSADOR_RANK_EXAMS">Ambassador</option>
                                 <option value="EXTRAORDINARY_RANK_EXAMS">Extraordinary</option>
-                                <option value="PRE_PLENIPOTENTIARY_EXAMS">Pre-Plenipotentiary</option>
+                                <option value="PRE_PLENIPOTENTIARY_RANK_EXAMS">Pre-Plenipotentiary</option>
                                 <option value="PLENIPOTENTIARY_RANK_EXAMS">Plenipotentiary</option>
                             </select>
                         </div>
@@ -424,7 +421,7 @@ export default function AdminSupportPage() {
                                                 <span className="absolute -bottom-1 -right-1 w-4 h-4 bg-white dark:bg-slate-800 rounded-full border border-slate-200 dark:border-slate-700 flex items-center justify-center" title={thread.user.userType}>
                                                     <div className={`w-2 h-2 rounded-full ${thread.user.userType === 'AMBASSADOR_RANK_EXAMS' ? 'bg-blue-500' :
                                                             thread.user.userType === 'EXTRAORDINARY_RANK_EXAMS' ? 'bg-purple-500' :
-                                                                thread.user.userType === 'PRE_PLENIPOTENTIARY_EXAMS' ? 'bg-amber-500' : 'bg-red-500'
+                                                                thread.user.userType === 'PRE_PLENIPOTENTIARY_RANK_EXAMS' ? 'bg-amber-500' : 'bg-red-500'
                                                         }`} />
                                                 </span>
                                             )}
@@ -508,7 +505,7 @@ export default function AdminSupportPage() {
                                         {currentThread?.user.userType && (
                                             <div className={`absolute -bottom-1 -right-1 w-3.5 h-3.5 rounded-full border-2 border-white dark:border-slate-800 ${currentThread.user.userType === 'AMBASSADOR_RANK_EXAMS' ? 'bg-blue-500' :
                                                     currentThread.user.userType === 'EXTRAORDINARY_RANK_EXAMS' ? 'bg-purple-500' :
-                                                        currentThread.user.userType === 'PRE_PLENIPOTENTIARY_EXAMS' ? 'bg-amber-500' : 'bg-red-500'
+                                                        currentThread.user.userType === 'PRE_PLENIPOTENTIARY_RANK_EXAMS' ? 'bg-amber-500' : 'bg-red-500'
                                                 }`} />
                                         )}
                                     </div>

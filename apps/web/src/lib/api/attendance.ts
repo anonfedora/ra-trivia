@@ -1,6 +1,9 @@
 import { getAccessToken } from "../auth";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000/api";
+// Use the same URL logic as api.ts for consistency
+const API_BASE = process.env.NODE_ENV === 'production'
+  ? '/api'
+  : (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api');
 
 export interface QRGenerateRequest {
   quizId: string;

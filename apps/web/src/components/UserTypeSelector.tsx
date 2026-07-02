@@ -6,7 +6,7 @@ import { ChevronDown, Check } from 'lucide-react';
 export type UserType = 
   | 'AMBASSADOR_RANK_EXAMS'
   | 'EXTRAORDINARY_RANK_EXAMS'
-  | 'PRE_PLENIPOTENTIARY_EXAMS'
+  | 'PRE_PLENIPOTENTIARY_RANK_EXAMS'
   | 'PLENIPOTENTIARY_RANK_EXAMS';
 
 interface UserTypeSelectorProps {
@@ -28,7 +28,7 @@ const USER_TYPE_OPTIONS: { value: UserType; label: string }[] = [
     label: 'Extraordinary Rank Exams'
   },
   {
-    value: 'PRE_PLENIPOTENTIARY_EXAMS',
+    value: 'PRE_PLENIPOTENTIARY_RANK_EXAMS',
     label: 'Pre-Plenipotentiary Exams'
   },
   {

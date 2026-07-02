@@ -5,7 +5,8 @@ import { createPortal } from 'react-dom';
 import { Bell, Check, CheckCheck, Trash2, X } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import Link from 'next/link';
-import { io, Socket } from 'socket.io-client';
+import { Socket } from 'socket.io-client';
+import { createSocket } from '../lib/socket';
 import { useToast } from '../contexts/ToastContext';
 import { getAccessToken } from '../lib/auth';
 import { requestCoordinator, coordinatedFetch } from '../lib/requestCoordinator';
@@ -70,12 +71,7 @@ export default function NotificationBell() {
         const token = getAccessToken();
         if (!token) return;
 
-        const socketUrl = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api').replace('/api', '');
-        const socket: Socket = io(socketUrl, {
-            auth: { token },
-            transports: ['websocket', 'polling'],
-            reconnectionAttempts: 5,
-        });
+        const socket: Socket = createSocket(token);
 
         socket.on('notification', () => {
             // A new notification arrived — refresh the list

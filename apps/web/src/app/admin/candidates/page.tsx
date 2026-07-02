@@ -23,7 +23,6 @@ export default function CandidatesPage() {
     const [isAnnouncementModalOpen, setIsAnnouncementModalOpen] = useState(false);
     const pageSize = 25;
     const { toast } = useToast();
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
 
     // Note: Allow ADMIN users to access this page to see candidates they uploaded
 

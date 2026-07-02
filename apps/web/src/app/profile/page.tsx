@@ -130,7 +130,7 @@ export default function ProfilePage() {
         const labels = {
             'AMBASSADOR_RANK_EXAMS': 'Ambassador Rank Exams',
             'EXTRAORDINARY_RANK_EXAMS': 'Extraordinary Rank Exams',
-            'PRE_PLENIPOTENTIARY_EXAMS': 'Pre-Plenipotentiary Exams',
+            'PRE_PLENIPOTENTIARY_RANK_EXAMS': 'Pre-Plenipotentiary Exams',
             'PLENIPOTENTIARY_RANK_EXAMS': 'Plenipotentiary Rank Exams'
         };
         return labels[userType];

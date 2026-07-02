@@ -210,7 +210,7 @@ function AdminResultsContent() {
                     } else if (searchLower.includes('extraordinary') || searchLower.includes('extra')) {
                         examTypePrefix = 'extraordinary_rank_exams_';
                     } else if (searchLower.includes('pre-plenipotentiary') || searchLower.includes('pre_plenipotentiary') || searchLower.includes('pre plenipotentiary')) {
-                        examTypePrefix = 'pre_plenipotentiary_exams_';
+                        examTypePrefix = 'pre_plenipotentiary_rank_exams_';
                     } else if (searchLower.includes('plenipotentiary') && !searchLower.includes('pre')) {
                         examTypePrefix = 'plenipotentiary_rank_exams_';
                     } else {
@@ -394,7 +394,7 @@ function AdminResultsContent() {
                                 <option value="all">All Types</option>
                                 <option value="AMBASSADOR_RANK_EXAMS">Ambassador Rank</option>
                                 <option value="EXTRAORDINARY_RANK_EXAMS">Extraordinary Rank</option>
-                                <option value="PRE_PLENIPOTENTIARY_EXAMS">Pre-Plenipotentiary</option>
+                                <option value="PRE_PLENIPOTENTIARY_RANK_EXAMS">Pre-Plenipotentiary</option>
                                 <option value="PLENIPOTENTIARY_RANK_EXAMS">Plenipotentiary Rank</option>
                             </select>
                         </div>

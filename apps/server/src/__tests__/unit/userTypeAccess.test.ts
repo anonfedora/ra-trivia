@@ -7,7 +7,7 @@ describe('User Type Access Control', () => {
     { id: '1', text: 'Q1', questionType: 'AMBASSADOR_RANK_EXAMS' as UserType, correctOption: 'A', optionA: 'A1', optionB: 'B1', optionC: 'C1', optionD: 'D1' },
     { id: '2', text: 'Q2', questionType: 'EXTRAORDINARY_RANK_EXAMS' as UserType, correctOption: 'B', optionA: 'A2', optionB: 'B2', optionC: 'C2', optionD: 'D2' },
     { id: '3', text: 'Q3', questionType: 'AMBASSADOR_RANK_EXAMS' as UserType, correctOption: 'C', optionA: 'A3', optionB: 'B3', optionC: 'C3', optionD: 'D3' },
-    { id: '4', text: 'Q4', questionType: 'PRE_PLENIPOTENTIARY_EXAMS' as UserType, correctOption: 'D', optionA: 'A4', optionB: 'B4', optionC: 'C4', optionD: 'D4' },
+    { id: '4', text: 'Q4', questionType: 'PRE_PLENIPOTENTIARY_RANK_EXAMS' as UserType, correctOption: 'D', optionA: 'A4', optionB: 'B4', optionC: 'C4', optionD: 'D4' },
     { id: '5', text: 'Q5', questionType: null, correctOption: 'A', optionA: 'A5', optionB: 'B5', optionC: 'C5', optionD: 'D5' }
   ];
 
@@ -24,8 +24,8 @@ describe('User Type Access Control', () => {
       expect(filtered.map(q => q.id)).toEqual(['2', '5']);
     });
 
-    it('should filter questions for PRE_PLENIPOTENTIARY_EXAMS', () => {
-      const filtered = filterQuestionsByUserType(mockQuestions, 'PRE_PLENIPOTENTIARY_EXAMS');
+    it('should filter questions for PRE_PLENIPOTENTIARY_RANK_EXAMS', () => {
+      const filtered = filterQuestionsByUserType(mockQuestions, 'PRE_PLENIPOTENTIARY_RANK_EXAMS');
       expect(filtered).toHaveLength(2); // 1 pre-plenipotentiary + 1 null
       expect(filtered.map(q => q.id)).toEqual(['4', '5']);
     });

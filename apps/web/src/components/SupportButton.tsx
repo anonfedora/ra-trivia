@@ -4,7 +4,8 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { HelpCircle, Send, X, AlertCircle, MessageCircle, User, Bell, Check, CheckCheck } from 'lucide-react';
 import { useToast } from '../contexts/ToastContext';
 import { format } from 'date-fns';
-import { io, Socket } from 'socket.io-client';
+import { Socket } from 'socket.io-client';
+import { createSocket } from '../lib/socket';
 import { getAccessToken } from '../lib/auth';
 import { requestCoordinator, coordinatedFetch } from '../lib/requestCoordinator';
 import { apiFetch } from '../lib/api';
@@ -101,12 +102,7 @@ export default function SupportButton({ quizId, isExam }: SupportButtonProps) {
             // Connect to Socket.IO for real-time replies
             const token = getAccessToken();
             if (token) {
-                const socketUrl = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api').replace('/api', '');
-                const socket = io(socketUrl, {
-                    auth: { token },
-                    transports: ['websocket', 'polling'],
-                    reconnectionAttempts: 5,
-                });
+                const socket = createSocket(token);
 
                 socket.on('support_reply', () => {
                     if (isOpen) {
