@@ -279,6 +279,18 @@ pnpm --filter server test -- --run
 
 ## Version History
 
+### v1.10.2
+- **Bug Fixes & Stability Improvements**:
+    - Fixed UserType enum mismatch error by updating all references from `PRE_PLENIPOTENTIARY_EXAMS` to `PRE_PLENIPOTENTIARY_RANK_EXAMS` across frontend, backend, and mobile app.
+    - Added missing `eventName` column to `AttendanceRecord` table to resolve database schema errors.
+    - Fixed hydration error in ThemeToggle component by deferring localStorage reads until after mount.
+    - Fixed WebSocket URL configuration to use production URL instead of localhost for consistent real-time connections.
+    - Regenerated Prisma Client to ensure database schema synchronization.
+- **Bulk Attendance Candidate Import**:
+    - Created backend endpoint `/admin/bulk-attendance-candidates` for importing attendance candidates from Excel without password creation.
+    - Created frontend modal `AttendanceBulkImportModal` with template download and result display.
+    - Integrated bulk import functionality into candidate registration page.
+
 ### v1.10.1
 - **QR Code Attendance System Enhancements**:
     - **Camera-based QR Scanning**: Integrated camera-based QR code scanning directly into the Admin QR Scanner for seamless check-ins.

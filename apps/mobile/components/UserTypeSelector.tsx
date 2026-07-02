@@ -5,7 +5,7 @@ import { CheckCircle, Circle } from 'lucide-react-native';
 export type UserType = 
     | 'AMBASSADOR_RANK_EXAMS'
     | 'EXTRAORDINARY_RANK_EXAMS' 
-    | 'PRE_PLENIPOTENTIARY_EXAMS'
+    | 'PRE_PLENIPOTENTIARY_RANK_EXAMS'
     | 'PLENIPOTENTIARY_RANK_EXAMS';
 
 interface UserTypeSelectorProps {
@@ -24,7 +24,7 @@ const userTypeOptions = [
         label: 'Extraordinary Rank Exams'
     },
     {
-        value: 'PRE_PLENIPOTENTIARY_EXAMS' as UserType,
+        value: 'PRE_PLENIPOTENTIARY_RANK_EXAMS' as UserType,
         label: 'Pre-Plenipotentiary Exams'
     },
     {

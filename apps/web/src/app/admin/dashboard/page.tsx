@@ -8,7 +8,8 @@ import NotificationBell from '../../../components/NotificationBell';
 import UserTypeSelector, { UserType } from '../../../components/UserTypeSelector';
 import { useToast } from '../../../contexts/ToastContext';
 import ConfirmModal from '../../../components/ConfirmModal';
-import { io, Socket } from 'socket.io-client';
+import { Socket } from 'socket.io-client';
+import { createSocket } from '../../../lib/socket';
 import { apiFetch } from '../../../lib/api';
 import { getAccessToken, getUser } from '../../../lib/auth';
 
@@ -188,11 +189,7 @@ export default function AdminDashboard() {
         fetchMaintenanceStatus();
 
         if (token) {
-            const socketUrl = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api').replace('/api', '');
-            const socket = io(socketUrl, {
-                auth: { token },
-                transports: ['websocket', 'polling'],
-            });
+            const socket = createSocket(token);
 
             socket.on('support_message', () => {
                 fetchSupportUnreadCount();

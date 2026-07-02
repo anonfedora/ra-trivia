@@ -27,6 +27,8 @@ model User {
   passwordResetTokenHash          String?
   uploadedById                    String?
   adminCheckIns                   AttendanceRecord[] @relation("AdminCheckIns")
+  attendanceRecords               AttendanceRecord[]
+  registeredAttendees             Attendee[]
   auditEntries                    AuditLog[]
   candidateQrs                    CandidateQR[]
   notifications                   Notification[]
@@ -37,8 +39,6 @@ model User {
   uploadedBy                      User?              @relation("CandidateUploader", fields: [uploadedById], references: [id])
   uploadedCandidates              User[]             @relation("CandidateUploader")
   auditLogs                       UserTypeAuditLog[]
-  registeredAttendees             Attendee[]
-  attendanceRecords               AttendanceRecord[]
 
   @@index([uploadedById])
   @@index([role])
@@ -200,18 +200,18 @@ model BlacklistedToken {
 }
 
 model Attendee {
-  id                String             @id @default(uuid())
+  id                String              @id @default(uuid())
   fullName          String
   church            String?
   email             String?
   phoneNumber       String?
-  identityCode      String             @unique
+  identityCode      String              @unique
   registeredById    String
-  registeredAt      DateTime           @default(now())
-  updatedAt         DateTime           @updatedAt
-  registeredBy      User               @relation(fields: [registeredById], references: [id])
-  identityQr        AttendeeIdentityQR?
+  registeredAt      DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
   attendanceRecords AttendanceRecord[]
+  registeredBy      User                @relation(fields: [registeredById], references: [id])
+  identityQr        AttendeeIdentityQR?
 
   @@index([registeredById])
   @@index([church])
@@ -225,8 +225,8 @@ model AttendeeIdentityQR {
   isActive          Boolean            @default(true)
   createdAt         DateTime           @default(now())
   updatedAt         DateTime           @updatedAt
-  attendee          Attendee           @relation(fields: [attendeeId], references: [id])
   attendanceRecords AttendanceRecord[]
+  attendee          Attendee           @relation(fields: [attendeeId], references: [id])
 
   @@index([attendeeId])
   @@index([identityCode])
@@ -294,7 +294,7 @@ model PublicQuestionAttempt {
   isCorrect        Boolean?
   createdAt        DateTime       @default(now())
   publicAttempt    PublicAttempt  @relation(fields: [publicAttemptId], references: [id])
-  publicQuestion  PublicQuestion @relation(fields: [publicQuestionId], references: [id])
+  publicQuestion   PublicQuestion @relation(fields: [publicQuestionId], references: [id])
 
   @@index([publicAttemptId])
   @@index([publicQuestionId])
@@ -318,24 +318,24 @@ model CandidateQR {
 }
 
 model AttendanceRecord {
-  id               String       @id @default(uuid())
+  id               String              @id @default(uuid())
   userId           String?
-  attendeeId        String?
   quizId           String?
   eventName        String?
-  checkedInAt      DateTime     @default(now())
+  checkedInAt      DateTime            @default(now())
   checkedInBy      String
-  method           String       @default("QR_SCAN")
+  method           String              @default("QR_SCAN")
   candidateQRId    String?
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+  attendeeId       String?
   attendeeQRId     String?
-  createdAt        DateTime     @default(now())
-  updatedAt        DateTime     @updatedAt
-  candidateQR      CandidateQR? @relation(fields: [candidateQRId], references: [id])
+  attendee         Attendee?           @relation(fields: [attendeeId], references: [id])
   attendeeQR       AttendeeIdentityQR? @relation(fields: [attendeeQRId], references: [id])
-  checkedInByAdmin User         @relation("AdminCheckIns", fields: [checkedInBy], references: [id])
-  quiz             Quiz?        @relation(fields: [quizId], references: [id])
-  user             User?         @relation(fields: [userId], references: [id])
-  attendee         Attendee?     @relation(fields: [attendeeId], references: [id])
+  candidateQR      CandidateQR?        @relation(fields: [candidateQRId], references: [id])
+  checkedInByAdmin User                @relation("AdminCheckIns", fields: [checkedInBy], references: [id])
+  quiz             Quiz?               @relation(fields: [quizId], references: [id])
+  user             User?               @relation(fields: [userId], references: [id])
 
   @@index([userId])
   @@index([attendeeId])

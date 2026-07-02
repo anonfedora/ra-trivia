@@ -452,6 +452,128 @@ router.post(
 
 /**
  * @openapi
+ * /admin/bulk-attendance-candidates:
+ *   post:
+ *     tags: [Admin Candidates]
+ *     summary: Bulk import attendance candidates from Excel file (no password)
+ *     security:
+ *       - BearerAuth: []
+ *     requestBody:
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               file:
+ *                 type: string
+ *                 format: binary
+ */
+router.post(
+  "/bulk-attendance-candidates",
+  authenticate,
+  authorizeAdmin,
+  upload.single("file"),
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const adminId = req.user?.userId;
+
+      if (!req.file) {
+        return res.status(400).json({ message: "No file uploaded" });
+      }
+
+      const workbook = xlsx.read(req.file.buffer, { type: "buffer" });
+      const sheetName = workbook.SheetNames[0];
+      const data = xlsx.utils.sheet_to_json(workbook.Sheets[sheetName]);
+
+      const imported: any[] = [];
+      const errors: any[] = [];
+
+      for (let i = 0; i < data.length; i++) {
+        const row = data[i] as any;
+        const name = row.Name || row.name || row["Full Name"] || row["Full Name"];
+        const email = row.Email || row.email || row["Email Address"] || null;
+        const church = row.Church || row.church || null;
+        const phoneNumber = row.PhoneNumber || row.phoneNumber || row["Phone Number"] || row["Phone Number"] || null;
+
+        if (!name) {
+          errors.push({
+            row: i + 2,
+            message: "Name is required",
+          });
+          continue;
+        }
+
+        try {
+          // Generate unique identity code
+          const identityCode = QRService.generateAttendanceCode();
+
+          // Create new attendee
+          const attendee = await prisma.attendee.create({
+            data: {
+              fullName: name,
+              email: email || null,
+              church: church || null,
+              phoneNumber: phoneNumber || null,
+              identityCode,
+              registeredById: adminId!,
+            },
+          });
+
+          // Create permanent identity QR
+          const expiresAt = new Date();
+          expiresAt.setFullYear(expiresAt.getFullYear() + 100);
+          const identityQR = await prisma.attendeeIdentityQR.create({
+            data: {
+              attendeeId: attendee.id,
+              identityCode,
+              expiresAt,
+              isActive: true,
+            },
+          });
+
+          const qrCode = await QRService.generateCandidateQRCode(identityCode, attendee.fullName);
+
+          imported.push({
+            id: attendee.id,
+            fullName: attendee.fullName,
+            email: attendee.email,
+            church: attendee.church,
+            phoneNumber: attendee.phoneNumber,
+            identityCode,
+            qrCode,
+          });
+        } catch (e) {
+          errors.push({
+            row: i + 2,
+            name,
+            message: "Failed to create attendee",
+          });
+        }
+      }
+
+      res.json({
+        message: `Import completed: ${imported.length} imported, ${errors.length} errors`,
+        success: imported.length,
+        failed: errors.length,
+        imported,
+        errors,
+      });
+
+      await auditService.logFromRequest(
+        req,
+        "ATTENDANCE_CANDIDATES_BULK_IMPORTED",
+        adminId,
+        { importedCount: imported.length, errorCount: errors.length }
+      );
+    } catch (error) {
+      console.error("Failed to import attendance candidates:", error);
+      res.status(500).json({ message: "Failed to import attendance candidates" });
+    }
+  }
+);
+
+/**
+ * @openapi
  * /admin/reports/attendance:
  *   get:
  *     tags: [Admin Reports]

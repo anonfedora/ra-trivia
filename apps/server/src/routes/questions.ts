@@ -137,7 +137,7 @@ router.get('/templates/:format', authenticate, authorizeAdmin, async (req, res) 
  *                 enum: [MULTIPLE_CHOICE, FILL_IN_THE_GAP]
  *               questionType:
  *                 type: string
- *                 enum: [AMBASSADOR_RANK_EXAMS, EXTRAORDINARY_RANK_EXAMS, PRE_PLENIPOTENTIARY_EXAMS, PLENIPOTENTIARY_RANK_EXAMS]
+ *                 enum: [AMBASSADOR_RANK_EXAMS, EXTRAORDINARY_RANK_EXAMS, PRE_PLENIPOTENTIARY_RANK_EXAMS, PLENIPOTENTIARY_RANK_EXAMS]
  *     responses:
  *       201:
  *         description: Questions imported

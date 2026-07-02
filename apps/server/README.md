@@ -147,6 +147,7 @@ pnpm --filter server test:coverage
 | GET | `/export/pdf` | Admin | PDF report (Puppeteer) |
 | GET | `/export/quiz-preview/:quizId?format=pdf` | Admin | Quiz preview PDF export with questions & answers |
 | POST | `/bulk-candidates` | Admin | Bulk register candidates via Excel upload |
+| POST | `/bulk-attendance-candidates` | Admin | Bulk import attendance candidates via Excel upload (no password) |
 | POST | `/announcement` | Admin | Send broadcast message to all/rank candidates |
 | GET | `/candidates` | Admin | List candidates (SUPER_ADMIN: all, ADMIN: uploaded only) |
 | GET | `/my-exam-takers` | Admin | List candidates who attempted admin's quizzes |

@@ -132,6 +132,13 @@ Admins can now register multiple candidates at once via Excel/CSV.
 - **Auto-Verification**: Candidates receive a welcome email with their password and a 6-digit verification code.
 - **Status Reporting**: Real-time summary of successful vs. failed registrations with error details.
 
+### Bulk Attendance Candidate Import
+Admins can now import attendance candidates without password creation via Excel upload.
+- **Template Download**: Get a pre-formatted Excel template with required headers (Full Name, Email Address, Church, Phone Number).
+- **No Password Required**: Attendance candidates are created without passwords, only requiring identity codes and QR codes.
+- **Auto-Generation**: Unique identity codes and QR codes are automatically generated for each imported candidate.
+- **Status Reporting**: Real-time summary of successful vs. failed imports with error details.
+
 ### Quiz Preview PDF Export
 - **Professional PDF Generation**: Export complete quiz with questions and answers as professionally formatted PDF from admin preview page.
 - **Clean Layout**: Optimized for printing with proper headers, question numbering, and answer highlighting.

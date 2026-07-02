@@ -42,7 +42,7 @@ const registerValidation = [
                 if (!value) {
                     throw new Error('User type is required for candidates');
                 }
-                if (!['AMBASSADOR_RANK_EXAMS', 'EXTRAORDINARY_RANK_EXAMS', 'PRE_PLENIPOTENTIARY_EXAMS', 'PLENIPOTENTIARY_RANK_EXAMS'].includes(value)) {
+                if (!['AMBASSADOR_RANK_EXAMS', 'EXTRAORDINARY_RANK_EXAMS', 'PRE_PLENIPOTENTIARY_RANK_EXAMS', 'PLENIPOTENTIARY_RANK_EXAMS'].includes(value)) {
                     throw new Error('User type must be one of: Ambassador Rank Exams, Extraordinary Rank Exams, Pre-Plenipotentiary Exams, or Plenipotentiary Rank Exams');
                 }
             }
@@ -93,7 +93,7 @@ const loginValidation = [
  *                 default: CANDIDATE
  *               userType:
  *                 type: string
- *                 enum: [AMBASSADOR_RANK_EXAMS, EXTRAORDINARY_RANK_EXAMS, PRE_PLENIPOTENTIARY_EXAMS, PLENIPOTENTIARY_RANK_EXAMS]
+ *                 enum: [AMBASSADOR_RANK_EXAMS, EXTRAORDINARY_RANK_EXAMS, PRE_PLENIPOTENTIARY_RANK_EXAMS, PLENIPOTENTIARY_RANK_EXAMS]
  *     responses:
  *       201:
  *         description: Registration successful
@@ -769,7 +769,7 @@ router.get('/profile', authenticate, async (req: AuthRequest, res: Response) => 
  *                 type: string
  *               userType:
  *                 type: string
- *                 enum: [AMBASSADOR_RANK_EXAMS, EXTRAORDINARY_RANK_EXAMS, PRE_PLENIPOTENTIARY_EXAMS, PLENIPOTENTIARY_RANK_EXAMS]
+ *                 enum: [AMBASSADOR_RANK_EXAMS, EXTRAORDINARY_RANK_EXAMS, PRE_PLENIPOTENTIARY_RANK_EXAMS, PLENIPOTENTIARY_RANK_EXAMS]
  *     responses:
  *       200:
  *         description: Profile updated
@@ -794,7 +794,7 @@ router.put('/profile', authenticate, [
         .withMessage('Association name must not exceed 200 characters'),
     body('userType')
         .optional()
-        .isIn(['AMBASSADOR_RANK_EXAMS', 'EXTRAORDINARY_RANK_EXAMS', 'PRE_PLENIPOTENTIARY_EXAMS', 'PLENIPOTENTIARY_RANK_EXAMS'])
+        .isIn(['AMBASSADOR_RANK_EXAMS', 'EXTRAORDINARY_RANK_EXAMS', 'PRE_PLENIPOTENTIARY_RANK_EXAMS', 'PLENIPOTENTIARY_RANK_EXAMS'])
         .withMessage('User type must be one of: Ambassador Rank Exams, Extraordinary Rank Exams, Pre-Plenipotentiary Exams, or Plenipotentiary Rank Exams')
 ], handleValidationErrors, async (req: AuthRequest, res: Response) => {
     try {

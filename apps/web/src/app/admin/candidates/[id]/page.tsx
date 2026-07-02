@@ -35,7 +35,7 @@ interface Candidate {
 const USER_TYPE_LABELS: Record<string, string> = {
     AMBASSADOR_RANK_EXAMS: 'Ambassador Rank',
     EXTRAORDINARY_RANK_EXAMS: 'Extraordinary Rank',
-    PRE_PLENIPOTENTIARY_EXAMS: 'Pre-Plenipotentiary',
+    PRE_PLENIPOTENTIARY_RANK_EXAMS: 'Pre-Plenipotentiary',
     PLENIPOTENTIARY_RANK_EXAMS: 'Plenipotentiary Rank',
 };
 

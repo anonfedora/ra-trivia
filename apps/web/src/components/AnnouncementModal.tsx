@@ -83,7 +83,7 @@ export default function AnnouncementModal({ isOpen, onClose }: AnnouncementModal
                                     { id: 'ALL', label: 'All Candidates' },
                                     { id: 'AMBASSADOR_RANK_EXAMS', label: 'Ambassadors' },
                                     { id: 'EXTRAORDINARY_RANK_EXAMS', label: 'Extraordinary' },
-                                    { id: 'PRE_PLENIPOTENTIARY_EXAMS', label: 'Pre-Pleni' },
+                                    { id: 'PRE_PLENIPOTENTIARY_RANK_EXAMS', label: 'Pre-Pleni' },
                                     { id: 'PLENIPOTENTIARY_RANK_EXAMS', label: 'Plenipotentiary' }
                                 ].map((type) => (
                                     <button
