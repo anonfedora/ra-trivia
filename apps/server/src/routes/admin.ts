@@ -88,10 +88,11 @@ router.post(
       await auditService.logFromRequest(
         req,
         "CANDIDATE_REGISTERED_WITH_QR",
-        attendee.id,
+        adminId,
         {
           name: attendee.fullName,
           identityCode,
+          attendeeId: attendee.id,
         }
       );
     } catch (error) {
