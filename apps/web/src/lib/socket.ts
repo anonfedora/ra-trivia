@@ -1,15 +1,13 @@
 import { io, Socket } from 'socket.io-client';
 
-// Use the same URL logic as api.ts for consistency
+// In production, WebSocket needs to connect directly to the backend (Render)
+// HTTP API calls use Next.js rewrites, but WebSocket doesn't support rewrites
 const SOCKET_URL = process.env.NODE_ENV === 'production'
-  ? '/api'
-  : (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api');
-
-// Remove /api suffix for socket connection
-const BASE_SOCKET_URL = SOCKET_URL.replace('/api', '');
+  ? (process.env.NEXT_PUBLIC_API_URL?.replace('/api', '') || 'https://ra-trivia.onrender.com')
+  : (process.env.NEXT_PUBLIC_API_URL?.replace('/api', '') || 'http://localhost:4000');
 
 export function createSocket(token?: string): Socket {
-  return io(BASE_SOCKET_URL, {
+  return io(SOCKET_URL, {
     auth: { token },
     transports: ['websocket', 'polling'],
     reconnectionAttempts: 5,

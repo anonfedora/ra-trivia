@@ -1,9 +1,6 @@
-import { getAccessToken } from "../auth";
+import { apiFetch } from "../api";
 
-// Use the same URL logic as api.ts for consistency
-const API_BASE = process.env.NODE_ENV === 'production'
-  ? '/api'
-  : (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api');
+// Use apiFetch for consistent auth handling and token refresh
 
 export interface QRGenerateRequest {
   quizId: string;
@@ -191,18 +188,9 @@ export interface ManualAttendanceListResponse {
 }
 
 class AttendanceAPI {
-  private getAuthHeaders() {
-    const token = getAccessToken();
-    return {
-      "Content-Type": "application/json",
-      Authorization: token ? `Bearer ${token}` : "",
-    };
-  }
-
   async generateQRCode(data: QRGenerateRequest): Promise<QRGenerateResponse> {
-    const response = await fetch(`${API_BASE}/attendance/qr/generate`, {
+    const response = await apiFetch('/attendance/qr/generate', {
       method: "POST",
-      headers: this.getAuthHeaders(),
       body: JSON.stringify(data),
     });
 
@@ -215,9 +203,7 @@ class AttendanceAPI {
   }
 
   async getQRStatus(quizId: string): Promise<QRStatusResponse> {
-    const response = await fetch(`${API_BASE}/attendance/qr/status/${quizId}`, {
-      headers: this.getAuthHeaders(),
-    });
+    const response = await apiFetch(`/attendance/qr/status/${quizId}`);
 
     if (!response.ok) {
       const error = await response.json();
@@ -228,9 +214,8 @@ class AttendanceAPI {
   }
 
   async disableQRAttendance(quizId: string): Promise<{ message: string; enableQRAttendance: boolean }> {
-    const response = await fetch(`${API_BASE}/attendance/qr/disable`, {
+    const response = await apiFetch('/attendance/qr/disable', {
       method: "POST",
-      headers: this.getAuthHeaders(),
       body: JSON.stringify({ quizId }),
     });
 
@@ -243,9 +228,8 @@ class AttendanceAPI {
   }
 
   async verifyAttendance(data: AttendanceVerifyRequest): Promise<AttendanceVerifyResponse> {
-    const response = await fetch(`${API_BASE}/attendance/verify`, {
+    const response = await apiFetch('/attendance/verify', {
       method: "POST",
-      headers: this.getAuthHeaders(),
       body: JSON.stringify(data),
     });
 
@@ -258,7 +242,7 @@ class AttendanceAPI {
   }
 
   async getPublicAttendanceInfo(attendanceCode: string): Promise<PublicAttendanceInfo> {
-    const response = await fetch(`${API_BASE}/attendance/public/${attendanceCode}`);
+    const response = await apiFetch(`/attendance/public/${attendanceCode}`);
 
     if (!response.ok) {
       const error = await response.json();
@@ -269,9 +253,7 @@ class AttendanceAPI {
   }
 
   async generateCandidateQR(): Promise<CandidateQRResponse> {
-    const response = await fetch(`${API_BASE}/attendance/qr/candidate`, {
-      headers: this.getAuthHeaders(),
-    });
+    const response = await apiFetch('/attendance/qr/candidate');
 
     if (!response.ok) {
       const error = await response.json();
@@ -282,9 +264,8 @@ class AttendanceAPI {
   }
 
   async scanCandidateQR(data: AdminScanRequest): Promise<AdminScanResponse> {
-    const response = await fetch(`${API_BASE}/attendance/qr/scan`, {
+    const response = await apiFetch('/attendance/qr/scan', {
       method: "POST",
-      headers: this.getAuthHeaders(),
       body: JSON.stringify(data),
     });
 
@@ -297,9 +278,7 @@ class AttendanceAPI {
   }
 
   async getAttendanceDashboard(quizId: string): Promise<AttendanceDashboardResponse> {
-    const response = await fetch(`${API_BASE}/attendance/quiz/${quizId}/candidates`, {
-      headers: this.getAuthHeaders(),
-    });
+    const response = await apiFetch(`/attendance/quiz/${quizId}/candidates`);
 
     if (!response.ok) {
       const error = await response.json();
@@ -310,9 +289,8 @@ class AttendanceAPI {
   }
 
   async createManualAttendance(data: ManualAttendanceRequest): Promise<ManualAttendanceResponse> {
-    const response = await fetch(`${API_BASE}/attendance/manual`, {
+    const response = await apiFetch('/attendance/manual', {
       method: "POST",
-      headers: this.getAuthHeaders(),
       body: JSON.stringify(data),
     });
 
@@ -340,10 +318,8 @@ class AttendanceAPI {
     if (params?.church) searchParams.set("church", params.church);
     if (params?.eventName) searchParams.set("eventName", params.eventName);
 
-    const url = `${API_BASE}/attendance/manual${searchParams.toString() ? `?${searchParams.toString()}` : ""}`;
-    const response = await fetch(url, {
-      headers: this.getAuthHeaders(),
-    });
+    const url = `/attendance/manual${searchParams.toString() ? `?${searchParams.toString()}` : ""}`;
+    const response = await apiFetch(url);
 
     if (!response.ok) {
       const error = await response.json();
@@ -354,9 +330,8 @@ class AttendanceAPI {
   }
 
   async deleteManualAttendance(id: string): Promise<{ message: string }> {
-    const response = await fetch(`${API_BASE}/attendance/manual/${id}`, {
+    const response = await apiFetch(`/attendance/manual/${id}`, {
       method: "DELETE",
-      headers: this.getAuthHeaders(),
     });
 
     if (!response.ok) {
@@ -368,9 +343,8 @@ class AttendanceAPI {
   }
 
   async registerCandidate(data: CandidateRegisterRequest): Promise<CandidateRegisterResponse> {
-    const response = await fetch(`${API_BASE}/admin/register-candidate`, {
+    const response = await apiFetch('/admin/register-candidate', {
       method: "POST",
-      headers: this.getAuthHeaders(),
       body: JSON.stringify(data),
     });
 
@@ -383,9 +357,7 @@ class AttendanceAPI {
   }
 
   async getCandidateIdentities(): Promise<CandidateIdentity[]> {
-    const response = await fetch(`${API_BASE}/admin/candidates/identities`, {
-      headers: this.getAuthHeaders(),
-    });
+    const response = await apiFetch('/admin/candidates/identities');
 
     if (!response.ok) {
       const error = await response.json();
@@ -407,12 +379,10 @@ class AttendanceAPI {
     if (params?.church) searchParams.set("church", params.church);
     if (params?.eventName) searchParams.set("eventName", params.eventName);
 
-    const url = `${API_BASE}/attendance/records${
+    const url = `/attendance/records${
       searchParams.toString() ? `?${searchParams.toString()}` : ""
     }`;
-    const response = await fetch(url, {
-      headers: this.getAuthHeaders(),
-    });
+    const response = await apiFetch(url);
 
     if (!response.ok) {
       const error = await response.json();
