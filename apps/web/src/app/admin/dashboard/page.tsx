@@ -99,10 +99,14 @@ export default function AdminDashboard() {
             const res = await apiFetch('support/admin/unread-count');
             if (res.ok) {
                 const data = await res.json();
-                setSupportUnreadCount(data.unreadCount);
+                setSupportUnreadCount(data.count || data.unreadCount || 0);
+            } else {
+                // Silently fail if endpoint doesn't exist
+                setSupportUnreadCount(0);
             }
         } catch (err) {
             console.error('Failed to fetch support unread count', err);
+            setSupportUnreadCount(0);
         }
     }, []);
 
@@ -165,10 +169,10 @@ export default function AdminDashboard() {
             }
 
             // Fetch Recent Results
-            const resultRes = await apiFetch('admin/results');
+            const resultRes = await apiFetch('quiz/my-sessions');
             if (resultRes.ok) {
-                const data: PagedResponse<Attempt> = await resultRes.json();
-                setRecentAttempts(data.items.slice(0, 5));
+                const data = await resultRes.json();
+                setRecentAttempts(data.slice(0, 5));
             }
         } catch (err) {
             console.error('Failed to fetch data', err);
@@ -542,6 +546,10 @@ export default function AdminDashboard() {
                             className="flex items-center gap-2 bg-slate-600 dark:bg-slate-700 text-white px-4 py-2.5 rounded-2xl font-bold shadow-lg hover:bg-slate-700 dark:hover:bg-slate-800 transition-all text-sm">
                             <Users size={16} />
                             {user?.role === 'SUPER_ADMIN' ? 'Candidates' : 'Exam Takers'}
+                        </Link>
+                        <Link href="/admin/attendees" className="flex items-center gap-2 bg-amber-500 hover:bg-amber-600 text-white px-4 py-2.5 rounded-2xl font-bold shadow-lg hover:shadow-xl transition-all text-sm">
+                            <CheckCircle size={16} />
+                            Attendees
                         </Link>
                         {user?.role === 'SUPER_ADMIN' && (
                             <Link href="/admin/audit-logs" className="flex items-center gap-2 bg-slate-600 dark:bg-slate-700 text-white px-4 py-2.5 rounded-2xl font-bold shadow-lg hover:bg-slate-700 dark:hover:bg-slate-800 transition-all text-sm">

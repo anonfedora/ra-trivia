@@ -209,12 +209,21 @@ model Attendee {
   registeredById    String
   registeredAt      DateTime            @default(now())
   updatedAt         DateTime            @updatedAt
+  status            AttendeeStatus      @default(ACTIVE)
+  notes             String?
   attendanceRecords AttendanceRecord[]
   registeredBy      User                @relation(fields: [registeredById], references: [id])
   identityQr        AttendeeIdentityQR?
 
   @@index([registeredById])
   @@index([church])
+  @@index([status])
+}
+
+enum AttendeeStatus {
+  ACTIVE
+  MARKED
+  INACTIVE
 }
 
 model AttendeeIdentityQR {

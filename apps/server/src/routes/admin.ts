@@ -184,6 +184,272 @@ router.get(
 
 /**
  * @openapi
+ * /admin/attendees:
+ *   get:
+ *     tags: [Admin]
+ *     summary: Get all attendees with pagination and filtering
+ *     security:
+ *       - BearerAuth: []
+ */
+router.get(
+  "/attendees",
+  authenticate,
+  authorizeAdmin,
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const adminId = req.user?.userId;
+      const adminRole = req.user?.role;
+      const page = parseInt(req.query.page as string) || 1;
+      const pageSize = parseInt(req.query.pageSize as string) || 25;
+      const search = req.query.search as string;
+      const status = req.query.status as string;
+      const church = req.query.church as string;
+
+      const where: any = {};
+      
+      // Filter by admin if not SUPER_ADMIN
+      if (adminRole === "ADMIN") {
+        where.registeredById = adminId;
+      }
+
+      // Search filter
+      if (search) {
+        where.OR = [
+          { fullName: { contains: search, mode: "insensitive" } },
+          { email: { contains: search, mode: "insensitive" } },
+          { phoneNumber: { contains: search, mode: "insensitive" } },
+        ];
+      }
+
+      // Status filter
+      if (status) {
+        where.status = status;
+      }
+
+      // Church filter
+      if (church) {
+        where.church = church;
+      }
+
+      const [attendees, total] = await Promise.all([
+        prisma.attendee.findMany({
+          where,
+          include: {
+            identityQr: true,
+            registeredBy: {
+              select: { id: true, name: true, email: true },
+            },
+          },
+          orderBy: { registeredAt: "desc" },
+          skip: (page - 1) * pageSize,
+          take: pageSize,
+        }),
+        prisma.attendee.count({ where }),
+      ]);
+
+      res.json({
+        items: attendees,
+        total,
+        page,
+        pageSize,
+        totalPages: Math.ceil(total / pageSize),
+      });
+    } catch (error) {
+      console.error("Failed to fetch attendees:", error);
+      res.status(500).json({ message: "Failed to fetch attendees" });
+    }
+  }
+);
+
+/**
+ * @openapi
+ * /admin/attendees/:id:
+ *   delete:
+ *     tags: [Admin]
+ *     summary: Delete an attendee
+ *     security:
+ *       - BearerAuth: []
+ */
+router.delete(
+  "/attendees/:id",
+  authenticate,
+  authorizeAdmin,
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const { id } = req.params;
+      const adminId = req.user?.userId;
+      const adminRole = req.user?.role;
+
+      const where: any = { id };
+      
+      // Only allow admins to delete attendees they registered
+      if (adminRole === "ADMIN") {
+        where.registeredById = adminId;
+      }
+
+      // Delete related records first (cascade manually)
+      await prisma.attendanceRecord.deleteMany({
+        where: { attendeeId: id as string }
+      });
+      
+      await prisma.attendeeIdentityQR.deleteMany({
+        where: { attendeeId: id as string }
+      });
+
+      // Delete attendee
+      await prisma.attendee.delete({ where });
+
+      await auditService.logFromRequest(
+        req,
+        "ATTENDEE_DELETED",
+        adminId,
+        { attendeeId: id }
+      );
+
+      res.json({ message: "Attendee deleted successfully" });
+    } catch (error) {
+      console.error("Failed to delete attendee:", error);
+      res.status(500).json({ message: "Failed to delete attendee" });
+    }
+  }
+);
+
+/**
+ * @openapi
+ * /admin/attendees/:id/status:
+ *   patch:
+ *     tags: [Admin]
+ *     summary: Update attendee status
+ *     security:
+ *       - BearerAuth: []
+ */
+router.patch(
+  "/attendees/:id/status",
+  authenticate,
+  authorizeAdmin,
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const { id } = req.params;
+      const { status, notes } = req.body;
+      const adminId = req.user?.userId;
+      const adminRole = req.user?.role;
+
+      const where: any = { id };
+      
+      // Only allow admins to update attendees they registered
+      if (adminRole === "ADMIN") {
+        where.registeredById = adminId;
+      }
+
+      const attendee = await prisma.attendee.update({
+        where,
+        data: {
+          status,
+          ...(notes !== undefined && { notes }),
+        },
+      });
+
+      await auditService.logFromRequest(
+        req,
+        "ATTENDEE_STATUS_UPDATED",
+        adminId,
+        { attendeeId: id, status, notes }
+      );
+
+      res.json({ message: "Attendee status updated successfully", attendee });
+    } catch (error) {
+      console.error("Failed to update attendee status:", error);
+      res.status(500).json({ message: "Failed to update attendee status" });
+    }
+  }
+);
+
+/**
+ * @openapi
+ * /admin/attendees/:id/attendance:
+ *   get:
+ *     tags: [Admin]
+ *     summary: Get attendance history for an attendee
+ *     security:
+ *       - BearerAuth: []
+ */
+router.get(
+  "/attendees/:id/attendance",
+  authenticate,
+  authorizeAdmin,
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const { id } = req.params;
+      const adminId = req.user?.userId;
+      const adminRole = req.user?.role;
+
+      const attendeeId = Array.isArray(id) ? id[0] : id;
+
+      // Verify attendee exists and user has access
+      const attendee = await prisma.attendee.findUnique({
+        where: { id: attendeeId },
+      });
+
+      if (!attendee) {
+        return res.status(404).json({ message: "Attendee not found" });
+      }
+
+      // Only allow admins to view attendees they registered
+      if (adminRole === "ADMIN" && attendee.registeredById !== adminId) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      // Get attendance records
+      const attendanceRecords = await prisma.attendanceRecord.findMany({
+        where: { attendeeId: attendeeId },
+        include: {
+          quiz: {
+            select: {
+              id: true,
+              title: true,
+            },
+          },
+          checkedInByAdmin: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+            },
+          },
+        },
+        orderBy: { checkedInAt: "desc" },
+      });
+
+      res.json({
+        attendee: {
+          id: attendee.id,
+          fullName: attendee.fullName,
+          email: attendee.email,
+          church: attendee.church,
+          phoneNumber: attendee.phoneNumber,
+          identityCode: attendee.identityCode,
+          status: attendee.status,
+          registeredAt: attendee.registeredAt,
+        },
+        attendanceRecords: attendanceRecords.map((record: any) => ({
+          id: record.id,
+          checkedInAt: record.checkedInAt,
+          method: record.method,
+          eventName: record.eventName,
+          quiz: record.quiz,
+          checkedInBy: record.checkedInByAdmin,
+        })),
+        totalAttendance: attendanceRecords.length,
+      });
+    } catch (error) {
+      console.error("Failed to fetch attendee attendance:", error);
+      res.status(500).json({ message: "Failed to fetch attendee attendance" });
+    }
+  }
+);
+
+/**
+ * @openapi
  * /admin/announcement:
  *   post:
  *     tags: [Admin]

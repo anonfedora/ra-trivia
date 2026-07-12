@@ -140,6 +140,38 @@ export interface CandidateIdentity {
   qrCode: string;
 }
 
+export interface Attendee {
+  id: string;
+  fullName: string;
+  email?: string | null;
+  church?: string | null;
+  phoneNumber?: string | null;
+  identityCode: string;
+  status: 'ACTIVE' | 'MARKED' | 'INACTIVE';
+  notes?: string | null;
+  registeredAt: string;
+  updatedAt: string;
+  registeredBy: {
+    id: string;
+    name: string;
+    email: string;
+  };
+  identityQr?: {
+    id: string;
+    identityCode: string;
+    expiresAt: string;
+    isActive: boolean;
+  } | null;
+}
+
+export interface AttendeesResponse {
+  items: Attendee[];
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+}
+
 export interface AttendanceRecord {
   id: string;
   fullName: string;
@@ -387,6 +419,82 @@ class AttendanceAPI {
     if (!response.ok) {
       const error = await response.json();
       throw new Error(error.message || "Failed to fetch attendance records");
+    }
+
+    return response.json();
+  }
+
+  async getAttendees(params?: {
+    page?: number;
+    pageSize?: number;
+    search?: string;
+    status?: string;
+    church?: string;
+  }): Promise<AttendeesResponse> {
+    const searchParams = new URLSearchParams();
+    if (params?.page) searchParams.set("page", String(params.page));
+    if (params?.pageSize) searchParams.set("pageSize", String(params.pageSize));
+    if (params?.search) searchParams.set("search", params.search);
+    if (params?.status) searchParams.set("status", params.status);
+    if (params?.church) searchParams.set("church", params.church);
+
+    const url = `/admin/attendees${
+      searchParams.toString() ? `?${searchParams.toString()}` : ""
+    }`;
+    const response = await apiFetch(url);
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.message || "Failed to fetch attendees");
+    }
+
+    return response.json();
+  }
+
+  async deleteAttendee(id: string): Promise<{ message: string }> {
+    const response = await apiFetch(`/admin/attendees/${id}`, {
+      method: "DELETE",
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.message || "Failed to delete attendee");
+    }
+
+    return response.json();
+  }
+
+  async updateAttendeeStatus(id: string, status: string, notes?: string): Promise<{ message: string; attendee: Attendee }> {
+    const response = await apiFetch(`/admin/attendees/${id}/status`, {
+      method: "PATCH",
+      body: JSON.stringify({ status, notes }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.message || "Failed to update attendee status");
+    }
+
+    return response.json();
+  }
+
+  async getAttendeeAttendance(id: string): Promise<{
+    attendee: Attendee;
+    attendanceRecords: Array<{
+      id: string;
+      checkedInAt: string;
+      method: string;
+      eventName: string | null;
+      quiz: { id: string; title: string } | null;
+      checkedInBy: { id: string; name: string; email: string };
+    }>;
+    totalAttendance: number;
+  }> {
+    const response = await apiFetch(`/admin/attendees/${id}/attendance`);
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.message || "Failed to fetch attendee attendance");
     }
 
     return response.json();
