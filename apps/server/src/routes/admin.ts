@@ -280,30 +280,53 @@ router.delete(
       const adminId = req.user?.userId;
       const adminRole = req.user?.role;
 
-      const where: any = { id };
-      
-      // Only allow admins to delete attendees they registered
-      if (adminRole === "ADMIN") {
-        where.registeredById = adminId;
+      const attendeeId = Array.isArray(id) ? id[0] : id;
+
+      // Check if attendee exists and user has permission
+      const attendee = await prisma.attendee.findUnique({
+        where: { id: attendeeId },
+      });
+
+      if (!attendee) {
+        return res.status(404).json({ message: "Attendee not found" });
       }
 
-      // Delete related records first (cascade manually)
-      await prisma.attendanceRecord.deleteMany({
-        where: { attendeeId: id as string }
-      });
-      
-      await prisma.attendeeIdentityQR.deleteMany({
-        where: { attendeeId: id as string }
+      // Only allow admins to delete attendees they registered
+      if (adminRole === "ADMIN" && attendee.registeredById !== adminId) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      // Get the attendee's identity QR if it exists
+      const identityQR = await prisma.attendeeIdentityQR.findUnique({
+        where: { attendeeId: attendeeId },
       });
 
+      // Delete related records first (cascade manually)
+      // Delete attendance records that reference this attendee
+      await prisma.attendanceRecord.deleteMany({
+        where: { attendeeId: attendeeId }
+      });
+
+      // If there's an identity QR, delete attendance records that reference it
+      if (identityQR) {
+        await prisma.attendanceRecord.deleteMany({
+          where: { attendeeQRId: identityQR.id }
+        });
+
+        // Delete the identity QR
+        await prisma.attendeeIdentityQR.delete({
+          where: { id: identityQR.id }
+        });
+      }
+
       // Delete attendee
-      await prisma.attendee.delete({ where });
+      await prisma.attendee.delete({ where: { id: attendeeId } });
 
       await auditService.logFromRequest(
         req,
         "ATTENDEE_DELETED",
         adminId,
-        { attendeeId: id }
+        { attendeeId: attendeeId }
       );
 
       res.json({ message: "Attendee deleted successfully" });
