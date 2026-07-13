@@ -6,7 +6,6 @@ const nextConfig = {
     ignoreBuildErrors: false,
   },
   trailingSlash: true,
-  output: 'standalone',
   experimental: {
     forceSwcTransforms: true,
   },
