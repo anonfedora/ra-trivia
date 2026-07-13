@@ -8,11 +8,25 @@ export async function runMigrations() {
   try {
     console.log('Checking for pending migrations...');
     
-    // Run prisma migrate deploy
-    const schemaPath = path.join(__dirname, '../../../packages/database/prisma/schema.prisma');
+    // Get the root directory (go up from apps/server to root)
+    const rootDir = path.resolve(process.cwd(), '../..');
+    const schemaPath = process.env.PRISMA_SCHEMA_PATH || 
+      path.resolve(rootDir, 'packages/database/prisma/schema.prisma');
+    
+    // Verify schema file exists
+    const fs = await import('fs');
+    if (!fs.existsSync(schemaPath)) {
+      console.error('Schema file not found at:', schemaPath);
+      return;
+    }
+    
+    console.log('Running migrations with schema:', schemaPath);
+    console.log('Working directory:', rootDir);
+    
+    // Run prisma migrate deploy from root directory
     execSync(`npx prisma migrate deploy --schema=${schemaPath}`, {
       stdio: 'inherit',
-      cwd: path.join(__dirname, '../../..')
+      cwd: rootDir
     });
     
     console.log('Migrations completed successfully');
