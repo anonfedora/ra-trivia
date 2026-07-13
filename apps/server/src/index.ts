@@ -26,17 +26,21 @@ import { initSocketIO } from './services/socketService';
 import { GoogleSheetsService } from './services/googleSheets';
 import swaggerUi from 'swagger-ui-express';
 import { swaggerSpec } from './config/swagger';
+import { ensureDatabaseSchema } from './utils/runMigrations';
 
 // Validate environment variables on startup
 validateEnv();
 
-// Test database connection
+// Test database connection and run migrations
 import { prisma } from 'database';
 
 async function testDatabaseConnection() {
     try {
         await prisma.$connect();
         console.log('✅ Database connected successfully');
+        
+        // Run migrations on startup to ensure schema is up to date
+        await ensureDatabaseSchema();
     } catch (error) {
         console.error('❌ Database connection failed:', error);
         // Don't exit in serverless environments - log and continue
